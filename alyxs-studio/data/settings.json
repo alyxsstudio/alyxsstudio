@@ -1,9 +1,13 @@
 {
   "name": "Alyx's Studio",
-  "tagline": "Writing, research, objects and images by Alyx.",
-  "email": "hello@yourdomain.com",
+  "tagline": "",
+  "announcement": null,
+  "email": "contact@alyxsstudio.com",
   "instagram_handle": "alyxsstudio",
   "instagram_url": "https://www.instagram.com/alyxsstudio/",
+  "social_links": [],
+  "logo_large": "",
+  "logo": "",
   "instagram_tiles": [
     {
       "image": "",
@@ -30,63 +34,22 @@
       "url": ""
     }
   ],
-  "announcement": {
-    "text": "",
-    "url": ""
-  },
   "home_blocks": [
     {
-      "type": "hero",
-      "show_tagline": true
-    },
-    {
-      "type": "index",
-      "title": "Index"
-    },
-    {
-      "type": "shop",
-      "title": "New in the shop",
-      "count": 4
-    },
-    {
-      "type": "instagram",
-      "title": "Instagram"
+      "type": "image",
+      "image": "",
+      "caption": "",
+      "url": "",
+      "size": "wide"
     }
   ],
   "menu": [
-    {
-      "label": "Read",
-      "items": [
-        "writing",
-        "research",
-        "books",
-        "serial",
-        "cv"
-      ]
-    },
-    {
-      "label": "Make",
-      "items": [
-        "objects",
-        "art",
-        "wardrobe"
-      ]
-    },
     {
       "label": "Watch & Listen",
       "items": [
         "video",
         "podcast"
       ]
-    },
-    {
-      "label": "Shop",
-      "items": [
-        "shop",
-        "picks",
-        "instagram"
-      ]
     }
-  ],
-  "social_links": []
+  ]
 }
