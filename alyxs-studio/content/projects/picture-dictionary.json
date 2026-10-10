@@ -2,9 +2,10 @@
   "title": "Picture Dictionary",
   "note": "",
   "kind": "image",
-  "sort": "title",
+  "sort": "date-asc",
   "cover": "",
   "status": "ongoing",
   "download": "private",
-  "date": "2026-10-10"
+  "date": "2026-10-10",
+  "hidden": true
 }
