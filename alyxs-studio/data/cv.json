@@ -1,61 +1,16 @@
 {
-  "title": "CV",
-  "short": "Education, publications, talks.",
-  "intro": "Literary studies. The Portuguese-speaking world, Brazil and Portuguese Asia.",
+  "title": "Intro",
+  "short": "",
+  "intro": "",
   "pdf": "",
   "sections": [
     {
-      "heading": "Research interests",
+      "heading": "Intro",
       "rows": [
         {
           "date": "",
-          "title": "Production of knowledge about the East",
+          "title": "alive",
           "note": "",
-          "url": ""
-        },
-        {
-          "date": "",
-          "title": "Writing East and West in Luso-Brazilian literature and film",
-          "note": "",
-          "url": ""
-        }
-      ]
-    },
-    {
-      "heading": "Publications",
-      "rows": [
-        {
-          "date": "2024",
-          "title": "Palimpsestic Orientalism: Deciphering the Layered Reconstructions of the Portuguese-Macau Film Co-production The Bewitching Braid (1996)",
-          "note": "Portuguese Studies 40.2",
-          "url": "https://www.mhra.org.uk/publications/ps-40-2"
-        }
-      ]
-    },
-    {
-      "heading": "Education",
-      "rows": [
-        {
-          "date": "[Year]",
-          "title": "[Degree], [Program]",
-          "note": "[University]",
-          "url": ""
-        },
-        {
-          "date": "[Year]",
-          "title": "[Degree], [Program]",
-          "note": "[University]",
-          "url": ""
-        }
-      ]
-    },
-    {
-      "heading": "Talks",
-      "rows": [
-        {
-          "date": "[Year]",
-          "title": "[Talk title]",
-          "note": "[Conference, city]",
           "url": ""
         }
       ]
