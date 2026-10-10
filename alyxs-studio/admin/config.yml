@@ -3,7 +3,7 @@
 
 backend:
   name: github
-  repo: GITHUB-USERNAME/alyxsstudio
+  repo: alyxsstudio/alyxsstudio
   branch: main
   commit_messages:
     update: Update {{collection}} “{{slug}}”
