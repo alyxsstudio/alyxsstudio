@@ -75,28 +75,45 @@ function parseAnswer(raw, n) {
   return null;
 }
 
+// POST to the models endpoint. Redirects are followed by hand so the request stays a POST
+// and keeps its sign-in header (fetch would otherwise turn it into a GET without one).
+async function post(payload) {
+  let url = ENDPOINT;
+  for (let hop = 0; hop < 4; hop++) {
+    const res = await fetch(url, {
+      method: "POST", redirect: "manual",
+      headers: {
+        "Content-Type": "application/json", Accept: "application/json",
+        "X-GitHub-Api-Version": "2022-11-28", Authorization: "Bearer " + TOKEN
+      },
+      body: JSON.stringify(payload)
+    }).catch((e) => ({ ok: false, status: 0, url, headers: new Headers(), text: async () => String(e) }));
+    const loc = res.headers.get("location");
+    if (res.status >= 300 && res.status < 400 && loc) { url = new URL(loc, url).toString(); continue; }
+    return res;
+  }
+  return { ok: false, status: 310, url, headers: new Headers(), text: async () => "too many redirects" };
+}
+
 async function ask(batch) {
   const input = {};
   batch.forEach((t, i) => { input[String(i + 1)] = t; });
   for (const model of MODELS) {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
-        body: JSON.stringify({
-          model, temperature: 0.3,
-          response_format: { type: "json_object" },
-          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify(input) }]
-        })
-      }).catch((e) => ({ ok: false, status: 0, text: async () => String(e) }));
+      const res = await post({
+        model, temperature: 0.3,
+        response_format: { type: "json_object" },
+        messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify(input) }]
+      });
       if (res.ok) {
         const body = await res.text();
         let raw = "";
         try { const j = JSON.parse(body); raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ""; } catch {}
         const out = parseAnswer(raw, batch.length);
         if (out) return out;
-        console.warn(`  ${model}: answer did not match, retrying: ${(raw || body).slice(0, 200)}`);
-        status.problems.push(model + ": answer did not match: " + (raw || body).slice(0, 300));
+        const what = `answer did not match (${res.status} ${res.url || ""} ${res.headers.get("content-type") || ""}): ${(raw || body).slice(0, 240)}`;
+        console.warn(`  ${model}: ${what}`);
+        status.problems.push(model + ": " + what);
         continue;
       }
       const body = await res.text();
