@@ -1,5 +1,8 @@
 [build]
   publish = "."
+  # Netlify builds are switched off: the site is moving to GitHub Pages, and each
+  # Netlify deploy uses free-plan credits. "exit 0" tells Netlify to skip every build.
+  ignore = "exit 0"
 
 # Uploaded pictures, audio and PDFs keep their file name, so they can be cached long.
 [[headers]]
