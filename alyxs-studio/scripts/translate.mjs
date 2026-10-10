@@ -64,7 +64,7 @@ async function ask(batch) {
         })
       }).catch((e) => ({ ok: false, status: 0, text: async () => String(e) }));
       if (res.ok) {
-        const j = await res.json();
+        const j = await res.json().catch(() => ({}));
         const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
         const m = raw.match(/\[[\s\S]*\]/);
         try {
@@ -130,4 +130,9 @@ async function main() {
   console.log(`Done. ${requests} request(s).`);
 }
 
-main().catch((e) => { console.error(e); process.exit(0); }); // never block publishing
+console.log("::notice title=Translation::starting");
+main().catch((e) => {
+  console.error(e);
+  if (process.env.GITHUB_ACTIONS) console.log(`::warning title=Translation stopped::${String(e && e.stack || e).replace(/[\r\n%]/g, " ").slice(0, 900)}`);
+  process.exit(0); // never block publishing
+});
