@@ -1,5 +1,5 @@
 {
-  "title": "Writing",
+  "title": "Article",
   "short": "",
   "intro": "Essays and short articles.",
   "items": [
@@ -7,33 +7,33 @@
       "date": "2026-09",
       "title": "The Orient Arrived by Ship",
       "note": "Asian goods in Rio before the novels.",
-      "url": "",
       "image": "",
-      "body": ""
+      "body": "",
+      "url": ""
     },
     {
       "date": "2026-08",
       "title": "A Smiley, Drawn by Hand",
       "note": "Why the studio mark is not an emoji.",
-      "url": "",
       "image": "",
-      "body": "The studio mark is drawn by hand, with a brush pen, on paper.\n\nAn emoji is perfectly round and perfectly yellow. This one is a little squashed, and the line wobbles where the pen slowed down.\n\n## Why it matters\n\nA drawn line keeps a trace of the hand. That is the whole point."
+      "body": "The studio mark is drawn by hand, with a brush pen, on paper.\n\nAn emoji is perfectly round and perfectly yellow. This one is a little squashed, and the line wobbles where the pen slowed down.\n\n## Why it matters\n\nA drawn line keeps a trace of the hand. That is the whole point.",
+      "url": ""
     },
     {
       "date": "2026-06",
       "title": "Notes on a White Bag",
       "note": "Designing something that disappears in the light.",
-      "url": "",
       "image": "",
-      "body": ""
+      "body": "",
+      "url": ""
     },
     {
       "date": "2026-04",
       "title": "Reading Slowly in an Archive",
       "note": "A week with one box of letters.",
-      "url": "",
       "image": "",
-      "body": ""
+      "body": "",
+      "url": ""
     }
   ]
 }
