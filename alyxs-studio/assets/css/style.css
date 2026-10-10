@@ -287,6 +287,47 @@ h1 {
   .buy { flex-wrap: wrap; gap: 4px 10px; }
 }
 
+/* ---------- notice bar, home blocks, preview badge ---------- */
+.notice {
+  margin-inline: calc(var(--gutter) * -1);
+  padding: 9px var(--gutter);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  text-align: center;
+}
+.notice a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.notice .ext { color: inherit; }
+
+.text-block { max-width: 40rem; }
+.text-block.center { margin-inline: auto; text-align: center; }
+.text-title { font-family: var(--head); font-weight: 500; font-size: calc(var(--size-body) * 1.6); line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 14px; text-wrap: balance; }
+
+.image-block figure { margin: 0; display: grid; gap: 10px; }
+.image-block img { width: 100%; height: auto; border-radius: var(--radius); }
+.image-block.wide figure { max-width: 80%; margin-inline: auto; }
+.image-block.narrow figure { max-width: 46%; margin-inline: auto; }
+.image-block figcaption { font-size: 13px; color: var(--mute); }
+.image-link { display: block; }
+
+.preview-badge {
+  position: fixed;
+  left: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.04em;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--sun);
+  color: #111111;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .image-block.wide figure, .image-block.narrow figure { max-width: 100%; }
+}
+
 /* Design setting: labels in normal case */
 .no-caps .nav-label, .no-caps .block-title, .no-caps .menu-btn { text-transform: none; letter-spacing: 0; }
 

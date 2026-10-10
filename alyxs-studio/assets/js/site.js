@@ -19,6 +19,25 @@
   var PAGES = ["home", "notfound"].concat(SECTIONS);
   var D = {};   // loaded data: D.settings, D.design, D.writing …
 
+  /* Live preview inside /admin: the editor loads pages with ?preview=1 and sends unsaved changes. */
+  var PREVIEW = /[?&]preview=1/.test(location.search);
+  var Q = PREVIEW ? location.search : "";   // keep ?preview=1&pid=… when clicking around inside the preview
+  var DRAFTS = "alyx-preview-" + ((location.search.match(/[?&]pid=([\w-]+)/) || [])[1] || "x");
+  function readDrafts() { try { return JSON.parse(sessionStorage.getItem(DRAFTS) || "{}"); } catch (e) { return {}; } }
+  function saveDraft(file, data) {
+    try { var d = readDrafts(); d[file] = data; sessionStorage.setItem(DRAFTS, JSON.stringify(d)); } catch (e) {}
+  }
+
+  function menu() {
+    var m = D.settings && D.settings.menu;
+    if (!m || !m.length) return NAV;
+    return m.map(function (g) {
+      return { group: g.label || "", items: (g.items || []).filter(function (k) {
+        return k === "instagram" || SECTIONS.indexOf(k) > -1;
+      }) };
+    }).filter(function (g) { return g.items.length; });
+  }
+
   /* ---------- helpers ---------- */
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -33,7 +52,7 @@
   function href(key) {
     if (key === "instagram") return D.settings.instagram_url || "#";
     if (HASH_MODE) return key === "home" ? "#" : "#" + key;
-    return key === "home" ? (ROOT || "./") : ROOT + key + "/";
+    return key === "home" ? (ROOT || "./") + Q : ROOT + key + "/" + Q;
   }
   function asset(p) {
     if (!p) return "";
@@ -119,7 +138,7 @@
   /* ---------- shared pieces ---------- */
   function header(current) {
     var s = D.settings;
-    var groups = NAV.map(function (g) {
+    var groups = menu().map(function (g) {
       var links = g.items.map(function (key) {
         var cur = key === current ? ' aria-current="page"' : "";
         var ext = key === "instagram" ? ' target="_blank" rel="noopener"' : "";
@@ -144,6 +163,9 @@
       '<footer class="site-foot">' +
         "<p>© " + new Date().getFullYear() + " " + esc(s.name) + "</p>" +
         (s.instagram_url ? '<p><a href="' + esc(s.instagram_url) + '" target="_blank" rel="noopener">Instagram @' + esc(s.instagram_handle) + "</a></p>" : "") +
+        (s.social_links || []).filter(function (l) { return l && l.label && l.url; }).map(function (l) {
+          return '<p><a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + "</a></p>";
+        }).join("") +
         (s.email ? '<p class="mail">' + esc(s.email) + "</p>" : "") +
       "</footer>"
     );
@@ -237,42 +259,123 @@
   }
   function anchor() { return (location.hash || "").replace("#", ""); }
 
-  /* ---------- pages ---------- */
-  var render = {
-    home: function () {
-      var s = D.settings;
-      var index = NAV.map(function (g) {
+  /* ---------- home page blocks (order and content set in /admin) ---------- */
+  function blockHead(title, moreHref, moreLabel, external) {
+    if (!title && !moreHref) return "";
+    var ext = external ? ' target="_blank" rel="noopener"' : "";
+    return '<div class="block-head"><h2 class="block-title">' + esc(title || "") + "</h2>" +
+      (moreHref ? '<a class="more" href="' + esc(moreHref) + '"' + ext + ">" + moreLabel + "</a>" : "") + "</div>";
+  }
+  var TILE_SECTIONS = { objects: ["4 / 5", 4], art: ["4 / 5", 4], wardrobe: ["3 / 4", 4], books: ["2 / 3", 4],
+                        picks: ["1 / 1", 4], shop: ["4 / 5", 4], video: ["16 / 9", 3] };
+  var BLOCK = {
+    hero: function (b, s) {
+      return '<section class="hero">' +
+        '<img class="hero-logo" src="' + asset(s.logo_large || "assets/img/logo.png") + '" alt="' + esc(s.name) + '">' +
+        (b.show_tagline !== false && s.tagline ? '<p class="hero-line">' + esc(s.tagline) + "</p>" : "") +
+      "</section>";
+    },
+    index: function (b) {
+      var items = menu().map(function (g) {
         return g.items.filter(function (k) { return k !== "instagram"; }).map(function (k) {
           var sec = D[k] || {};
           return '<li><a href="' + esc(href(k)) + '"><span class="ix-name">' + esc(label(k)) +
             '</span><span class="ix-note">' + esc(sec.short || sec.intro || "") + "</span></a></li>";
         }).join("");
       }).join("");
-      var shopItems = (D.shop.items || []).slice(0, num(s.home_shop_count, 4));
+      return '<section class="block">' + blockHead(b.title) + '<ul class="index">' + items + "</ul></section>";
+    },
+    shop: function (b) {
+      return BLOCK.section({ section: "shop", title: b.title, count: b.count });
+    },
+    section: function (b) {
+      var key = b.section;
+      if (!TILE_SECTIONS[key] || !D[key]) return "";
+      var list = (D[key].items || []).slice(0, num(b.count, 4));
+      if (!list.length) return "";
+      if (key === "video") {
+        list = list.map(function (i) {
+          var id = youtubeId(i.url);
+          return { title: i.title, note: i.note, url: i.url, image: i.image || (id ? "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg" : "") };
+        });
+      }
+      var n = Math.min(TILE_SECTIONS[key][1], Math.max(2, list.length));
+      return '<section class="block">' + blockHead(b.title || label(key), href(key), "See all") +
+        tiles(list, key === "video" ? "16 / 9" : shape(key, TILE_SECTIONS[key][0]), n, key === "shop" ? shopAction : null) +
+      "</section>";
+    },
+    latest: function (b) {
+      var key = b.section, p = D[key];
+      if (!p) return "";
+      var list = [];
+      if (key === "writing") list = (p.items || []).map(function (i) {
+        return { date: i.date, title: i.title, note: i.note, url: i.body ? href("writing") + "#" + slug(i.title) : i.url };
+      });
+      if (key === "research") list = (p.items || []).map(function (i) { return { date: i.date, title: i.title, note: i.note, url: i.url }; });
+      if (key === "serial") list = (p.chapters || []).slice().reverse().map(function (c) {
+        return { date: c.date, title: c.title, end: "Chapter " + c.number, url: c.body ? href("serial") + "#chapter-" + c.number : c.url };
+      });
+      if (key === "podcast") list = (p.episodes || []).map(function (e) {
+        return { date: e.date, title: e.title, note: e.length, end: "No. " + e.number, url: href("podcast") };
+      });
+      list = list.slice(0, num(b.count, 3));
+      if (!list.length) return "";
+      return '<section class="block">' + blockHead(b.title || label(key), href(key), "See all") + rows(list) + "</section>";
+    },
+    instagram: function (b, s) {
       var ig = (s.instagram_tiles || []).map(function (t) {
         var u = t.url || s.instagram_url;
         return '<li><a href="' + esc(u) + '" target="_blank" rel="noopener" aria-label="Instagram post">' + pic(t.image, "") + "</a></li>";
       }).join("");
-      return (
-        '<section class="hero">' +
-          '<img class="hero-logo" src="' + asset(s.logo_large || "assets/img/logo.png") + '" alt="' + esc(s.name) + '">' +
-          (s.tagline ? '<p class="hero-line">' + esc(s.tagline) + "</p>" : "") +
-        "</section>" +
-        '<section class="block"><h2 class="block-title">Index</h2><ul class="index">' + index + "</ul></section>" +
-        (shopItems.length ? '<section class="block"><div class="block-head"><h2 class="block-title">New in the shop</h2>' +
-          '<a class="more" href="' + esc(href("shop")) + '">All items</a></div>' +
-          tiles(shopItems, shape("shop", "4 / 5"), Math.min(4, Math.max(2, shopItems.length)), shopAction) + "</section>" : "") +
-        (ig ? '<section class="block"><div class="block-head"><h2 class="block-title">Instagram</h2>' +
-          '<a class="more" href="' + esc(s.instagram_url) + '" target="_blank" rel="noopener">@' + esc(s.instagram_handle) + ' <span class="ext" aria-hidden="true">↗</span></a></div>' +
-          '<ul class="ig">' + ig + "</ul></section>" : "")
-      );
+      if (!ig) return "";
+      return '<section class="block">' +
+        blockHead(b.title, s.instagram_url, "@" + esc(s.instagram_handle) + ' <span class="ext" aria-hidden="true">↗</span>', true) +
+        '<ul class="ig">' + ig + "</ul></section>";
+    },
+    text: function (b) {
+      if (!b.title && !b.body) return "";
+      var align = b.align === "center" ? " center" : "";
+      return '<section class="block text-block' + align + '">' +
+        (b.title ? '<h2 class="text-title">' + esc(b.title) + "</h2>" : "") +
+        (b.body ? '<div class="prose">' + md(b.body) + "</div>" : "") +
+      "</section>";
+    },
+    image: function (b) {
+      if (!b.image) return "";
+      var size = b.size || "wide";
+      var img = '<img src="' + esc(asset(b.image)) + '" alt="' + esc(b.caption || "") + '" loading="lazy">';
+      return '<section class="block image-block ' + esc(size) + '"><figure>' +
+        (b.url ? a(b.url, img, "image-link") : img) +
+        (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "") +
+      "</figure></section>";
+    },
+    spacer: function (b) {
+      var h = { small: 24, medium: 64, large: 128 }[b.size || "medium"] || 64;
+      return '<div class="spacer" style="height:' + h + 'px" aria-hidden="true"></div>';
+    }
+  };
+
+  /* ---------- pages ---------- */
+  var render = {
+    home: function () {
+      var s = D.settings;
+      var blocks = s.home_blocks && s.home_blocks.length ? s.home_blocks : [
+        { type: "hero", show_tagline: true },
+        { type: "index", title: "Index" },
+        { type: "shop", title: "New in the shop", count: num(s.home_shop_count, 4) },
+        { type: "instagram", title: "Instagram" }
+      ];
+      return blocks.map(function (b) {
+        var fn = BLOCK[b && b.type];
+        return fn ? fn(b, s) : "";
+      }).join("");
     },
 
     writing: function () {
       var p = D.writing, items = p.items || [];
       var hit = items.filter(function (i) { return i.body && slug(i.title) === anchor(); })[0];
       if (hit && !HASH_MODE) {
-        return reader({ back: "./", backLabel: p.title, title: hit.title, meta: hit.date, image: hit.image, body: hit.body });
+        return reader({ back: href("writing"), backLabel: p.title, title: hit.title, meta: hit.date, image: hit.image, body: hit.body });
       }
       return pageHead(p.title, p.intro) + rows(items.map(function (i) {
         var url = i.body && !HASH_MODE ? "#" + slug(i.title) : i.url;
@@ -313,7 +416,7 @@
           var readable = function (i) { return ch[i] && ch[i].body; };
           var prev = readable(idx - 1) ? '<a href="#chapter-' + esc(ch[idx - 1].number) + '">← Chapter ' + esc(ch[idx - 1].number) + "</a>" : "<span></span>";
           var next = readable(idx + 1) ? '<a href="#chapter-' + esc(ch[idx + 1].number) + '">Chapter ' + esc(ch[idx + 1].number) + " →</a>" : "<span></span>";
-          return reader({ back: "./", backLabel: p.novel || p.title, kicker: (p.novel || "") + " · Chapter " + c.number,
+          return reader({ back: href("serial"), backLabel: p.novel || p.title, kicker: (p.novel || "") + " · Chapter " + c.number,
                           title: c.title, meta: c.date, body: c.body,
                           pager: '<nav class="pager" aria-label="Chapters">' + prev + next + "</nav>" });
         }
@@ -379,6 +482,7 @@
   };
 
   function needsMarked(page) {
+    if (page === "home") return (D.settings.home_blocks || []).some(function (b) { return b && b.type === "text" && b.body; });
     if (page === "writing") return (D.writing.items || []).some(function (i) { return i.body; });
     if (page === "serial") return (D.serial.chapters || []).some(function (c) { return c.body; });
     return false;
@@ -386,7 +490,14 @@
 
   function draw(page) {
     if (PAGES.indexOf(page) < 0) page = "home";
-    app.innerHTML = header(page) + '<main id="main" class="page page-' + page + '">' + render[page]() + "</main>" + footer();
+    var s = D.settings, bar = "";
+    if (s.announcement && s.announcement.text) {
+      bar = '<div class="notice">' + (s.announcement.url
+        ? a(s.announcement.url, esc(s.announcement.text) + arrow(s.announcement.url), "")
+        : esc(s.announcement.text)) + "</div>";
+    }
+    app.innerHTML = bar + header(page) + '<main id="main" class="page page-' + page + '">' + render[page]() + "</main>" + footer() +
+      (PREVIEW ? '<p class="preview-badge">Preview · not saved yet</p>' : "");
     var name = D.settings.name;
     var reading = app.querySelector(".reader h1");
     document.title = page === "home" ? name
@@ -409,19 +520,41 @@
   }
 
   Promise.all(["settings", "design"].concat(SECTIONS).map(load)).then(function () {
+    if (PREVIEW) {
+      var drafts = readDrafts();
+      Object.keys(drafts).forEach(function (k) { D[k] = drafts[k]; });
+    }
     D.settings = D.settings || {};
     applyDesign(D.design);
     var page = HASH_MODE ? (anchor() || "home") : app.getAttribute("data-page");
+    var current = function () { return HASH_MODE ? (anchor() || "home") : page; };
     var go = function () {
       if (anchor() === "main") return;   // "Skip to content" link, not a page change
-      var p = HASH_MODE ? (anchor() || "home") : page;
-      draw(p);
+      draw(current());
       window.scrollTo(0, 0);
     };
     var start = function () {
       go();
       window.addEventListener("hashchange", go);
     };
+
+    if (PREVIEW) {
+      // Unsaved changes arrive from the editor; redraw in place without jumping to the top.
+      window.addEventListener("message", function (e) {
+        if (e.origin !== location.origin) return;
+        var m = e.data;
+        if (!m || m.type !== "alyx-preview" || !m.file) return;
+        D[m.file] = m.data || {};
+        if (m.file === "settings") D.settings = D.settings || {};
+        saveDraft(m.file, D[m.file]);
+        if (m.file === "design") applyDesign(D.design);
+        var y = window.scrollY;
+        var redraw = function () { draw(current()); window.scrollTo(0, y); };
+        if (needsMarked(current())) loadMarked().then(redraw); else redraw();
+      });
+      try { window.parent.postMessage({ type: "alyx-preview-ready" }, location.origin); } catch (e) {}
+    }
+
     if (!HASH_MODE && needsMarked(page)) loadMarked().then(start); else start();
   });
 })();
