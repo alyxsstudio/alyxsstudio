@@ -106,6 +106,62 @@
       throw e;
     });
   }
+  /* ---------- private drafts in your GitHub account ----------
+     Unfinished writing is copied to a private repository (alyxsstudio/studio-drafts) that only you can see,
+     so a draft started on the laptop opens on the phone. Nothing there is published. */
+  var DREPO = REPO.split("/")[0] + "/studio-drafts";
+  var cloud = { ok: null, ready: null, sha: {}, timers: {} };
+  function cloudReady() {
+    if (cloud.ready) return cloud.ready;
+    cloud.ready = gh("/repos/" + DREPO, { allow404: true }).then(function (r) {
+      if (r && r.private) return true;
+      if (r && !r.private) return false; // never keep drafts somewhere public
+      return gh("/user/repos", { method: "POST", body: { name: DREPO.split("/")[1], private: true, auto_init: true, description: "Private drafts for the website. Not published." } })
+        .then(function () { return new Promise(function (res) { setTimeout(function () { res(true); }, 1500); }); });
+    }).catch(function () { return false; }).then(function (ok) { cloud.ok = ok; return ok; });
+    return cloud.ready;
+  }
+  function draftPath(key) { return "/repos/" + DREPO + "/contents/drafts/" + encodeURIComponent(String(key).replace(/[^\w.-]+/g, "_")) + ".json"; }
+  function cloudGet(key) {
+    if (!token()) return Promise.resolve(null);
+    return cloudReady().then(function (ok) {
+      if (!ok) return null;
+      return gh(draftPath(key), { allow404: true }).then(function (j) {
+        if (!j) { cloud.sha[key] = null; return null; }
+        cloud.sha[key] = j.sha;
+        try { return JSON.parse(textFromB64(j.content)); } catch (e) { return null; }
+      });
+    }).catch(function () { return null; });
+  }
+  function cloudPut(key, data) {
+    if (!token()) return;
+    clearTimeout(cloud.timers[key]);
+    cloud.timers[key] = setTimeout(function () {
+      cloudReady().then(function (ok) {
+        if (!ok) return;
+        var send = function (retry) {
+          return gh(draftPath(key), { method: "PUT", body: { message: "Draft", content: b64FromText(JSON.stringify(data)), sha: cloud.sha[key] || undefined } })
+            .then(function (r) { cloud.sha[key] = r && r.content && r.content.sha; })
+            .catch(function (e) {
+              if (retry || (e.status !== 409 && e.status !== 422)) return;
+              return gh(draftPath(key), { allow404: true }).then(function (j) { cloud.sha[key] = j && j.sha; return send(true); });
+            });
+        };
+        return send(false);
+      });
+    }, 2500);
+  }
+  function cloudDel(key) {
+    clearTimeout(cloud.timers[key]);
+    if (!token() || cloud.ok === false) return;
+    cloudReady().then(function (ok) {
+      if (!ok) return;
+      var go = function (sha) { if (sha) return gh(draftPath(key), { method: "DELETE", body: { message: "Draft done", sha: sha } }).catch(function () {}); };
+      if (cloud.sha[key]) return go(cloud.sha[key]);
+      return gh(draftPath(key), { allow404: true }).then(function (j) { return j && go(j.sha); });
+    }).then(function () { cloud.sha[key] = null; });
+  }
+
   function explain(e) {
     if (e && (e.status === 401 || e.status === 403)) return "Your sign-in has expired. Open /admin, sign in again, then try once more.";
     if (e && e.status === 404) return "The repository wasn't found with this sign-in. Check that /admin works.";
@@ -285,36 +341,48 @@
      Close it, reload, come back tomorrow: it opens where you left off. */
   function autosave(wrap, key) {
     var f = $("form", wrap), k = "alyx-form:" + key;
-    wrap.draftKey = k;
+    wrap.draftKey = k; wrap.cloudKey = key;
     var fields = function () { return Array.prototype.filter.call(f.elements, function (el) { return el.name && el.type !== "file" && el.type !== "button"; }); };
     var read = function () { var o = {}; fields().forEach(function (el) { o[el.name] = el.type === "checkbox" ? el.checked : el.value; }); return o; };
     var write = function (o) { fields().forEach(function (el) { if (!(el.name in o)) return; if (el.type === "checkbox") el.checked = !!o[el.name]; else el.value = o[el.name]; el.dispatchEvent(new Event("input", { bubbles: true })); }); };
-    var original = read(), saved = null;
+    var original = read(), saved = null, shownAt = 0;
     try { saved = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) {}
-    if (saved && saved.v && JSON.stringify(saved.v) !== JSON.stringify(original)) {
-      write(saved.v);
+    var restore = function (d, where) {
+      if (!d || !d.v || JSON.stringify(d.v) === JSON.stringify(original) || d.t <= shownAt) return;
+      shownAt = d.t;
+      write(d.v);
+      var old = $(".ed-restored", wrap); if (old) old.remove();
       var note = document.createElement("p");
       note.className = "ed-restored";
-      note.innerHTML = "Restored what you were writing (" + esc(new Date(saved.t).toLocaleString()) + ") · <button type=\"button\" class=\"linkish\">Start over</button>";
+      note.innerHTML = "Restored your draft" + (where ? " " + where : "") + " (" + esc(new Date(d.t).toLocaleString()) + ") · <button type=\"button\" class=\"linkish\">Start over</button>";
       $(".ed-body", wrap).insertBefore(note, $(".ed-body", wrap).firstChild);
-      $("button", note).addEventListener("click", function () { write(original); try { localStorage.removeItem(k); } catch (e) {} note.remove(); });
-    }
+      $("button", note).addEventListener("click", function () { write(original); try { localStorage.removeItem(k); } catch (e) {} cloudDel(key); note.remove(); shownAt = Infinity; });
+    };
+    restore(saved, "");
+    // a newer draft from another device? (only if nothing has been typed here yet)
+    var opened = JSON.stringify(read());
+    cloudGet(key).then(function (c) {
+      if (!c || !document.body.contains(wrap) || JSON.stringify(read()) !== opened) return;
+      if (!saved || c.t > saved.t) restore(c, "from your other device");
+    });
     var timer;
     var keep = function () {
       clearTimeout(timer);
       timer = setTimeout(function () {
         var v = read();
-        try {
-          if (JSON.stringify(v) === JSON.stringify(original)) localStorage.removeItem(k);
-          else localStorage.setItem(k, JSON.stringify({ v: v, t: Date.now() }));
-        } catch (e) {}
+        var same = JSON.stringify(v) === JSON.stringify(original), d = { v: v, t: Date.now() };
+        try { if (same) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(d)); } catch (e) {}
+        if (same) cloudDel(key); else cloudPut(key, d);
         var st = $(".ed-status", wrap);
-        if (st && !st.textContent.match(/Saving|Couldn/)) st.textContent = "Draft kept on this device";
+        if (st && !st.textContent.match(/Saving|Couldn/)) st.textContent = same ? "" : "Draft saved";
       }, 500);
     };
     f.addEventListener("input", keep); f.addEventListener("change", keep);
   }
-  function dropDraft(wrap) { if (wrap && wrap.draftKey) try { localStorage.removeItem(wrap.draftKey); } catch (e) {} }
+  function dropDraft(wrap) {
+    if (wrap && wrap.draftKey) try { localStorage.removeItem(wrap.draftKey); } catch (e) {}
+    if (wrap && wrap.cloudKey) cloudDel(wrap.cloudKey);
+  }
   function saveFlow(wrap, run) {
     busy(wrap, true, "Saving…");
     return run().then(function () {
@@ -328,11 +396,14 @@
   }
 
   /* ---------- sign in ---------- */
-  function signIn(next) {
+  function signIn(next, ctx, msg) {
+    if (ctx) CTX = ctx;
     var wrap = sheet("Sign in to edit",
-      '<p class="ed-text">Editing here uses the same sign-in as the editor. Open <a href="' + CTX.root + 'admin/" target="_blank">/admin</a> in this browser and sign in there once, then come back and press Continue.</p>' +
+      (msg ? '<p class="ed-restored">' + esc(msg) + "</p>" : "") +
+      '<p class="ed-text">Only you can edit this site. Editing uses the same sign-in as the editor: open <a href="' + CTX.root + 'admin/" target="_blank">/admin</a> in this browser, sign in there once, then come back and press Continue.</p>' +
       '<details class="ed-more"><summary>Or paste a GitHub token</summary>' + field("Token", input("tok", "", "password", ' autocomplete="off"')) + "</details>");
-    actions(wrap, [{ label: "Continue", solid: true, run: function () {
+    actions(wrap, [{ label: "Just look around", run: function () { try { localStorage.removeItem("alyx-me"); } catch (e) {} close(); location.href = location.pathname + location.hash; } },
+                   { label: "Continue", solid: true, run: function () {
       var t = $("[name=tok]", wrap).value.trim();
       if (t) try { localStorage.setItem("alyx-gh-token", t); } catch (e) {}
       if (!token()) { $(".ed-status", wrap).textContent = "Not signed in yet."; return; }
@@ -491,11 +562,26 @@
     var body = $(".ew-body", w), status = $(".ew-status", w);
     var startText = local && local.text != null && local.saved > Date.now() - 1000 * 60 * 60 * 24 * 30 ? local : e;
     body.innerHTML = CTX.md(startText.text || "");
-    if (startText !== e) { $(".ew-title", w).value = local.title || ""; status.textContent = "Restored your unpublished draft from this device"; }
+    if (startText !== e) { $(".ew-title", w).value = local.title || ""; status.textContent = "Restored your unpublished draft"; }
+    var ckey = "write:" + (id || "new:" + e.project), baseText = toMarkdown(body), baseTitle = $(".ew-title", w).value;
+    var publishedText = e.text || "", publishedTitle = e.title || "";
+    // a newer draft written on another device?
+    cloudGet(ckey).then(function (c) {
+      if (!c || !document.body.contains(w)) return;
+      if (toMarkdown(body) !== baseText || $(".ew-title", w).value !== baseTitle) return; // already typing here
+      if (local && local.saved >= c.saved) return;
+      body.innerHTML = CTX.md(c.text || ""); $(".ew-title", w).value = c.title || "";
+      status.textContent = "Restored your draft from your other device";
+      try { localStorage.setItem(key, JSON.stringify(c)); } catch (x) {}
+      count();
+    });
     var count = function () { var t = body.innerText.replace(/\s/g, ""); $(".ew-count", w).textContent = t.length + " characters"; };
     var keep = function () {
-      try { localStorage.setItem(key, JSON.stringify({ text: toMarkdown(body), title: $(".ew-title", w).value, saved: Date.now() })); } catch (x) {}
-      status.textContent = "Saved on this device · " + new Date().toTimeString().slice(0, 5);
+      var d = { text: toMarkdown(body), title: $(".ew-title", w).value, saved: Date.now() };
+      if (d.text === publishedText && d.title === publishedTitle) { try { localStorage.removeItem(key); } catch (x) {} return; }
+      try { localStorage.setItem(key, JSON.stringify(d)); } catch (x) {}
+      cloudPut(ckey, d);
+      status.textContent = "Draft saved · " + new Date().toTimeString().slice(0, 5);
     };
     var timer;
     var changed = function () { count(); clearTimeout(timer); timer = setTimeout(keep, 1200); status.textContent = "Typing…"; };
@@ -531,7 +617,9 @@
       commit([{ path: BASE + "content/entries/" + newId + ".json", text: JSON.stringify(out, null, 2) + "\n" }], [], (id ? "Update" : "Add") + " chapter “" + newId + "”")
         .then(function () {
           try { localStorage.removeItem(key); } catch (x) {}
-          id = newId; key = "alyx-draft:" + id;
+          cloudDel(ckey);
+          id = newId; key = "alyx-draft:" + id; ckey = "write:" + id;
+          publishedText = out.text; publishedTitle = out.title;
           status.textContent = "Published · the site updates in about a minute";
           btn.disabled = false;
           CTX.onSaved("entry", Object.assign({ id: newId }, out));
@@ -543,6 +631,7 @@
       if (!window.confirm("Delete this chapter for good?")) return;
       commit([], [BASE + "content/entries/" + id + ".json"], "Delete chapter “" + id + "”").then(function () {
         try { localStorage.removeItem(key); } catch (x) {}
+        cloudDel(ckey);
         CTX.onSaved("entry", { id: id, project: e.project }, true); close(); toast("Deleted.");
       }).catch(function (err) { status.textContent = explain(err); });
     });
@@ -902,31 +991,48 @@
   function addPending(path, value, translated) {
     var list = pending(), sp = splitPath(path);
     var real = translated ? sp.file + "#" + sp.field + "_en" : path;
-    if (list.length && list[list.length - 1].path === real) list[list.length - 1].value = value;
+    if (!PUBLISHING && list.length && list[list.length - 1].path === real) list[list.length - 1].value = value;
     else list.push({ path: real, value: value });
     savePending(list);
     applyToView({ path: path, value: value });
-    pendingBar();
+    schedulePublish();
+  }
+  /* changes made on the page are saved to GitHub a moment after you stop typing — no Publish button,
+     nothing that only lives on one device. If the internet drops, they wait here and go up next time. */
+  var PUBLISHING = false, pubTimer = null;
+  function schedulePublish() {
+    setBar("Saving…");
+    clearTimeout(pubTimer);
+    pubTimer = setTimeout(publishPending, 1800);
   }
   function publishPending() {
+    clearTimeout(pubTimer); pubTimer = null;
     var list = pending();
-    if (!list.length) return Promise.resolve();
+    if (!list.length) { pendingBar(); return Promise.resolve(); }
+    if (PUBLISHING) { pubTimer = setTimeout(publishPending, 1500); setBar("Saving…"); return Promise.resolve(); }
     if (!token()) { signIn(publishPending); return Promise.resolve(); }
-    var files = {};
+    PUBLISHING = true;
+    var n = list.length, files = {};
     list.forEach(function (op) { var f = splitPath(op.path).file; (files[f] = files[f] || []).push(op); });
     var names = Object.keys(files);
-    setBar("Publishing…");
+    setBar("Saving…");
     return Promise.all(names.map(function (f) { return readJSON(BASE + f).then(function (o) { return { f: f, o: o || {} }; }); })).then(function (got) {
       var out = [];
       got.forEach(function (g) {
         files[g.f].forEach(function (op) { setAt(g.o, splitPath(op.path).field, clone(op.value)); });
         out.push({ path: BASE + g.f, text: JSON.stringify(g.o, null, 2) + "\n" });
       });
-      return commit(out, [], "Edit on the page: " + names.map(function (n) { return n.split("/").pop().replace(".json", ""); }).join(", "));
+      return commit(out, [], "Edit on the page: " + names.map(function (x) { return x.split("/").pop().replace(".json", ""); }).join(", "));
     }).then(function () {
-      savePending([]); pendingBar();
-      toast("Published. The site updates in about a minute.");
-    }).catch(function (e) { console.error(e); setBar(explain(e)); });
+      PUBLISHING = false;
+      savePending(pending().slice(n));
+      if (pending().length) return publishPending();
+      setBar("✓ Saved · live on the site in about a minute", "ok");
+      clearTimeout(setBar.t); setBar.t = setTimeout(pendingBar, 4000);
+    }).catch(function (e) {
+      PUBLISHING = false; console.error(e);
+      setBar("Not saved yet — " + explain(e).replace(/^Couldn't save just now\. ?/, ""), "err");
+    });
   }
 
   /* ---------- the owner bar (bottom left) ---------- */
@@ -942,28 +1048,28 @@
         var k = t.getAttribute("data-own");
         if (k === "menu") ownerMenu();
         if (k === "publish") publishPending();
-        if (k === "undo") { if (window.confirm("Undo the changes you haven't published?")) { savePending([]); location.reload(); } }
+        if (k === "visitor") window.open(location.pathname + "?visitor" + location.hash, "_blank");
       });
     }
     pendingBar();
   }
-  function setBar(msg) { var p = $(".own-pending"); if (p) { p.hidden = false; p.innerHTML = '<span class="own-msg">' + esc(msg) + "</span>"; } }
+  function setBar(msg, kind) {
+    var p = $(".own-pending"); if (!p) return;
+    p.hidden = false; p.className = "own-pending" + (kind ? " " + kind : "");
+    p.innerHTML = '<span class="own-msg">' + esc(msg) + "</span>" + (kind === "err" ? '<button type="button" class="own-pub" data-own="publish">Try again</button>' : "");
+  }
   function pendingBar() {
     var p = $(".own-pending"); if (!p) return;
-    var n = pending().length;
-    p.hidden = !n;
-    p.innerHTML = n ? '<span class="own-msg">' + n + (n === 1 ? " change" : " changes") + ' · kept on this device</span>' +
-      '<button type="button" class="own-link" data-own="undo">Undo</button><button type="button" class="own-pub" data-own="publish">Publish</button>' : "";
+    if (pending().length) { if (pubTimer || PUBLISHING) setBar("Saving…"); else setBar("Not saved yet", "err"); return; }
+    p.hidden = true; p.className = "own-pending";
   }
   function ownerMenu() {
     var zh = CTX.lang === "zh";
     var wrap = sheet("Owner tools",
-      '<p class="ed-text">Click any text with a dotted line under it to change it. Use the buttons on each section to add, edit and move things. Every form keeps your draft on this device until you save.</p>' +
-      '<div class="ed-field"><span class="ed-label">You are looking at</span><div class="ed-tabs">' +
-        '<button type="button" class="pill' + (zh ? " on" : "") + '" data-lang="zh">中文 · only you</button>' +
-        '<button type="button" class="pill' + (!zh ? " on" : "") + '" data-lang="en">English · what visitors see</button></div>' +
-        '<span class="ed-hint">You write in Chinese; visitors only see the English version made when the site updates. In English view, text you change is kept as the English version.</span></div>' +
+      '<p class="ed-text">Click any text with a dotted line under it to change it — it saves to the site by itself. Use the buttons on each section to add, edit and move things. Unfinished writing is kept as a private draft in your GitHub account, so it follows you to any device.</p>' +
+      '<p class="ed-text">Only you can change things: editing needs your GitHub sign-in. Here you see what you wrote (Chinese stays Chinese); visitors see the English version.</p>' +
       '<div class="ed-menu">' +
+        '<button type="button" class="pill solid" data-go="visitor">See it as a visitor ↗</button>' +
         '<button type="button" class="pill" data-go="menu">Menu & page names</button>' +
         '<button type="button" class="pill" data-go="site">Name, logo, email</button>' +
         '<button type="button" class="pill" data-go="look">Fonts, colours, sizes</button>' +
@@ -973,6 +1079,7 @@
       var l = e.target.closest("[data-lang]"); if (l) { CTX.setLang(l.getAttribute("data-lang")); return; }
       var g = e.target.closest("[data-go]"); if (!g) return;
       var k = g.getAttribute("data-go");
+      if (k === "visitor") { window.open(location.pathname + "?visitor" + location.hash, "_blank"); return; }
       if (k === "menu") menuSheet();
       if (k === "site") siteSheet();
       if (k === "look") lookSheet();
@@ -991,7 +1098,7 @@
       started = true;
       rawData();
       var list = pending();
-      if (list.length) { list.forEach(function (op) { var sp = splitPath(op.path); applyToView({ path: sp.file + "#" + sp.field.replace(/_en$/, ""), value: op.value }); }); ownerBar(); CTX.redraw(); return; }
+      if (list.length) { list.forEach(function (op) { var sp = splitPath(op.path); applyToView({ path: sp.file + "#" + sp.field.replace(/_en$/, ""), value: op.value }); }); ownerBar(); schedulePublish(); CTX.redraw(); return; }
     }
     ownerBar();
     var app = document.getElementById("app");
@@ -1038,7 +1145,7 @@
     var list = pending();
     list.push({ path: "data/settings.json#home_blocks", value: clone(r) });
     savePending(list);
-    pendingBar();
+    schedulePublish();
     CTX.redraw();
   }
   function homeTools(app) {
@@ -1524,5 +1631,5 @@
     if (k === "media") return editMedia(spec.mode === "edit" ? spec.id : null, spec.shelf);
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && $(".ed-sheet")) close(); });
-  window.AlyxEditor = { open: open, toMarkdown: toMarkdown, decorate: decorate };
+  window.AlyxEditor = { open: open, toMarkdown: toMarkdown, decorate: decorate, signIn: signIn };
 })();

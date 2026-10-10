@@ -22,11 +22,25 @@
   }
 
   /* ---------- owner mode: open any page with ?me once to see download tools ---------- */
-  var OWNER = false;
+  /* Owner mode needs your GitHub sign-in (the same as /admin). Without it, ?me shows the sign-in,
+     never the editing tools — visitors can't change anything. ?visitor shows the site as visitors see it. */
+  var OWNER = false, WANTS_OWNER = false, VISITOR = false, NEEDS_SIGNIN = false, NEEDS_CHECK = false;
+  function ghToken() {
+    try { var u = JSON.parse(localStorage.getItem("sveltia-cms.user") || "null"); if (u && u.token) return u.token; } catch (e) {}
+    try { return localStorage.getItem("alyx-gh-token") || ""; } catch (e) { return ""; }
+  }
+  function tokenMark(t) { var h = 0; for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return String(h); }
   try {
     if (/[?&]me=0\b/.test(location.search)) localStorage.removeItem("alyx-me");
     else if (/[?&]me\b/.test(location.search)) localStorage.setItem("alyx-me", "1");
-    OWNER = localStorage.getItem("alyx-me") === "1";
+    if (/[?&]visitor=0\b/.test(location.search)) sessionStorage.removeItem("alyx-visitor");
+    else if (/[?&]visitor\b/.test(location.search)) sessionStorage.setItem("alyx-visitor", "1");
+    VISITOR = sessionStorage.getItem("alyx-visitor") === "1";
+    WANTS_OWNER = localStorage.getItem("alyx-me") === "1" && !VISITOR;
+    var tok = ghToken(), ok = JSON.parse(localStorage.getItem("alyx-ok") || "null");
+    if (WANTS_OWNER && !tok) NEEDS_SIGNIN = true;
+    else if (WANTS_OWNER && ok && ok.m === tokenMark(tok) && Date.now() - ok.t < 7 * 864e5) OWNER = true;
+    else if (WANTS_OWNER) NEEDS_CHECK = true;
   } catch (e) {}
   if (PREVIEW) OWNER = true;
 
@@ -1305,7 +1319,7 @@
   }
   function withEditor(fn) {
     if (window.AlyxEditor) return fn();
-    loadScript(ROOT + "assets/js/editor.js?v=6").then(function () { if (window.AlyxEditor) fn(); });
+    loadScript(ROOT + "assets/js/editor.js?v=7").then(function () { if (window.AlyxEditor) fn(); });
   }
   function openEditor(spec) { withEditor(function () { window.AlyxEditor.open(spec, editorCtx()); }); }
 
@@ -1408,6 +1422,27 @@
     localize(D);
     applyTheme(D.theme);
     draw();
+    if (VISITOR && localStorage.getItem("alyx-me") === "1") {
+      var vb = document.createElement("a");
+      vb.className = "visitor-badge"; vb.href = location.pathname + "?visitor=0" + location.hash;
+      vb.textContent = "Seeing it as a visitor · back to editing";
+      document.body.appendChild(vb);
+    }
+    if (NEEDS_SIGNIN) withEditor(function () { window.AlyxEditor.signIn(function () { location.reload(); }, editorCtx()); });
+    if (NEEDS_CHECK) {
+      // make sure this sign-in can really change the site before showing the editing tools
+      var tk = ghToken();
+      fetch("https://api.github.com/repos/alyxsstudio/alyxsstudio", { headers: { Authorization: "Bearer " + tk, Accept: "application/vnd.github+json" }, cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : { status: r.status }; })
+        .then(function (j) {
+          if (j && j.permissions && j.permissions.push) {
+            try { localStorage.setItem("alyx-ok", JSON.stringify({ m: tokenMark(tk), t: Date.now() })); } catch (e) {}
+            location.reload();
+          } else if (j && (j.status === 401 || j.status === 403 || j.permissions)) {
+            withEditor(function () { window.AlyxEditor.signIn(function () { location.reload(); }, editorCtx(), "Your sign-in has expired or can't change this site. Sign in again to edit."); });
+          }
+        }).catch(function () {});
+    }
     window.addEventListener("hashchange", function () {
       if (hash() === "main") return;
       draw(PAGE === "daily" && /^\d{4}-\d{2}-\d{2}$/.test(hash()));
