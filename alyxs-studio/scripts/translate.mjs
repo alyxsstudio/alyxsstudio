@@ -2,22 +2,27 @@
 //
 //   node scripts/translate.mjs <site folder>
 //
-// Uses GitHub Models with the workflow's own GITHUB_TOKEN (free, no key to set up).
+// Which translator is used depends on which key is saved in the repository's
+// Settings → Secrets and variables → Actions (the first one found wins):
+//   ANTHROPIC_API_KEY  Claude — the most natural, literary English (paid, a few cents a month)
+//   GEMINI_API_KEY     Google Gemini — free key from aistudio.google.com, good English
+//   DEEPL_API_KEY      DeepL — free plan, good English
+//   (no key)           MyMemory — free, no setup, plainer English and about 5,000 characters a day
 // Only new or changed paragraphs are translated; results are kept in data/translations.json,
-// so each paragraph is translated once. Corrections made by hand in that file are kept.
+// so each paragraph is translated once. Corrections made by hand in that file are always kept.
+// Text translated by the no-key fallback is redone automatically once a key is added.
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { walk, hasCJK, hash, paragraphs, readCache, writeCache } from "./i18n.mjs";
 
 const SITE = path.resolve(process.argv[2] || ".");
 const CACHE = path.join(SITE, "data", "translations.json");
-const TOKEN = process.env.GITHUB_TOKEN || process.env.GH_MODELS_TOKEN;
-const ENDPOINT = process.env.TRANSLATE_ENDPOINT || "https://models.github.ai/inference/chat/completions";
-const MODELS = ["openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4o-mini"];
-const MAX_REQUESTS = Number(process.env.MAX_TRANSLATE_REQUESTS || 40); // stay well inside the free daily limit
-const CHUNK_CHARS = 2400;
 const STATUS = path.join(SITE, "data", "translate-status.json");   // published, so problems are easy to see
-const status = { checked: new Date().toISOString(), paragraphs: 0, waiting: 0, translated: 0, requests: 0, problems: [] };
+const MAX_REQUESTS = Number(process.env.MAX_TRANSLATE_REQUESTS || 60);
+const env = process.env;
+const status = { checked: new Date().toISOString(), translator: "", paragraphs: 0, waiting: 0, translated: 0, requests: 0, problems: [] };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const problem = (s) => { console.warn("  " + s); status.problems.push(String(s).slice(0, 400)); };
 
 const SYSTEM = [
   "You translate a writer's Chinese into natural, literary English for her personal website.",
@@ -27,6 +32,7 @@ const SYSTEM = [
   "The input is a JSON object of numbered strings. Answer with a JSON object only, with exactly the same keys, each holding the English for that string."
 ].join(" ");
 
+// ---------- what needs English ----------
 async function collect() {
   const sources = [];
   const addFile = async (file) => {
@@ -50,10 +56,8 @@ async function collect() {
   return needed;
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// Reads the model's answer: {"1": "...", "2": "..."} (asked for), or a plain list, or — for a
-// single item — just the English text.
+// ---------- reading a language model's answer ----------
+// {"1": "...", "2": "..."} (asked for), or a plain list, or — for a single item — just the text.
 function parseAnswer(raw, n) {
   const text = String(raw || "").replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
   let v = null;
@@ -74,106 +78,172 @@ function parseAnswer(raw, n) {
   if (n === 1 && text && !/^[\[{]/.test(text)) return [text];
   return null;
 }
+const numbered = (texts) => { const o = {}; texts.forEach((t, i) => { o[String(i + 1)] = t; }); return JSON.stringify(o); };
 
-// POST to the models endpoint. Redirects are followed by hand so the request stays a POST
-// and keeps its sign-in header (fetch would otherwise turn it into a GET without one).
-async function post(payload) {
-  let url = ENDPOINT;
-  for (let hop = 0; hop < 4; hop++) {
-    const res = await fetch(url, {
-      method: "POST", redirect: "manual",
-      headers: {
-        "Content-Type": "application/json", Accept: "application/json",
-        "X-GitHub-Api-Version": "2022-11-28", Authorization: "Bearer " + TOKEN
-      },
-      body: JSON.stringify(payload)
-    }).catch((e) => ({ ok: false, status: 0, url, headers: new Headers(), text: async () => String(e) }));
-    const loc = res.headers.get("location");
-    if (res.status >= 300 && res.status < 400 && loc) { url = new URL(loc, url).toString(); continue; }
-    return res;
-  }
-  return { ok: false, status: 310, url, headers: new Headers(), text: async () => "too many redirects" };
+async function call(url, options) {
+  const res = await fetch(url, options).catch((e) => ({ ok: false, status: 0, text: async () => String(e) }));
+  const body = await res.text();
+  let json = null; try { json = JSON.parse(body); } catch {}
+  return { ok: res.ok, status: res.status, body, json };
 }
 
-async function ask(batch) {
-  const input = {};
-  batch.forEach((t, i) => { input[String(i + 1)] = t; });
-  for (const model of MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const res = await post({
-        model, temperature: 0.3,
-        response_format: { type: "json_object" },
-        messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify(input) }]
-      });
-      if (res.ok) {
-        const body = await res.text();
-        let raw = "";
-        try { const j = JSON.parse(body); raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ""; } catch {}
-        const out = parseAnswer(raw, batch.length);
-        if (out) return out;
-        const what = `answer did not match (${res.status} ${res.url || ""} ${res.headers.get("content-type") || ""}): ${(raw || body).slice(0, 240)}`;
-        console.warn(`  ${model}: ${what}`);
-        status.problems.push(model + ": " + what);
-        continue;
+// A model-based translator: tries each model in turn; stops early on sign-in problems.
+function llm(name, models, request, read, pause) {
+  return {
+    name, rank: 3, chunkChars: 2400, chunkItems: 40, pause,
+    async run(texts) {
+      for (const model of models) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const r = await call(...request(model, texts));
+          if (r.ok) {
+            const out = parseAnswer(read(r.json), texts.length);
+            if (out) return out;
+            problem(`${name} ${model}: answer did not match: ${(read(r.json) || r.body).slice(0, 200)}`);
+            continue;
+          }
+          problem(`${name} ${model}: HTTP ${r.status} ${r.body.slice(0, 240)}`);
+          if (r.status === 401 || r.status === 403) return null;  // key not accepted
+          if (r.status === 404 || r.status === 400) break;        // try the next model
+          await sleep(r.status === 429 ? 15000 : 3000);
+        }
       }
-      const body = await res.text();
-      console.warn(`  ${model}: HTTP ${res.status} ${body.slice(0, 160)}`);
-      status.problems.push(model + ": HTTP " + res.status + " " + body.slice(0, 200));
-      if (res.status === 429) { await sleep(8000); break; } // rate limited: try the next model
-      if (res.status === 401 || res.status === 403) return null;
-      await sleep(3000);
+      return null;
+    }
+  };
+}
+
+const TRANSLATORS = {
+  claude: () => env.ANTHROPIC_API_KEY && llm("Claude", ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-sonnet-4-5"],
+    (model, texts) => ["https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model, max_tokens: 8000, temperature: 0.3, system: SYSTEM, messages: [{ role: "user", content: numbered(texts) }] })
+    }],
+    (j) => (j && Array.isArray(j.content) ? j.content.filter((c) => c.type === "text").map((c) => c.text).join("") : ""), 1000),
+
+  gemini: () => env.GEMINI_API_KEY && llm("Gemini", ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest"],
+    (model, texts) => [`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM }] },
+        contents: [{ role: "user", parts: [{ text: numbered(texts) }] }],
+        generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
+      })
+    }],
+    (j) => { try { return j.candidates[0].content.parts.map((p) => p.text || "").join(""); } catch { return ""; } }, 7000), // free plan: ~10 a minute
+
+  deepl: () => env.DEEPL_API_KEY && {
+    name: "DeepL", rank: 2, chunkChars: 20000, chunkItems: 50, pause: 500,
+    async run(texts) {
+      const host = env.DEEPL_API_KEY.trim().endsWith(":fx") ? "api-free.deepl.com" : "api.deepl.com";
+      const r = await call(`https://${host}/v2/translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "DeepL-Auth-Key " + env.DEEPL_API_KEY.trim() },
+        body: JSON.stringify({ text: texts, source_lang: "ZH", target_lang: "EN-US", preserve_formatting: true })
+      });
+      if (r.ok && r.json && Array.isArray(r.json.translations) && r.json.translations.length === texts.length)
+        return r.json.translations.map((t) => t.text);
+      problem(`DeepL: HTTP ${r.status} ${r.body.slice(0, 240)}`);
+      return null;
+    }
+  },
+
+  // Free, no key. Pieces of at most ~450 characters; stops for the day when the quota is used up.
+  mymemory: () => env.TRANSLATE_FREE !== "0" && {
+    name: "MyMemory (free, no key)", rank: 1, chunkChars: 1, chunkItems: 1, pause: 300,
+    async run(texts) {
+      const pieces = splitForFree(texts[0]);
+      const out = [];
+      for (const piece of pieces) {
+        if (!hasCJK(piece)) { out.push(piece); continue; }
+        const url = "https://api.mymemory.translated.net/get?langpair=zh-CN%7Cen&q=" + encodeURIComponent(piece);
+        const r = await call(url, { headers: { Accept: "application/json" } });
+        const d = r.json || {};
+        const code = Number(d.responseStatus);
+        const t = d.responseData && d.responseData.translatedText;
+        if (!r.ok || code !== 200 || !t || d.quotaFinished) {
+          problem(`MyMemory: HTTP ${r.status} ${code || ""} ${(t || r.body || "").slice(0, 200)}`);
+          return null;
+        }
+        out.push(decode(t));
+        await sleep(300);
+      }
+      return [out.join("")];
     }
   }
-  return null;
-}
+};
 
+function splitForFree(text) {
+  const parts = String(text).match(/[^。！？!?；;\n]+[。！？!?；;\n]*|[。！？!?；;\n]+/g) || [text];
+  const pieces = [];
+  let cur = "";
+  for (const p of parts) {
+    if (cur && cur.length + p.length > 450) { pieces.push(cur); cur = ""; }
+    if (p.length > 450) { for (let i = 0; i < p.length; i += 450) pieces.push(p.slice(i, i + 450)); continue; }
+    cur += p;
+  }
+  if (cur) pieces.push(cur);
+  // keep a space between translated sentences
+  return pieces.map((s, i) => (i < pieces.length - 1 && !/\n$/.test(s) ? s + " " : s));
+}
+const decode = (s) => String(s).replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+// Only for tests: an OpenAI-style endpoint on this computer.
+if (env.TRANSLATE_ENDPOINT) TRANSLATORS.claude = () => llm("Test", ["test"],
+  (model, texts) => [env.TRANSLATE_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: numbered(texts) }] }) }],
+  (j) => { try { return j.choices[0].message.content; } catch { return ""; } }, 0);
+
+// ---------- main ----------
 async function main() {
+  const tr = ["claude", "gemini", "deepl", "mymemory"].map((k) => TRANSLATORS[k]()).find(Boolean);
+  status.translator = tr ? tr.name : "none";
   const cache = await readCache(CACHE);
   const needed = await collect();
-  const todo = [...needed.entries()].filter(([h]) => !cache[h]);
   // forget translations nobody uses any more, so the file stays small
   for (const h of Object.keys(cache)) if (!needed.has(h)) delete cache[h];
+  // new paragraphs, plus ones a weaker translator did that nobody has corrected by hand
+  const RANK = { "MyMemory (free, no key)": 1, DeepL: 2 };
+  const weaker = (c) => tr && c.by && (RANK[c.by] || 3) < tr.rank && c.en === c.auto;
+  const todo = [...needed.entries()].filter(([h]) => !cache[h] || weaker(cache[h]));
+  console.log(`${needed.size} Chinese paragraphs, ${todo.length} need English. Translator: ${status.translator}.`);
 
-  console.log(`${needed.size} Chinese paragraphs, ${todo.length} need English.`);
-  if (todo.length && !TOKEN) console.warn("No GITHUB_TOKEN: skipping translation.");
   let requests = 0;
-  if (todo.length && TOKEN) {
-    // group into batches that stay well inside the model's limits
+  if (todo.length && tr) {
     const batches = [];
     let cur = [], size = 0;
     for (const item of todo) {
-      if (cur.length && (size + item[1].length > CHUNK_CHARS || cur.length >= 40)) { batches.push(cur); cur = []; size = 0; }
+      if (cur.length && (size + item[1].length > tr.chunkChars || cur.length >= tr.chunkItems)) { batches.push(cur); cur = []; size = 0; }
       cur.push(item); size += item[1].length;
     }
     if (cur.length) batches.push(cur);
     for (const batch of batches) {
-      if (requests >= MAX_REQUESTS) { console.log("Request limit for this run reached; the rest will be translated next time."); break; }
+      if (requests >= MAX_REQUESTS) { console.log("Enough for this run; the rest will be translated next time."); break; }
       requests++;
-      const out = await ask(batch.map((b) => b[1]));
+      const out = await tr.run(batch.map((b) => b[1]));
       if (!out) { console.warn("Translation unavailable right now; showing the Chinese until next time."); break; }
-      batch.forEach(([h, zh], i) => { cache[h] = { zh, en: out[i] }; });
+      batch.forEach(([h, zh], i) => { cache[h] = { zh, en: out[i], auto: out[i], by: tr.name }; });
       status.translated += batch.length;
       await writeCache(CACHE, cache);
-      await sleep(process.env.TRANSLATE_ENDPOINT ? 0 : 4500); // free tier: keep under 15 requests a minute
+      await sleep(tr.pause);
     }
   }
   await writeCache(CACHE, cache);
   status.paragraphs = needed.size; status.requests = requests;
   status.waiting = [...needed.keys()].filter((h) => !cache[h]).length;
-  if (!TOKEN && todo.length) status.problems.push("No GITHUB_TOKEN");
   await fs.writeFile(STATUS, JSON.stringify(status, null, 1) + "\n");
-  if (process.env.GITHUB_ACTIONS) {
-    // shows up as a note on the run, readable from the GitHub API
+  if (env.GITHUB_ACTIONS) {
+    // shows up as a note on the publish run
     const clean = (s) => String(s).replace(/[\r\n%]/g, " ").slice(0, 900);
-    console.log(`::notice title=Translation::${status.paragraphs} Chinese paragraphs, ${status.translated} translated now, ${status.waiting} waiting, ${requests} request(s)`);
+    console.log(`::notice title=Translation::${status.translator}: ${status.paragraphs} Chinese paragraphs, ${status.translated} translated now, ${status.waiting} waiting, ${requests} request(s)`);
     for (const p of status.problems.slice(0, 5)) console.log(`::warning title=Translation problem::${clean(p)}`);
   }
   console.log(`Done. ${requests} request(s).`);
 }
 
-console.log("::notice title=Translation::starting");
 main().catch((e) => {
   console.error(e);
-  if (process.env.GITHUB_ACTIONS) console.log(`::warning title=Translation stopped::${String(e && e.stack || e).replace(/[\r\n%]/g, " ").slice(0, 900)}`);
+  if (env.GITHUB_ACTIONS) console.log(`::warning title=Translation stopped::${String(e && e.stack || e).replace(/[\r\n%]/g, " ").slice(0, 900)}`);
   process.exit(0); // never block publishing
 });

@@ -11,7 +11,6 @@ permissions:
   contents: write   # to keep data/translations.json up to date
   pages: write
   id-token: write
-  models: read      # free GitHub Models, used to make English versions of Chinese text
 
 # If you save several times in a row, only the newest version is published.
 concurrency:
@@ -29,7 +28,11 @@ jobs:
       - name: English versions of Chinese text
         run: node alyxs-studio/scripts/translate.mjs alyxs-studio
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # add one of these in Settings → Secrets and variables → Actions for better English;
+          # with none, a free translator without a key is used
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
         continue-on-error: true
       - name: Build
         run: node alyxs-studio/scripts/build.mjs alyxs-studio _site
