@@ -9,7 +9,7 @@
   "color_line": "#e7e6e1",
   "color_tile": "#f4f3ef",
   "color_highlight": "#f5e47c",
-  "size_body": 20,
+  "size_body": 22,
   "size_heading": 60,
   "size_nav": 20,
   "uppercase_labels": true,
