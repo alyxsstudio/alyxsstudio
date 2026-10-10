@@ -570,6 +570,10 @@ collections:
       label: 邮箱
       widget: string
       required: false
+    - name: language_switch
+      label: 让访客也能切换 English / 中文
+      widget: boolean
+      default: false
     - name: announcement
       label: 顶部通知条（不用就留空）
       widget: object
