@@ -1,0 +1,45 @@
+{
+  "title": "Books",
+  "short": "",
+  "intro": "Read online on Kindle or Apple Books.",
+  "items": [
+    {
+      "title": "Small Things, White Rooms",
+      "note": "Essays, 2026",
+      "image": "",
+      "links": [
+        {
+          "label": "Kindle",
+          "url": ""
+        },
+        {
+          "label": "Apple Books",
+          "url": ""
+        },
+        {
+          "label": "Amazon",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "title": "Letters from the Tropics",
+      "note": "Short nonfiction, 2025",
+      "image": "",
+      "links": [
+        {
+          "label": "Kindle",
+          "url": ""
+        },
+        {
+          "label": "Apple Books",
+          "url": ""
+        },
+        {
+          "label": "Amazon",
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

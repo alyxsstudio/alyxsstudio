@@ -1,0 +1,27 @@
+{
+  "title": "Wardrobe",
+  "short": "",
+  "intro": "What I wore.",
+  "items": [
+    {
+      "title": "Archive Day",
+      "note": "White shirt, grey trousers, the white bag",
+      "image": ""
+    },
+    {
+      "title": "Seminar",
+      "note": "Black knit, long skirt",
+      "image": ""
+    },
+    {
+      "title": "Weekend",
+      "note": "Smiley tee, wide jeans",
+      "image": ""
+    },
+    {
+      "title": "Travel",
+      "note": "Navy coat, flat shoes",
+      "image": ""
+    }
+  ]
+}

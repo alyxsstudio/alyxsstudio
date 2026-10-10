@@ -1,0 +1,46 @@
+{
+  "title": "Podcast",
+  "short": "Studio Hours. Conversations about making.",
+  "intro": "Short conversations about books, objects and making.",
+  "show": "Studio Hours",
+  "cover": "",
+  "listen": [
+    {
+      "label": "Spotify",
+      "url": ""
+    },
+    {
+      "label": "Apple Podcasts",
+      "url": ""
+    }
+  ],
+  "episodes": [
+    {
+      "number": 3,
+      "title": "What a Shopping Bag Says",
+      "date": "2026-09",
+      "length": "24 min",
+      "note": "",
+      "audio": "",
+      "url": ""
+    },
+    {
+      "number": 2,
+      "title": "Reading in Portuguese",
+      "date": "2026-08",
+      "length": "31 min",
+      "note": "",
+      "audio": "",
+      "url": ""
+    },
+    {
+      "number": 1,
+      "title": "Why a Studio",
+      "date": "2026-07",
+      "length": "18 min",
+      "note": "",
+      "audio": "",
+      "url": ""
+    }
+  ]
+}
