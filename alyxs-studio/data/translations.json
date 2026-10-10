@@ -133,12 +133,6 @@
    "auto": "“I am not.”",
    "by": "MyMemory (free, no key)"
   },
-  "16cc799eb7e09b18": {
-   "zh": "早已风干的沙棕色新英格兰长嘴蚊子，像极了蜻蜓标本。昨天清理过的蜘蛛网，似乎又在天花板四角织出了一层半透明的灰翳。",
-   "en": "An air-dried, sandy-brown New England mosquito with a mouth that resembles a dragonfly specimen. The cobweb that was cleaned yesterday seemed to weave a layer of semi-transparent gray in the four corners of the ceiling.",
-   "auto": "An air-dried, sandy-brown New England mosquito with a mouth that resembles a dragonfly specimen. The cobweb that was cleaned yesterday seemed to weave a layer of semi-transparent gray in the four corners of the ceiling.",
-   "by": "MyMemory (free, no key)"
-  },
   "16e95a566874e70c": {
    "zh": "她不得不扶着桌子站起来，慌乱将书籍重新堆放在最上面，合拢纸箱，低头装作整理背包。楼梯响了几声，二楼穿着睡裤的室友走进厨房。",
    "en": "She had to help herself to the table, frantically restoring the books to the top, folding the cartons, and bowing her head to pretend to be a backpack. The stairs rang a few times, and the roommate in pajamas on the second floor entered the kitchen.",
@@ -181,6 +175,12 @@
    "auto": "That glue seam is too new. The pages have yellowed, there are irregular oxidation spots on the edges, but the glue has not aged to the same extent.",
    "by": "MyMemory (free, no key)"
   },
+  "1cc0c3d4f7a2d10a": {
+   "zh": "Kirin把手机屏幕放大，又缩小。",
+   "en": "Kirin zooms in and out on the phone screen.",
+   "auto": "Kirin zooms in and out on the phone screen.",
+   "by": "MyMemory (free, no key)"
+  },
   "1cf684ba5b73159e": {
    "zh": "Kirin也被问了话。",
    "en": "Kirin was also questioned.",
@@ -191,6 +191,12 @@
    "zh": "“……我还是喜欢这女的来之前的实验室。”",
    "en": "\"... I still like the lab before this woman came.\"",
    "auto": "\"... I still like the lab before this woman came.\"",
+   "by": "MyMemory (free, no key)"
+  },
+  "1e6e0b1b572a20a6": {
+   "zh": "窗外，一辆除雪车拖着黄色警示灯缓缓驶过，轮胎碾碎积冰，发出长而迟钝的摩擦声。",
+   "en": "Outside the window, a snowplow pulled a yellow warning light, and the tires crushed ice and made a long, slow friction sound.",
+   "auto": "Outside the window, a snowplow pulled a yellow warning light, and the tires crushed ice and made a long, slow friction sound.",
    "by": "MyMemory (free, no key)"
   },
   "2450660757c3f067": {
@@ -349,12 +355,6 @@
    "auto": "She was placed in the deepest part of the shadowy second basement, washing the tubes, providing sterile water, and recording the weight of the waste tank.",
    "by": "MyMemory (free, no key)"
   },
-  "51e17f8b43416cee": {
-   "zh": "Kirin是被手机在床缝的剧烈震动震醒的。",
-   "en": "Kirin was awakened by the violent vibration of her phone in the bed.",
-   "auto": "Kirin was awakened by the violent vibration of her phone in the bed.",
-   "by": "MyMemory (free, no key)"
-  },
   "526724b04db753f4": {
    "zh": "夏娃的实验室",
    "en": "Eve's Lab",
@@ -365,12 +365,6 @@
    "zh": "威廉·哈维一六五一年出版的《论动物的生成》。",
    "en": "On the Origin of Animals, published by William Harvey in 1651.",
    "auto": "On the Origin of Animals, published by William Harvey in 1651.",
-   "by": "MyMemory (free, no key)"
-  },
-  "53eddf3323fffa6b": {
-   "zh": "## 第一章",
-   "en": "Chapter one the",
-   "auto": "Chapter one the",
    "by": "MyMemory (free, no key)"
   },
   "5749c5a302bee14a": {
@@ -413,6 +407,12 @@
    "zh": "光芒敛去，黑屏上只倒映出Kirin苍白消瘦的面孔。她面无表情地看着那块玻璃，眼神连半毫米的波动都没有。在异国的最底层，任何被伤害的情绪都是对体能的无用消耗。",
    "en": "The light converged, and only Kirin's pale and emaciated face was reflected on the black screen. She looked at the glass expressionlessly, and her eyes did not even fluctuate by half a millimeter. At the lowest level of the exotic, any emotion that is hurt is a useless drain on physical fitness.",
    "auto": "The light converged, and only Kirin's pale and emaciated face was reflected on the black screen. She looked at the glass expressionlessly, and her eyes did not even fluctuate by half a millimeter. At the lowest level of the exotic, any emotion that is hurt is a useless drain on physical fitness.",
+   "by": "MyMemory (free, no key)"
+  },
+  "5e137eb1101c83bc": {
+   "zh": "Kirin在储物柜最内侧翻出一只带滑轮的折叠保温买菜包，那是去年为了领Food Bank的蔬菜牛奶买的。\n她把买菜包撑开，比量了一下尺寸。\n刚好能放下培养仓和书。",
+   "en": "Kirin turned out a folding insulated bag with pulleys at the innermost side of the locker, which was bought last year to lead Food Bank's vegetable milk.\nShe held the grocery bag apart and weighed the size.\nJust enough to put down incubators and books.",
+   "auto": "Kirin turned out a folding insulated bag with pulleys at the innermost side of the locker, which was bought last year to lead Food Bank's vegetable milk.\nShe held the grocery bag apart and weighed the size.\nJust enough to put down incubators and books.",
    "by": "MyMemory (free, no key)"
   },
   "5ea88d8a45abf3b0": {
@@ -473,12 +473,6 @@
    "zh": "如果继续隐瞒？……",
    "en": "If you continue to conceal it?...",
    "auto": "If you continue to conceal it?...",
-   "by": "MyMemory (free, no key)"
-  },
-  "6ebf39600376a3b2": {
-   "zh": "波士顿的四季没有暖春这回事，只有从灰白、深灰过渡到浅绿。",
-   "en": "Boston's four seasons have no warm spring, only a transition from gray and dark gray to light green.",
-   "auto": "Boston's four seasons have no warm spring, only a transition from gray and dark gray to light green.",
    "by": "MyMemory (free, no key)"
   },
   "6ecd257e2961f64a": {
@@ -607,6 +601,12 @@
    "auto": "\"What are you in charge of?\"",
    "by": "MyMemory (free, no key)"
   },
+  "8e630c24a9aad39e": {
+   "zh": "楼上的暖气管道突然传来一声猛烈的金属敲击。\nKirin惊得浑身一颤。",
+   "en": "The heating pipe upstairs suddenly received a fierce metal knock.\nKirin trembled in horror.",
+   "auto": "The heating pipe upstairs suddenly received a fierce metal knock.\nKirin trembled in horror.",
+   "by": "MyMemory (free, no key)"
+  },
   "90bcdf10be10f740": {
    "zh": "硬纸板掀开，是一本深褐色小牛皮精装书，皮面斑驳磨损，封皮上压印着褪色的烫金拉丁文：",
    "en": "Cardboard lift is a hardcover book in dark brown calfskin with mottled frayed leather and faded bronzed Latin stamped on the cover:",
@@ -685,6 +685,12 @@
    "auto": "Kirin put on the white cotton T-shirt that washed up to the pilling, and the neckline was stained with two reagent stains that had been splashed last week. Before going out, he habitually touched the driver's license in his pocket and touched the copy of the folded I-20 form in another pocket. A driver's license in Massachusetts is a good test, but you can't afford a car. In Boston's snow-crippled city, the Green Line subway and the pair of Vibram anti-skid boots at her feet are her only means of transportation.",
    "by": "MyMemory (free, no key)"
   },
+  "a68f7e22fd1e5941": {
+   "zh": "把一个可能与谋杀有关的培养仓放在家里，简直是疯了。",
+   "en": "It was madness to keep a training warehouse at home that might be linked to the murder.",
+   "auto": "It was madness to keep a training warehouse at home that might be linked to the murder.",
+   "by": "MyMemory (free, no key)"
+  },
   "a6fcd7fb6d27d978": {
    "zh": "就在她拉开沉重的隔音防火门时，迎面而来的并非系办的安全专员，而是数名身着黑蓝色防弹战术背心、手持卡宾枪的突击队员。",
    "en": "When she pulled open the heavy soundproof fire door, it was not the safety commissioner who was in charge, but several commandos wearing black and blue bulletproof tactical vests and holding carbines.",
@@ -703,6 +709,12 @@
    "auto": "\"Don't touch it! Let's go!\"",
    "by": "MyMemory (free, no key)"
   },
+  "ac7f08c44be180c2": {
+   "zh": "她望了眼墙上的挂钟。 距离天亮只剩不到三个小时。",
+   "en": "She looked at the wall clock. Less than three hours until dawn.",
+   "auto": "She looked at the wall clock. Less than three hours until dawn.",
+   "by": "MyMemory (free, no key)"
+  },
   "af7c1e43ea388574": {
    "zh": "那声音不像枪响，反而像是有人正在强行破开一扇厚重的金属门。Kirin下意识回头，却只看见两名警员将楼梯间的防火门重新合拢。",
    "en": "Instead of a gunshot, it sounded like someone was forcibly breaking through a heavy metal door. Kirin subconsciously turned around and saw only two officers reclosing the fire doors of the stairwell.",
@@ -713,12 +725,6 @@
    "zh": "她将邮件拉到最下方，找到合规办公室的电话号码，手指悬在手机拨号键上。",
    "en": "She pulled the email to the bottom and found the phone number of the Compliance Office, her finger hanging over the phone dial button.",
    "auto": "She pulled the email to the bottom and found the phone number of the Compliance Office, her finger hanging over the phone dial button.",
-   "by": "MyMemory (free, no key)"
-  },
-  "b0ba8531dcb67a3b": {
-   "zh": "展开后，是一张黑白复印的建筑平面图。她一眼认出了沃伦大楼的外形轮廓。\n那张纸似乎出自旧的施工图档案，房间仍以数字与英文字母编号，有些墙体的位置与她熟悉的楼层完全不同。\n她将图纸转了九十度，又对照右下角的楼层标记。\n有一条用极细的紫色墨水勾出的线路，从三楼的一处角落延伸到建筑中央，最后停在一个没有房间编号的方格前。\n旧图中的那条走廊，如今已经不属于任何公开标示的通行区域。它的一端似乎被后来改造的墙体封死，另一端则消失在楼梯间与设备井之间。\nKirin把手机屏幕放大，又缩小。\n楼上的暖气管道突然传来一声猛烈的金属敲击。\nKirin惊得浑身一颤。\n窗外，一辆除雪车拖着黄色警示灯缓缓驶过，轮胎碾碎积冰，发出长而迟钝的摩擦声。\n她望了眼墙上的挂钟。\n距离天亮只剩不到三个小时。\n把一个可能与谋杀有关的培养仓放在家里，简直是疯了。",
-   "en": "After unfolding, it is a black and white copy of the building floor plan.She recognized the outline of the Warren Building at a glance.\nThe paper seemed to be from an old construction drawing file, the room was still numbered with numbers and English letters, and some of the walls were located in a completely different location from the floor she was familiar with.\nShe turned the drawing 90 degrees and compared it to the floor mark in the lower right corner.\nThere is a line hooked out with very fine purple ink that runs from a corner of the third floor to the center of the building, and finally stops in front of a square without a room number.\nThe corridor in the old diagram no longer belongs to any publicly marked traffic area.One end of it appears to be sealed off by a later remodeled wall, while the other end disappears between the stairwell and the equipment shaft.\nKirin zooms in and out on the phone screen.\nThe heating pipe upstairs suddenly received a fierce metal knock.\nKirin trembled in horror.\nOutside the window, a snowplow pulled a yellow warning light, and the tires crushed ice and made a long, slow friction sound.\nShe looked at the wall clock.\nLess than three hours until dawn.\nIt was madness to keep a training warehouse at home that might be linked to the murder.",
-   "auto": "After unfolding, it is a black and white copy of the building floor plan.She recognized the outline of the Warren Building at a glance.\nThe paper seemed to be from an old construction drawing file, the room was still numbered with numbers and English letters, and some of the walls were located in a completely different location from the floor she was familiar with.\nShe turned the drawing 90 degrees and compared it to the floor mark in the lower right corner.\nThere is a line hooked out with very fine purple ink that runs from a corner of the third floor to the center of the building, and finally stops in front of a square without a room number.\nThe corridor in the old diagram no longer belongs to any publicly marked traffic area.One end of it appears to be sealed off by a later remodeled wall, while the other end disappears between the stairwell and the equipment shaft.\nKirin zooms in and out on the phone screen.\nThe heating pipe upstairs suddenly received a fierce metal knock.\nKirin trembled in horror.\nOutside the window, a snowplow pulled a yellow warning light, and the tires crushed ice and made a long, slow friction sound.\nShe looked at the wall clock.\nLess than three hours until dawn.\nIt was madness to keep a training warehouse at home that might be linked to the murder.",
    "by": "MyMemory (free, no key)"
   },
   "b0f1748e87d7b3d0": {
@@ -797,6 +803,12 @@
    "zh": "“以极其沉痛的心情通报，遗传学泰斗、哈佛医学院罗伯特·温斯罗普讲席教授Professor G，于今日下午在个人工作间不幸离世。出于对遗属隐私的严格保护与联邦刑侦程序的要求，校方目前无法提供更详尽的说明。鉴于刑事案件调查与伦理规程，相关楼层已被执法机构封锁，所有实验室活动即刻暂停。”",
    "en": "“It is with great sadness that we inform you that Professor Taito Genetics, Robert Winthrop Professor of Medicine at Harvard Medical School, passed away this afternoon at his personal workplace. Due to the strict protection of the privacy of the survivors and the requirements of the federal criminal investigation procedure, the school is currently unable to provide more detailed explanations. In view of the criminal case investigation and ethical procedures, the relevant floor has been blocked by law enforcement agencies, and all laboratory activities will be suspended immediately.\"",
    "auto": "“It is with great sadness that we inform you that Professor Taito Genetics, Robert Winthrop Professor of Medicine at Harvard Medical School, passed away this afternoon at his personal workplace. Due to the strict protection of the privacy of the survivors and the requirements of the federal criminal investigation procedure, the school is currently unable to provide more detailed explanations. In view of the criminal case investigation and ethical procedures, the relevant floor has been blocked by law enforcement agencies, and all laboratory activities will be suspended immediately.\"",
+   "by": "MyMemory (free, no key)"
+  },
+  "bdc7176a5b4c809a": {
+   "zh": "展开后，是一张黑白复印的建筑平面图。她一眼认出了沃伦大楼的外形轮廓。\n那张纸似乎出自旧的施工图档案，房间仍以数字与英文字母编号，有些墙体的位置与她熟悉的楼层完全不同。",
+   "en": "After unfolding, it is a black and white copy of the building floor plan.She recognized the outline of the Warren Building at a glance.\nThe paper seemed to be from an old construction drawing file, the room was still numbered with numbers and English letters, and some of the walls were located in a completely different location from the floor she was familiar with.",
+   "auto": "After unfolding, it is a black and white copy of the building floor plan.She recognized the outline of the Warren Building at a glance.\nThe paper seemed to be from an old construction drawing file, the room was still numbered with numbers and English letters, and some of the walls were located in a completely different location from the floor she was familiar with.",
    "by": "MyMemory (free, no key)"
   },
   "c1a87dc32c59d1db": {
@@ -883,6 +895,12 @@
    "auto": "\"Laboratory routine maintenance, some molecular biology experiments, and waste liquid and consumable records.\"",
    "by": "MyMemory (free, no key)"
   },
+  "d0a8d432b970c1a0": {
+   "zh": "波士顿的四季没有暖春这回事，只有从灰白、深灰过渡到浅绿。Kirin是被手机在床缝的剧烈震动震醒的。早已风干的沙棕色新英格兰长嘴蚊子，像极了蜻蜓标本。昨天清理过的蜘蛛网，似乎又在天花板四角织出了一层半透明的灰翳。",
+   "en": "Boston's four seasons have no warm spring, only a transition from gray and dark gray to light green. Kirin was awakened by the violent vibration of her phone in the bed. An air-dried, sandy-brown New England mosquito with a mouth that resembles a dragonfly specimen. The cobweb that was cleaned yesterday seemed to weave a layer of semi-transparent gray in the four corners of the ceiling.",
+   "auto": "Boston's four seasons have no warm spring, only a transition from gray and dark gray to light green. Kirin was awakened by the violent vibration of her phone in the bed. An air-dried, sandy-brown New England mosquito with a mouth that resembles a dragonfly specimen. The cobweb that was cleaned yesterday seemed to weave a layer of semi-transparent gray in the four corners of the ceiling.",
+   "by": "MyMemory (free, no key)"
+  },
   "d44a44448e2f5f1b": {
    "zh": "有一封发自学校研究合规办公室的邮件特别指出，调查人员正在核实某些生物材料和相关设备的去向，任何工作人员都不得以个人判断为依据擅自拆卸、移动或者处理疑似涉案物品。",
    "en": "An email from the school's Research Compliance Office specifically stated that investigators were verifying the whereabouts of certain biological materials and related equipment, and that no staff member should disassemble, move or dispose of suspected items based on personal judgment.",
@@ -923,6 +941,12 @@
    "zh": "老教授坐在摇椅上，既没有考问基因敲除与高通量测序，也没有要求她推导酶动力学方程，而是用那双藏在浓密灰白眉毛下的深邃眼睛凝视着她，抛出了一连串令旁人摸不着头脑的历史与哲学问题。",
    "en": "Sitting in a rocking chair, the old professor neither asked about gene knockout and high-throughput sequencing, nor asked her to derive enzyme kinetics equations. Instead, he stared at her with those deep eyes hidden under thick gray eyebrows, throwing up a series of historical and philosophical questions that made others confused.",
    "auto": "Sitting in a rocking chair, the old professor neither asked about gene knockout and high-throughput sequencing, nor asked her to derive enzyme kinetics equations. Instead, he stared at her with those deep eyes hidden under thick gray eyebrows, throwing up a series of historical and philosophical questions that made others confused.",
+   "by": "MyMemory (free, no key)"
+  },
+  "dbd3fa7d52c34b5a": {
+   "zh": "她将图纸转了九十度，有一条用极细的紫色墨水勾出的线路，从三楼的一处角落延伸到建筑中央，最后停在一个没有房间编号的方格前。",
+   "en": "She turned the drawings ninety degrees, and there was a line hooked out in very fine purple ink, stretching from a corner of the third floor to the center of the building, and finally stopping in front of a square without a room number.",
+   "auto": "She turned the drawings ninety degrees, and there was a line hooked out in very fine purple ink, stretching from a corner of the third floor to the center of the building, and finally stopping in front of a square without a room number.",
    "by": "MyMemory (free, no key)"
   },
   "de903109d58cd4c3": {
@@ -1021,12 +1045,6 @@
    "auto": "There are too many weird, unemployed tenants in this ragged seven-person home. Some people bring home marijuana and women every day, some people can't pay their rent in the middle of the night to sneak into the house through the back door, and some people buy several guns to shoot in the backyard in the middle of the night, and the community echoes with crisp gunfire at night.",
    "by": "MyMemory (free, no key)"
   },
-  "f6e4a3ded40776e0": {
-   "zh": "Kirin在储物柜最内侧翻出一只带滑轮的折叠保温买菜包——那是去年为了领Food Bank的蔬菜牛奶买的。\n她把买菜包撑开，比量了一下尺寸。\n刚好能放下培养仓和书。",
-   "en": "Kirin turned out a folding insulated bag with pulleys at the innermost side of the locker - bought last year to lead Food Bank's vegetable milk.\nShe held the grocery bag apart and weighed the size.\nJust enough to put down incubators and books.",
-   "auto": "Kirin turned out a folding insulated bag with pulleys at the innermost side of the locker - bought last year to lead Food Bank's vegetable milk.\nShe held the grocery bag apart and weighed the size.\nJust enough to put down incubators and books.",
-   "by": "MyMemory (free, no key)"
-  },
   "f6e7bcab1cf7f774": {
    "zh": "他从不让她触碰组里任何千万级基金的核心课题，也没有给她挂过任何重要论文的名字。",
    "en": "He never let her touch on the core issues of any of the tens of millions of funds in the group, nor did he name any important papers for her.",
@@ -1043,6 +1061,12 @@
    "zh": "一道影子落在她的实验台上。她抬头，是Iris，课题组协调员，脸上挂着一种熟练的、成熟的关切。",
    "en": "A shadow fell on her experimental table. She looked up, Iris, the coordinator of the research group, with a skilled and mature concern on her face.",
    "auto": "A shadow fell on her experimental table. She looked up, Iris, the coordinator of the research group, with a skilled and mature concern on her face.",
+   "by": "MyMemory (free, no key)"
+  },
+  "fbf575b1aefb785b": {
+   "zh": "旧图中的那条走廊，如今已经不属于任何公开标示的通行区域。它的一端似乎被后来改造的墙体封死，另一端则消失在楼梯间与设备井之间。",
+   "en": "The corridor in the old diagram no longer belongs to any publicly marked traffic area. One end of it appears to be sealed off by a later remodeled wall, while the other end disappears between the stairwell and the equipment shaft.",
+   "auto": "The corridor in the old diagram no longer belongs to any publicly marked traffic area. One end of it appears to be sealed off by a later remodeled wall, while the other end disappears between the stairwell and the equipment shaft.",
    "by": "MyMemory (free, no key)"
   }
  }
