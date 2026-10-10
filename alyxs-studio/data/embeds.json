@@ -3,7 +3,7 @@
  "items": {
   "https://music.apple.com/us/album/bohemian-rhapsody/1440806041?i=1440806768": {
    "ok": false,
-   "tries": 1,
+   "tries": 2,
    "error": "HTTP 404",
    "checked": "2026-10-10"
   },
@@ -13,6 +13,13 @@
    "cover": "/assets/uploads/covers/0cd45a3c0fe2.jpg",
    "checked": "2026-10-10"
   },
+  "https://podcasts.apple.com/us/podcast/the-daily/id1200361736": {
+   "ok": true,
+   "title": "The Daily",
+   "author": "The New York Times",
+   "cover": "/assets/uploads/covers/b490d69a1b0f.jpg",
+   "checked": "2026-10-10"
+  },
   "https://soundcloud.com/forss/flickermood": {
    "ok": true,
    "title": "Flickermood by Forss",
@@ -20,15 +27,23 @@
    "cover": "/assets/uploads/covers/f0df4f9fb3b6.jpg",
    "checked": "2026-10-10"
   },
+  "https://vimeo.com/1084537": {
+   "ok": true,
+   "title": "Big Buck Bunny",
+   "author": "Blender",
+   "cover": "/assets/uploads/covers/453fbb7c4ce3.jpg",
+   "checked": "2026-10-10"
+  },
   "https://vimeo.com/76979871": {
-   "ok": false,
-   "tries": 1,
-   "error": "HTTP 404",
+   "ok": true,
+   "title": "The New Vimeo Player (You Know, For Videos)",
+   "author": "Vimeo",
+   "cover": "/assets/uploads/covers/0c80a34bbb79.webp",
    "checked": "2026-10-10"
   },
   "https://www.bilibili.com/video/BV1GJ411x7h7": {
    "ok": false,
-   "tries": 1,
+   "tries": 2,
    "error": "HTTP 412",
    "checked": "2026-10-10"
   },
