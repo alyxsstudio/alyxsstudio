@@ -2,7 +2,7 @@
   "items": [
     {
       "title": "Thank You Bag",
-      "category": "Bags & Charms",
+      "category": "Bag",
       "price": "$68",
       "status": "soon",
       "note": "",
@@ -38,7 +38,7 @@
     },
     {
       "title": "Smiley Pin",
-      "category": "Bags & Charms",
+      "category": "Bag",
       "price": "$12",
       "status": "sold out",
       "note": "",
