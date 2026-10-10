@@ -162,7 +162,30 @@
     }).then(function () { cloud.sha[key] = null; });
   }
 
+  /* files in the private repository (journal), for journal.js */
+  function privPath(p) { return "/repos/" + DREPO + "/contents/" + p.split("/").map(encodeURIComponent).join("/"); }
+  var priv = {
+    ready: function () { return token() ? cloudReady() : Promise.resolve(false); },
+    read: function (p) {
+      return priv.ready().then(function (ok) {
+        if (!ok) throw new Error("private storage unavailable");
+        return gh(privPath(p), { allow404: true }).then(function (j) { return j ? { data: JSON.parse(textFromB64(j.content)), sha: j.sha } : null; });
+      });
+    },
+    write: function (p, data, sha) {
+      return priv.ready().then(function (ok) {
+        if (!ok) throw new Error("private storage unavailable");
+        var put = function (s2) { return gh(privPath(p), { method: "PUT", body: { message: "Journal " + p, content: b64FromText(JSON.stringify(data, null, 1)), sha: s2 || undefined } }); };
+        return put(sha).catch(function (e) {
+          if (e.status !== 409 && e.status !== 422) throw e;
+          return gh(privPath(p), { allow404: true }).then(function (j) { return put(j && j.sha); });
+        }).then(function (r) { return r && r.content && r.content.sha; });
+      });
+    }
+  };
+
   function explain(e) {
+    if (e && e.quiet) return "";
     if (e && (e.status === 401 || e.status === 403)) return "Your sign-in has expired. Open /admin, sign in again, then try once more.";
     if (e && e.status === 404) return "The repository wasn't found with this sign-in. Check that /admin works.";
     return "Couldn't save just now. Your text is kept on this device; try again in a moment.";
@@ -1041,17 +1064,32 @@
     if (!bar) {
       bar = document.createElement("div");
       bar.className = "own-bar";
-      bar.innerHTML = '<button type="button" class="own-btn" data-own="menu" aria-label="Owner tools">✎ <span>Owner</span></button><span class="own-pending" hidden></span>';
+      bar.innerHTML = '<button type="button" class="own-btn" data-own="menu" aria-label="Owner tools">✎ <span>Owner</span></button>' +
+        '<button type="button" class="own-lock" data-own="lock"></button><span class="own-pending" hidden></span>';
       document.body.appendChild(bar);
       bar.addEventListener("click", function (e) {
         var t = e.target.closest("[data-own]"); if (!t) return;
         var k = t.getAttribute("data-own");
         if (k === "menu") ownerMenu();
+        if (k === "lock") {
+          var locked = !!(CTX.D.settings || {}).locked;
+          var q = locked ? "Open the studio to everyone again?" : "Make the whole studio private for now? Visitors will only see “Private for now”. You can still see and edit everything.";
+          if (!window.confirm(q)) return;
+          addPending("data/settings.json#locked", !locked);
+          lockLabel();
+        }
         if (k === "publish") publishPending();
         if (k === "visitor") window.open(location.pathname + "?visitor" + location.hash, "_blank");
       });
     }
-    pendingBar();
+    pendingBar(); lockLabel();
+  }
+  function lockLabel() {
+    var b = $(".own-lock"); if (!b) return;
+    var locked = !!(CTX.D.settings || {}).locked;
+    b.classList.toggle("on", locked);
+    b.textContent = locked ? "🔒 Private" : "🔓 Public";
+    b.title = locked ? "Only you can see the site. Click to open it to everyone." : "Everyone can see the site. Click to make it private for now.";
   }
   function setBar(msg, kind) {
     var p = $(".own-pending"); if (!p) return;
@@ -1070,6 +1108,7 @@
       '<p class="ed-text">Only you can change things: editing needs your GitHub sign-in. Here you see what you wrote (Chinese stays Chinese); visitors see the English version.</p>' +
       '<div class="ed-menu">' +
         '<button type="button" class="pill solid" data-go="visitor">See it as a visitor ↗</button>' +
+        '<button type="button" class="pill" data-go="translations">English versions</button>' +
         '<button type="button" class="pill" data-go="menu">Menu & page names</button>' +
         '<button type="button" class="pill" data-go="site">Name, logo, email</button>' +
         '<button type="button" class="pill" data-go="look">Fonts, colours, sizes</button>' +
@@ -1080,6 +1119,7 @@
       var g = e.target.closest("[data-go]"); if (!g) return;
       var k = g.getAttribute("data-go");
       if (k === "visitor") { window.open(location.pathname + "?visitor" + location.hash, "_blank"); return; }
+      if (k === "translations") { translationsSheet(); return; }
       if (k === "menu") menuSheet();
       if (k === "site") siteSheet();
       if (k === "look") lookSheet();
@@ -1181,6 +1221,7 @@
     }
   }
   var BLOCK_HELP = {
+    updates: "A calendar of what you updated each day",
     text: "A title and a few paragraphs", image: "One large picture, with a caption and link", hero: "Your logo and a line under it",
     daily: "The latest Daily posts", watch: "The latest videos", listen: "Songs and podcasts", ongoing: "Ongoing collections",
     visual: "Pictures from Visual", design: "Latest sketches", store: "Things from the Store", books: "Your books",
@@ -1208,7 +1249,7 @@
   function blockSheet(i) {
     var b = clone(blocksRaw()[i] || {}), t = b.type, body = "";
     var name = (CTX.blockNames || {})[t] || t;
-    if (/daily|watch|listen|ongoing|visual|design|store|books|follow|index/.test(t))
+    if (/updates|daily|watch|listen|ongoing|visual|design|store|books|follow|index/.test(t))
       body += field("Title (empty: the section's name)", input("title", b.title));
     if (/daily|watch|listen|ongoing|visual|design|store|books/.test(t))
       body += field("How many to show", input("count", b.count || 4, "number", ' min="1" max="24"'));
@@ -1339,6 +1380,7 @@
         range("size_body", "Main text size", 12, 28, 15, "px") + range("size_heading", "Page title size", 24, 110, 46, "px") + range("size_nav", "Menu size", 11, 26, 13, "px") +
         '<div class="ed-colors">' + color("color_background", "Background", "#ffffff") + color("color_text", "Text", "#111111") + color("color_muted", "Grey text", "#8a8984") +
           color("color_line", "Lines", "#e7e6e1") + color("color_tile", "Empty pictures, calendar", "#f4f3ef") + color("color_highlight", "Highlight (today, selected text)", "#f5e47c") + "</div>" +
+        field("Pictures", select("image_fit", g.image_fit || "natural", [["natural", "Show the whole picture (no cropping)"], ["crop", "Crop to the same shape (tidy grid)"]])) +
         range("page_width", "Page width", 860, 1800, 1240, "px") + range("image_corners", "Picture corners", 0, 32, 0, "px") +
         range("logo_header_width", "Small logo width", 36, 140, 64, "px") + range("logo_home_width", "Big logo width", 120, 520, 300, "px") +
         '<div class="ed-row2">' + range("cols_visual", "Per row: Visual", 1, 6, 4) + range("cols_store", "Per row: Store", 1, 6, 4) + "</div>" +
@@ -1532,6 +1574,11 @@
         ev.preventDefault();
         saveFlow(wrap, function () {
           var pre = "visual-" + id;
+          if (!main.items.length) {
+            // no picture left: that means removing it from the series, not keeping an empty frame
+            if (!window.confirm("There's no picture now. Remove this picture from the series?")) return Promise.reject({ status: 0, quiet: true });
+            return changeFile(file, function (o) { (o.images || []).splice(i, 1); return o; }, "Remove a picture from “" + id + "”").then(function (o) { CTX.onSaved("visual", Object.assign({ id: id }, o)); });
+          }
           return Promise.all([collectMedia(main, pre), collectMedia(phone, pre + "-phone"), collectMedia(desk, pre + "-desktop")]).then(function (r) {
             return changeFile(file, function (o) {
               o.images = o.images || [];
@@ -1594,8 +1641,179 @@
     }).catch(function (e) { toast(explain(e)); });
   }
 
+
+  /* ---------- Translation desk: Chinese on the left, your English on the right ----------
+     Nothing machine-made goes to visitors until you approve it here. */
+  function englishTypography(text) {
+    return String(text || "")
+      .replace(/[《〈]\s*([^》〉]+?)\s*[》〉]/g, "*$1*")
+      .replace(/……|\.{6}/g, "…").replace(/——/g, "—")
+      .replace(/，/g, ", ").replace(/。/g, ". ").replace(/；/g, "; ").replace(/：/g, ": ")
+      .replace(/！/g, "! ").replace(/？/g, "? ").replace(/、/g, ", ")
+      .replace(/（/g, " (").replace(/）/g, ") ")
+      .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+      .replace(/[ \t]+([,.;:!?)])/g, "$1").replace(/\( +/g, "(")
+      .replace(/([.!?,;:…]) (["'])(?=\s|$)/g, "$1$2")
+      .replace(/[ \t]{2,}/g, " ").replace(/ +\n/g, "\n").replace(/\n +/g, "\n").trim();
+  }
+  var CJK = /[぀-ヿ㐀-鿿가-힯]/;
+  function sha16(s) {
+    return crypto.subtle.digest("SHA-1", new TextEncoder().encode(String(s).trim())).then(function (b) {
+      return Array.prototype.map.call(new Uint8Array(b), function (x) { return (x < 16 ? "0" : "") + x.toString(16); }).join("").slice(0, 16);
+    });
+  }
+  function deeplLink(zh) { return "https://www.deepl.com/translator#zh/en-us/" + encodeURIComponent(zh).replace(/%2F/g, "%5C%2F"); }
+  var DESK_FIELDS = ["title", "text", "note", "intro", "caption", "quote"];
+  var machineCache = null;
+  function machineDrafts() {
+    if (machineCache) return machineCache;
+    // raw, so it still works when the file grows past 1 MB
+    machineCache = fetch(API + "/repos/" + REPO + "/contents/" + BASE + "data/translations.json?ref=" + BRANCH, {
+      headers: { Authorization: "Bearer " + token(), Accept: "application/vnd.github.raw+json" }, cache: "no-store"
+    }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { return (j && j.items) || {}; }).catch(function () { return {}; });
+    return machineCache;
+  }
+  function desk(file, label) {
+    Promise.all([readJSON(BASE + file), machineDrafts()]).then(function (r) {
+      var raw = r[0], cache = r[1];
+      if (!raw) { toast("Couldn't open this one."); return; }
+      var fields = DESK_FIELDS.filter(function (k) { return typeof raw[k] === "string" && CJK.test(raw[k]); });
+      if (!fields.length) { toast("Nothing in Chinese here."); return; }
+      close();
+      var w = document.createElement("div");
+      w.className = "ed-write desk";
+      w.innerHTML = '<header class="ew-bar"><button type="button" class="pill" data-close>← Close</button>' +
+        '<span class="ew-where">English · ' + esc(label || raw.title || file.split("/").pop()) + '</span><span class="ew-status" aria-live="polite"></span>' +
+        '<button type="button" class="pill" data-fill title="Put the machine draft into every empty box">Fill empty with drafts</button>' +
+        '<button type="button" class="pill" data-tidy title="English punctuation; 《titles》 in italics">Tidy punctuation</button>' +
+        '<button type="button" class="pill solid" data-ok>Approve</button></header>' +
+        '<div class="desk-page"><p class="desk-help">Write or correct the English on the right. Visitors only see English you approve; until then they see your Chinese. ' +
+        '<b>DeepL ↗</b> opens that paragraph in DeepL; <b>Tidy</b> fixes punctuation and puts 《book titles》 in <i>italics</i>. Your work is kept as a private draft while you go.</p><div class="desk-rows"></div></div>';
+      document.body.appendChild(w);
+      document.documentElement.classList.add("lb-open");
+      var rowsBox = $(".desk-rows", w), status = $(".ew-status", w), boxes = [];
+      var ckey = "desk:" + file;
+      var jobs = [];
+      fields.forEach(function (k) {
+        var zhParas = k === "text" || k === "note" || k === "intro" ? String(raw[k]).split(/\n{2,}/) : [String(raw[k])];
+        var enParas = typeof raw[k + "_en"] === "string" ? String(raw[k + "_en"]).split(/\n{2,}/) : [];
+        if (enParas.length !== zhParas.length) enParas = zhParas.length === 1 && enParas.length ? [enParas.join("\n\n")] : [];
+        var head = document.createElement("h3");
+        head.className = "desk-field"; head.textContent = { title: "Title", text: "Text", note: "Note", intro: "Intro", caption: "Caption", quote: "Quote" }[k] || k;
+        rowsBox.appendChild(head);
+        zhParas.forEach(function (zh, i) {
+          var row = document.createElement("div");
+          row.className = "desk-row";
+          var hasZh = CJK.test(zh);
+          row.innerHTML = '<div class="desk-zh">' + esc(zh) + '</div><div class="desk-en"><textarea rows="' + (k === "title" ? 1 : 3) + '"' + (hasZh ? "" : " disabled") + ">" +
+            esc(hasZh ? (enParas[i] || "") : zh) + "</textarea>" +
+            (hasZh ? '<div class="desk-tools"><a class="mini-btn" href="' + esc(deeplLink(zh)) + '" target="_blank" rel="noopener">DeepL ↗</a>' +
+              '<button type="button" class="mini-btn" data-use hidden>Use machine draft</button><button type="button" class="mini-btn" data-t>Tidy</button></div>' : "") + "</div>";
+          rowsBox.appendChild(row);
+          var ta = $("textarea", row), box = { field: k, i: i, zh: zh, ta: ta, has: hasZh, draft: "" };
+          boxes.push(box);
+          autoGrow(ta);
+          if (hasZh) jobs.push(sha16(zh).then(function (h) {
+            var c = cache[h];
+            if (c && c.en) { box.draft = c.en; ta.placeholder = c.en; var u = $("[data-use]", row); u.hidden = false; }
+            else ta.placeholder = "English…";
+          }));
+          if (hasZh) {
+            $("[data-t]", row).addEventListener("click", function () { ta.value = englishTypography(ta.value); changed(); });
+            $("[data-use]", row).addEventListener("click", function () { ta.value = englishTypography(box.draft); changed(); ta.focus(); });
+          }
+        });
+      });
+      var read = function () { return boxes.map(function (b) { return b.ta.value; }); };
+      var original = JSON.stringify(read()), timer;
+      var keep = function () {
+        var v = read();
+        if (JSON.stringify(v) === original) return;
+        try { localStorage.setItem("alyx-form:" + ckey, JSON.stringify({ v: v, t: Date.now() })); } catch (e) {}
+        cloudPut(ckey, { v: v, t: Date.now() });
+        status.textContent = "Draft saved · " + new Date().toTimeString().slice(0, 5);
+      };
+      var changed = function () { clearTimeout(timer); timer = setTimeout(keep, 1000); status.textContent = "Typing…"; };
+      rowsBox.addEventListener("input", changed);
+      var restore = function (d, where) {
+        if (!d || !d.v || d.v.length !== boxes.length) return;
+        d.v.forEach(function (x, i) { if (boxes[i].has) { boxes[i].ta.value = x; boxes[i].ta.dispatchEvent(new Event("input")); } });
+        status.textContent = "Restored your draft" + (where || "");
+      };
+      var local = null;
+      try { local = JSON.parse(localStorage.getItem("alyx-form:" + ckey) || "null"); } catch (e) {}
+      restore(local);
+      cloudGet(ckey).then(function (c) { if (c && (!local || c.t > local.t) && JSON.stringify(read()) === (local ? JSON.stringify(local.v) : original)) restore(c, " from your other device"); });
+      $("[data-fill]", w).addEventListener("click", function () {
+        Promise.all(jobs).then(function () {
+          var n = 0;
+          boxes.forEach(function (b) { if (b.has && !b.ta.value.trim() && b.draft) { b.ta.value = englishTypography(b.draft); b.ta.dispatchEvent(new Event("input")); n++; } });
+          status.textContent = n ? n + " filled with machine drafts — please read them through" : "No machine drafts for the empty boxes";
+          changed();
+        });
+      });
+      $("[data-tidy]", w).addEventListener("click", function () { boxes.forEach(function (b) { if (b.has) b.ta.value = englishTypography(b.ta.value); }); changed(); });
+      var closeIt = function () { clearTimeout(timer); keep(); close(); };
+      $("[data-close]", w).addEventListener("click", closeIt);
+      $("[data-ok]", w).addEventListener("click", function () {
+        var empty = boxes.filter(function (b) { return b.has && !b.ta.value.trim(); }).length;
+        if (empty && !window.confirm(empty + (empty === 1 ? " box is" : " boxes are") + " still empty. Those parts will show in Chinese. Approve the rest?")) return;
+        var btn = $("[data-ok]", w); btn.disabled = true; status.textContent = "Saving…";
+        changeFile(file, function (o) {
+          fields.forEach(function (k) {
+            var parts = boxes.filter(function (b) { return b.field === k; }).map(function (b) { return b.has ? b.ta.value.trim() : b.zh; });
+            var joined = parts.join("\n\n");
+            if (parts.every(function (p, i) { var b = boxes.filter(function (x) { return x.field === k; })[i]; return !b.has || !p; })) delete o[k + "_en"];
+            else o[k + "_en"] = joined;
+          });
+          return o;
+        }, "English for “" + (raw.title || file.split("/").pop()) + "”").then(function () {
+          try { localStorage.removeItem("alyx-form:" + ckey); } catch (e) {}
+          cloudDel(ckey);
+          close();
+          toast("Approved. Visitors see this English in about a minute.");
+        }).catch(function (e) { btn.disabled = false; status.textContent = explain(e); });
+      });
+      w.addEventListener("keydown", function (k) { if ((k.metaKey || k.ctrlKey) && k.key === "s") { k.preventDefault(); keep(); } });
+      var first = boxes.filter(function (b) { return b.has; })[0]; if (first) first.ta.focus();
+    }).catch(function (e) { toast(explain(e)); });
+  }
+  /* everything written in Chinese, and whether its English is approved */
+  function deskList() {
+    var D = CTX.D, items = [];
+    var add = function (file, it, kind, label) {
+      var zh = DESK_FIELDS.filter(function (k) { return it[k + "_zh"] && CJK.test(it[k + "_zh"]); });
+      if (!zh.length) return;
+      var done = zh.every(function (k) { return it[k + "_en"]; });
+      items.push({ file: file, kind: kind, label: label || it.title_zh || it.title || (it.text_zh || "").slice(0, 40), done: done, date: it.date || "" });
+    };
+    ((D.daily || {}).posts || []).forEach(function (p) { add("content/daily/" + p.id + ".json", p, "Feed", (p.text_zh || p.text || "").slice(0, 40)); });
+    ((D.media || {}).items || []).forEach(function (m) { add("content/media/" + m.id + ".json", m, "Video / Audio"); });
+    ((D.design || {}).items || []).forEach(function (x) { add("content/design/" + x.id + ".json", x, "Concept"); });
+    ((D.visual || {}).series || []).forEach(function (x) { add("content/visual/" + x.id + ".json", x, "Gallery"); });
+    var projects = ((D.ongoing || {}).projects || []);
+    projects.forEach(function (p) { add("content/projects/" + p.id + ".json", p, "Draft"); });
+    return Promise.all(projects.map(function (p) {
+      return fetch(CTX.root + "data/gen/ongoing-" + p.id + ".json", { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }).then(function (j) {
+        ((j || {}).entries || []).forEach(function (e) { add("content/entries/" + e.id + ".json", e, p.title_zh || p.title, e.title_zh || e.title || "No. " + e.number); });
+      });
+    })).then(function () { items.sort(function (a, b) { return (a.done - b.done) || String(b.date).localeCompare(String(a.date)); }); return items; });
+  }
+  function translationsSheet() {
+    var wrap = sheet("English versions", '<p class="ed-text">Everything you wrote in Chinese. Visitors see the English only after you approve it.</p><div class="desk-list"><p class="ed-hint">Loading…</p></div>');
+    deskList().then(function (items) {
+      $(".desk-list", wrap).innerHTML = items.length ? items.map(function (x) {
+        return '<button type="button" class="desk-item" data-file="' + esc(x.file) + '" data-label="' + esc(x.label) + '"><span class="desk-kind">' + esc(x.kind) + "</span>" +
+          '<span class="desk-label">' + esc(x.label) + "</span>" + (x.done ? '<span class="desk-ok">✓ English</span>' : '<span class="desk-todo">Needs English</span>') + "</button>";
+      }).join("") : '<p class="ed-hint">Nothing in Chinese yet.</p>';
+    });
+    wrap.addEventListener("click", function (e) { var b = e.target.closest("[data-file]"); if (b) desk(b.getAttribute("data-file"), b.getAttribute("data-label")); });
+    actions(wrap, [{ label: "Close", run: close }]);
+  }
+
   function ownerAction(spec) {
     var m = spec.mode;
+    if (m === "desk") return desk(spec.file, spec.val);
     if (m === "item") return editItem(spec.file, spec.i);
     if (m === "item-move") return moveItem(spec.file, +spec.i, spec.dir);
     if (m === "rename-cat") return renameCategory(spec.file, spec.val);
@@ -1609,13 +1827,14 @@
       if (spec.sheet === "series") return seriesSheet(spec.id);
       if (spec.sheet === "vimage") return vImageSheet(spec.id, +spec.i);
       if (spec.sheet === "project") return projectSheet(spec.id);
+      if (spec.sheet === "translations") return translationsSheet();
     }
   }
 
   /* ---------- entry point ---------- */
   function open(spec, ctx) {
     CTX = ctx || CTX;
-    if (["sheet", "item", "item-move", "rename-cat", "block", "vimage-move"].indexOf(spec.mode) > -1) {
+    if (["sheet", "item", "item-move", "rename-cat", "block", "vimage-move", "desk"].indexOf(spec.mode) > -1) {
       // home blocks change on the page first and wait for Publish; no sign-in needed yet
       if (spec.mode === "block") return ownerAction(spec);
       if (!token()) return signIn(function () { open(spec, ctx); });
@@ -1631,5 +1850,5 @@
     if (k === "media") return editMedia(spec.mode === "edit" ? spec.id : null, spec.shelf);
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && $(".ed-sheet")) close(); });
-  window.AlyxEditor = { open: open, toMarkdown: toMarkdown, decorate: decorate, signIn: signIn };
+  window.AlyxEditor = { open: open, toMarkdown: toMarkdown, decorate: decorate, signIn: signIn, priv: priv, toast: function (m) { toast(m); } };
 })();

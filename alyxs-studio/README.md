@@ -58,17 +58,53 @@
 - 小红书、微博、X 这些不让别的网站嵌入播放，会显示成带封面的卡片，点了去原页面看。
 - 抓取情况记在 `data/embeds.json`，想改某个标题可以直接改这里。
 
-## 中文写，英文显示
-- 你用中文写，后台保存中文原文；网站更新时自动生成英文。
-- **访客只看到英文**（除非在 Name, logo, email 里打开 "Let visitors switch to Chinese"）。
-- **Owner 模式下你默认看到中文**，章节可以切换 中文 / English / 对照，日常有 English 按钮看翻译。
-- 想看访客看到的样子：左下角 ✎ Owner → English · what visitors see。在英文视图里点字修改，改的是英文版本，以后一直保留你改的。
-- 翻译用哪个服务、怎么换：
-  - 什么都不设置：用免费的 MyMemory，英文比较直白，每天大约 5000 字，超出的第二天继续翻。
-  - 想要更好的英文，在仓库 Settings → Secrets and variables → Actions 里存一把钥匙：`GEMINI_API_KEY`（免费）、`DEEPL_API_KEY`（DeepL 免费版）或 `ANTHROPIC_API_KEY`（Claude，按量付费）。
-  - 存了钥匙后，免费翻译翻过、你没手动改过的段落会自动重翻。
-- 一次发布太多新内容时，剩下的下次发布继续翻，翻好之前暂时显示中文。翻译情况见 `alyxsstudio.com/data/translate-status.json`。
-- 中文字体和大小在 Fonts, colours, sizes 里调（"Chinese size next to English"），让中文和英文看起来一样大。
+## 中文写，英文显示（先确认再公开）
+- 你用中文写，后台保存中文原文。
+- **访客只看到你确认过的英文**；还没确认的部分，访客看到的是中文。（想改回自动显示机器翻译：后台 Site → 首页 · 联系方式 →"访客看到的英文"。）
+- **翻译台**：Owner 模式下，凡是中文写的内容旁边都有 **English** 按钮（确认过的显示 **English ✓**）。点开是左右对照：
+  - 左边中文，右边写英文，一段对一段。
+  - 每段有 **DeepL ↗**：在 DeepL 网页里打开这一段，复制回来再改。
+  - **Use machine draft / Fill empty with drafts**：把自动生成的英文草稿放进来，作为修改的起点。
+  - **Tidy**：改成英文标点，《书名》变成*斜体*。
+  - 写到一半会自动存成私密草稿，换设备也在。改好点 **Approve**，约 1 分钟后访客就能看到。
+- **✎ Owner → English versions**：列出所有中文内容，哪些已经有英文、哪些还没有。
+- 菜单名、页面介绍这类短文字：直接点字改成你想给访客看的英文名字就行（比如你现在的 Feed、Draft）。
+- 想要更好的英文草稿，可以在 GitHub 存 `GEMINI_API_KEY`、`DEEPL_API_KEY` 或 `ANTHROPIC_API_KEY`（Settings → Secrets and variables → Actions）。没有钥匙就用免费的 MyMemory，草稿比较生硬。
+
+## 🔒 锁：暂时不公开
+- Owner 模式左下角有 **🔓 Public / 🔒 Private** 按钮。
+- 锁上后约 1 分钟，访客打开任何页面都只看到 "Private for now"，搜索引擎也不会收录。你自己（Owner 模式）照常看、照常改。
+- 注意：网站的文件放在公开的 GitHub 仓库里，锁只是挡住访客的页面，不是加密。真正私密的东西（草稿、私人日历）都放在私密仓库 `studio-drafts` 里。
+
+## 首页：更新日历
+- 首页现在只有一个 **Updates** 日历：每天哪些栏目有更新，用栏目首字母圈标出来（F = Feed，D = Draft……），点一天看当天更新了什么。
+- 其他模块随时可以用 **+ Add a block** 加回来。
+
+## Feed：只有你能看的私人日历
+- Owner 模式打开 Feed，日历右边多了 **My day · only you**：
+  - 喝水（杯）、上厕所、💩 次数，点 + / −。
+  - 心情、🩸 月经（无 / 点滴 / 少 / 中 / 多），会算出下次大概哪天、晚了几天、平均周期。
+  - 吃了什么：输入食物（常见的中英文食物都有，比如"米饭""鸡胸肉""奶茶"），选份量，自动算热量、蛋白质、碳水、膳食纤维、蔬菜份数，和每日目标对比"够不够"。列表里没有的，填一次数字就会记住；在设置里填 Gemini 钥匙，还可以让 AI 估算。
+  - 饮料：一键添加咖啡、奶茶、可乐……
+  - 花了多少钱：金额 + 分类（Shopping、Food……可以自己改），日历上方显示本月总额和各类花费。
+  - 随手记。
+  - 电脑时间（装了 Mac 小程序后显示，见下）。
+- 日历格子上会出现小图标：心情、🩸、🍽、💰、✎。
+- 这些全部存在你的**私密仓库** `studio-drafts` 的 `journal/` 里，**不会出现在网站上**，访客的 Feed 只有公开的日常。
+- 目标数值（热量、蛋白质、喝水……）、货币符号、花费分类：私人日历底部 **Targets, currency, AI key…**。
+
+## 电脑时间（Mac 小程序）
+记录每天几点到几点在用电脑、用的是哪个软件或网站，自动分成"工作"、"休息娱乐"、"其他"，离开电脑 5 分钟以上算休息。每 10 分钟同步一次到私人日历。
+1. 先在网站上写过一次草稿（这样私密仓库 `studio-drafts` 已经建好）。
+2. 在 GitHub 新建一个钥匙：github.com/settings/personal-access-tokens/new
+   - Repository access 选 **Only select repositories → studio-drafts**
+   - Permissions → Repository permissions → **Contents: Read and write**
+   - 生成后复制。
+3. 打开 Mac 的"终端"，粘贴这一行，回车，按提示粘贴钥匙：
+   `curl -fsSL https://raw.githubusercontent.com/alyxsstudio/alyxsstudio/main/tools/mac-activity/install.sh | bash`
+4. 第一次 Mac 可能会问"osascript 想控制 Safari / Chrome"：允许的话能按网站区分工作和娱乐（比如 YouTube 算休息、Google Docs 算工作），不允许也能用。
+- 哪些软件、网站算工作或休息：改 `~/Library/Application Support/AlyxActivity/apps.json`。
+- 卸载：`curl -fsSL https://raw.githubusercontent.com/alyxsstudio/alyxsstudio/main/tools/mac-activity/uninstall.sh | bash`
 
 ## 引用卡片
 在任何文章或章节里选中一段文字，会出现 **Quote card** 按钮，点一下生成一张 Story 尺寸的引用图。手机上会直接调出分享面板。
@@ -83,6 +119,7 @@
   - 注意：这只是把按钮藏起来，不是加密。网站上的内容本身是公开的。
 
 ## 小提示
+- 图片默认**完整显示，不裁剪**（A4 页面、书封、竖长图都完整）。想要整齐的统一形状：✎ Owner → Fonts, colours, sizes → Pictures。
 - 上传的图片会自动转成 webp，并缩小到长边 2880px 以内，网站不会越来越慢。
 - 语音和音频建议每个 30MB 以内。
 - 想先写好、暂时不公开，就勾选"先不公开"。

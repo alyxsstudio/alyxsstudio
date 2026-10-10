@@ -13,7 +13,7 @@
 // Text translated by the no-key fallback is redone automatically once a key is added.
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { walk, hasCJK, hash, paragraphs, readCache, writeCache } from "./i18n.mjs";
+import { walk, hasCJK, hash, paragraphs, readCache, writeCache, englishTypography } from "./i18n.mjs";
 
 const SITE = path.resolve(process.argv[2] || ".");
 const CACHE = path.join(SITE, "data", "translations.json");
@@ -25,8 +25,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const problem = (s) => { console.warn("  " + s); status.problems.push(String(s).slice(0, 400)); };
 
 const SYSTEM = [
-  "You translate a writer's Chinese into natural, literary English for her personal website.",
-  "Keep her voice, rhythm and line breaks. Keep Markdown (**bold**, *italics*, headings, lists, links) exactly where it is.",
+  "You translate a novelist's Chinese into natural, literary English for her personal website, the way a good published translation reads.",
+  "Keep her voice, rhythm, imagery and paragraphing; never summarise, never add. Keep Markdown (**bold**, *italics*, headings, lists, links) where it is.",
+  "Follow English conventions, not Chinese ones: titles of books, films, journals, paintings and albums (in 《》) are in *italics* without quotation marks;",
+  "short works (poems, songs, articles, chapters) go in double quotation marks; use English punctuation (no full-width marks), em dashes and ellipses as English does.",
   "Keep names, brand names, URLs, emoji and any English words as they are. If a string is partly English, translate only the Chinese.",
   "Short strings are titles, captions or single dictionary words: translate them as titles or words, not sentences.",
   "The input is a JSON object of numbered strings. Answer with a JSON object only, with exactly the same keys, each holding the English for that string."
@@ -235,7 +237,7 @@ async function main() {
       requests++;
       const out = await tr.run(batch.map((b) => b[1]));
       if (!out) { console.warn("Translation unavailable right now; showing the Chinese until next time."); break; }
-      batch.forEach(([h, zh], i) => { cache[h] = { zh, en: out[i], auto: out[i], by: tr.name }; });
+      batch.forEach(([h, zh], i) => { const en = englishTypography(out[i]); cache[h] = { zh, en, auto: en, by: tr.name }; });
       status.translated += batch.length;
       await writeCache(CACHE, cache);
       await sleep(tr.pause);

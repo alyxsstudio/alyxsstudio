@@ -635,6 +635,19 @@ collections:
       label: 邮箱
       widget: string
       required: false
+    - name: english
+      label: 访客看到的英文
+      widget: select
+      options:
+      - label: 只显示我确认过的英文（没确认的显示中文）
+        value: approved
+      - label: 自动显示机器翻译
+        value: auto
+      default: approved
+    - name: locked
+      label: 🔒 暂时私密（访客只看到"Private for now"）
+      widget: boolean
+      default: false
     - name: media_autoplay
       label: 视频滑到屏幕中间时自动静音播放
       widget: boolean
@@ -682,6 +695,14 @@ collections:
           label: 显示一句话
           widget: boolean
           default: true
+      - name: updates
+        label: 更新日历（每天哪些栏目有更新）
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就是 Updates）
+          widget: string
+          required: false
       - name: daily
         label: 最新日常
         widget: object
@@ -1017,6 +1038,15 @@ collections:
       - JetBrains Mono
       - Courier Prime
       default: Same as body
+    - name: image_fit
+      label: 图片显示
+      widget: select
+      options:
+      - label: 显示完整图片（不裁剪）
+        value: natural
+      - label: 裁成统一形状
+        value: crop
+      default: natural
     - name: font_cjk
       label: 中文字体
       widget: select

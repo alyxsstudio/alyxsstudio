@@ -241,9 +241,11 @@
       : '<span class="blank" aria-hidden="true"></span>';
   }
   /* tiles: list of {title, note, image, url, act, extra} */
+  // pictures are shown whole (A4 pages, book covers…) unless "crop to the same shape" is chosen in Look
+  function natural() { return (D.theme || {}).image_fit !== "crop"; }
   function tiles(items, ratio, n, extra) {
     var t = Math.min(n, 3);
-    return '<ul class="tiles" style="--ratio:' + esc(ratio) + ";--cols:" + n + ";--cols-t:" + t + '">' +
+    return '<ul class="tiles' + (natural() ? " natural" : "") + '" style="--ratio:' + esc(ratio) + ";--cols:" + n + ";--cols-t:" + t + '">' +
       items.map(function (it) {
         var media = '<div class="tile-pic">' + pic(it.image, it.title) + (it.badge ? '<span class="badge">' + esc(it.badge) + "</span>" : "") + "</div>";
         var wrapped = it.act
@@ -280,7 +282,10 @@
   }
   function ownerEdit(kind) {
     if (!EDIT) return null;
-    return function (it) { return it.id ? '<p class="tile-more"><button type="button" class="mini-btn" data-act="edit" data-kind="' + kind + '" data-id="' + esc(it.id) + '">Edit</button></p>' : ""; };
+    return function (it) {
+      return it.id ? '<p class="tile-more"><button type="button" class="mini-btn" data-act="edit" data-kind="' + kind + '" data-id="' + esc(it.id) + '">Edit</button>' +
+        (it.src ? deskBtn("content/" + (kind === "entry" ? "entries" : kind) + "/" + it.id + ".json", it.src) : "") + "</p>" : "";
+    };
   }
   /* Edit / ← / → under items kept in one list file (books, store) */
   function listTools(file, i, n) {
@@ -288,6 +293,15 @@
     return '<p class="tile-more owner-row"><button type="button" class="mini-btn" data-act="item" data-file="' + file + '" data-i="' + i + '">Edit</button>' +
       (i > 0 ? '<button type="button" class="mini-btn" data-act="item-move" data-file="' + file + '" data-i="' + i + '" data-dir="-1" aria-label="Move earlier">←</button>' : "") +
       (i < n - 1 ? '<button type="button" class="mini-btn" data-act="item-move" data-file="' + file + '" data-i="' + i + '" data-dir="1" aria-label="Move later">→</button>' : "") + "</p>";
+  }
+  /* owner: open the translation desk for something written in Chinese */
+  var DESK_KEYS = ["title", "text", "note", "intro", "caption", "quote"], CJK_RE = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+  function deskBtn(file, it, label) {
+    if (!EDIT || !it) return "";
+    var zh = DESK_KEYS.filter(function (k) { return it[k + "_zh"] && CJK_RE.test(it[k + "_zh"]); });
+    if (!zh.length) return "";
+    var done = zh.every(function (k) { return it[k + "_en"]; });
+    return ' <button type="button" class="mini-btn ' + (done ? "en-ok" : "en-todo") + '" data-act="desk" data-file="' + esc(file) + '" data-val="' + esc(label || "") + '">' + (done ? "English ✓" : "English") + "</button>";
   }
   function addButton(label, attrs) {
     return EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" ' + attrs + ">" + esc(label) + "</button></p>" : "";
@@ -330,7 +344,7 @@
     opts = opts || {};
     var imgs = list(p.images);
     var gallery = imgs.length
-      ? '<div class="post-images n' + Math.min(imgs.length, 4) + '">' + imgs.map(function (src, i) {
+      ? '<div class="post-images n' + Math.min(imgs.length, 4) + (natural() ? " natural" : "") + '">' + imgs.map(function (src, i) {
           return '<button type="button" class="post-img" data-act="lightbox" data-src="post:' + esc(p.id) + '" data-i="' + i + '">' + pic(src, "") + "</button>";
         }).join("") + "</div>"
       : "";
@@ -347,7 +361,8 @@
     var meta = '<p class="post-meta"><a href="' + esc(href("daily", "p-" + p.id)) + '">' +
       (opts.showDay ? esc(fmtDay(p.day)) + " · " : "") + esc(timeOf(p.date)) + "</a>" +
       (hasEnglish(p) && (OWNER || (D.settings || {}).language_switch) ? ' <button type="button" class="mini-btn" data-act="orig" data-id="' + esc(p.id) + '">' + (LANG === "zh" ? "English" : "原文") + "</button>" : "") +
-      (OWNER && !PREVIEW ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '">Edit</button>' : "") + "</p>";
+      (OWNER && !PREVIEW ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '">Edit</button>' : "") +
+      deskBtn("content/daily/" + p.id + ".json", p, cut(plain(p.text_zh || p.text), 30)) + "</p>";
     return '<article class="post" id="p-' + esc(p.id) + '">' + meta +
       (p.text ? '<div class="prose post-text"' + (EDIT ? ' data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '" title="Click to edit"' : "") + ">" + md(p.text) + "</div>" : "") +
       gallery + audio + link + tags + shareRow(p) + "</article>";
@@ -381,15 +396,17 @@
     for (var d = 1; d <= days; d++) {
       var key = month + "-" + pad(d), ps = byDay[key];
       var cls = "cal-cell" + (ps ? " has" : "") + (key === selected ? " sel" : "") + (key === today() ? " today" : "");
+      // owner: the private journal's marks (mood, period, food, money, notes) sit on every day
+      var jm = EDIT && window.AlyxJournal ? window.AlyxJournal.marks(key) : "";
       if (ps) {
         var t = thumbFor(ps);
         cells += '<a class="' + cls + '" href="#' + key + '" aria-label="' + esc(fmtDay(key)) + ", " + ps.length + ' post' + (ps.length > 1 ? "s" : "") + '">' +
           '<span class="cal-num">' + d + "</span>" +
           (t.img ? '<span class="cal-thumb">' + pic(t.img, "") + "</span>" : '<span class="cal-text">' + esc(t.text) + "</span>") +
-          (ps.length > 1 ? '<span class="cal-count">' + ps.length + "</span>" : "") + "</a>";
+          (ps.length > 1 ? '<span class="cal-count">' + ps.length + "</span>" : "") + jm + "</a>";
       } else {
         cells += EDIT
-          ? '<button type="button" class="' + cls + ' cal-new" data-act="new" data-kind="daily" data-day="' + key + '" aria-label="New post on ' + esc(fmtDay(key)) + '"><span class="cal-num">' + d + '</span><span class="cal-plus" aria-hidden="true">+</span></button>'
+          ? '<a class="' + cls + (jm ? " jhas" : "") + '" href="#' + key + '" aria-label="' + esc(fmtDay(key)) + '"><span class="cal-num">' + d + "</span>" + jm + "</a>"
           : '<span class="' + cls + '"><span class="cal-num">' + d + "</span></span>";
       }
     }
@@ -465,7 +482,7 @@
       (info.title && info.type !== "card" ? '<p class="m-title">' + esc(info.title) + "</p>" : "") +
       (it.note ? '<p class="m-note">' + esc(it.note) + "</p>" : "") +
       '<p class="m-meta">' + esc(bits) + (info.link && info.type !== "card" ? (bits ? " · " : "") + '<a href="' + esc(info.link) + '" target="_blank" rel="noopener">' + esc(info.platform || "Open") + " ↗</a>" : "") +
-      (withEdit && OWNER && !PREVIEW && it.id ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="media" data-id="' + esc(it.id) + '">Edit</button>' : "") + "</p></div>";
+      (withEdit && OWNER && !PREVIEW && it.id ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="media" data-id="' + esc(it.id) + '">Edit</button>' + deskBtn("content/media/" + it.id + ".json", it) : "") + "</p></div>";
   }
   function mediaFigure(info, cls, opts) {
     return '<figure class="m-item ' + (cls || "") + '" id="m-' + esc(info.id || "") + '">' + player(info, opts) + mediaCaption(info, true) + "</figure>";
@@ -636,6 +653,41 @@
   /* ---------- pages ---------- */
   var TILE_LIMIT = 4;
   var BLOCK = {
+    updates: function (b, s, i) {
+      var by = activity(), days = Object.keys(by).sort();
+      var months = {}; days.forEach(function (d) { months[d.slice(0, 7)] = 1; }); months[today().slice(0, 7)] = 1;
+      months = Object.keys(months).sort();
+      var month = STATE.uMonth && months.indexOf(STATE.uMonth) > -1 ? STATE.uMonth : months[months.length - 1];
+      var mi = months.indexOf(month);
+      var inMonth = days.filter(function (d) { return d.slice(0, 7) === month; });
+      var sel = STATE.uDay && STATE.uDay.slice(0, 7) === month ? STATE.uDay : inMonth[inMonth.length - 1] || "";
+      var parts = month.split("-"), y = +parts[0], m = +parts[1];
+      var lead = (new Date(y, m - 1, 1).getDay() + 6) % 7, n = new Date(y, m, 0).getDate(), cells = "";
+      for (var k = 0; k < lead; k++) cells += '<span class="u-cell empty" aria-hidden="true"></span>';
+      var used = {};
+      for (var d = 1; d <= n; d++) {
+        var key = month + "-" + pad(d), ups = by[key] || [];
+        var secs = []; ups.forEach(function (u) { if (secs.indexOf(u.key) < 0) secs.push(u.key); used[u.key] = 1; });
+        var cls = "u-cell" + (ups.length ? " has" : "") + (key === sel ? " sel" : "") + (key === today() ? " today" : "");
+        cells += ups.length
+          ? '<button type="button" class="' + cls + '" data-act="u-day" data-day="' + key + '" aria-label="' + esc(fmtDay(key) + ": " + secs.map(title).join(", ")) + '">' +
+              '<span class="u-num">' + d + '</span><span class="u-marks">' + secs.map(function (x) { return '<span class="u-mark" title="' + esc(title(x)) + '">' + esc(mark(x)) + "</span>"; }).join("") + "</span></button>"
+          : '<span class="' + cls + '"><span class="u-num">' + d + "</span></span>";
+      }
+      var legend = Object.keys(used).map(function (x) { return '<span><b class="u-mark">' + esc(mark(x)) + "</b> " + esc(title(x)) + "</span>"; }).join("");
+      var list = sel ? (by[sel] || []).map(function (u) {
+        return '<li><a href="' + esc(u.url) + '"><span class="u-sec">' + esc(title(u.key)) + '</span><span class="u-what">' + esc(u.what) + "</span></a></li>";
+      }).join("") : "";
+      return '<section class="block updates">' + blockHead(b.title || "Updates", null, null, bt(b, i)) +
+        '<div class="u-wrap"><div class="u-cal-col"><div class="cal-head">' +
+          '<button type="button" class="cal-arrow" data-act="u-month" data-dir="-1" aria-label="Previous month"' + (mi <= 0 ? " disabled" : "") + ">‹</button>" +
+          '<h3 class="cal-title">' + esc(fmtMonth(month)) + "</h3>" +
+          '<button type="button" class="cal-arrow" data-act="u-month" data-dir="1" aria-label="Next month"' + (mi >= months.length - 1 ? " disabled" : "") + ">›</button></div>" +
+          '<div class="u-cal">' + ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(function (w) { return '<span class="cal-wd">' + w + "</span>"; }).join("") + cells + "</div>" +
+          (legend ? '<p class="u-legend">' + legend + "</p>" : "") + "</div>" +
+          '<div class="u-day" aria-live="polite">' + (sel ? '<h3 class="day-head">' + esc(fmtDay(sel)) + '</h3><ul class="u-list">' + list + "</ul>" : '<p class="empty">Nothing new this month yet.</p>') + "</div>" +
+        "</div></section>";
+    },
     hero: function (b, s, i) {
       var line = b.show_tagline !== false && (s.tagline || EDIT) ? '<p class="hero-line"' + ed("data/settings.json#tagline", s, "tagline", "A line under the logo (optional)") + ">" + esc(s.tagline || "") + "</p>" : "";
       if (b.show_logo === false && !line) return "";
@@ -737,7 +789,32 @@
     return '<div class="block-head"><h2 class="block-title"' + (attrs || "") + ">" + esc(t || "") + "</h2>" +
       (moreHref ? '<a class="more" href="' + esc(moreHref) + '">' + esc(moreLabel) + "</a>" : "") + "</div>";
   }
-  var BLOCK_NAMES = { hero: "Logo + line", index: "List of sections", daily: "Latest daily", ongoing: "Ongoing", watch: "Watch", listen: "Listen",
+  /* ---------- what was updated on which day (home calendar) ---------- */
+  function activity() {
+    var by = {};
+    var add = function (day, key, what, url) { day = String(day || "").slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return; (by[day] = by[day] || []).push({ key: key, what: what, url: url }); };
+    posts().forEach(function (p) { add(p.day, "daily", cut(plain(p.text) || (p.link && p.link.title) || (list(p.images).length ? "Photos" : p.audio ? "Voice note" : "Post"), 70), href("daily", "p-" + p.id)); });
+    var projects = {}; ((D.ongoing || {}).projects || []).forEach(function (p) { projects[p.id] = p; });
+    // several entries in one collection on the same day: one line, "6 new"
+    var perDay = {};
+    ((D.ongoing || {}).recent || []).forEach(function (e) {
+      var pr = projects[e.project]; if (!pr) return;
+      var k = String(e.date || "").slice(0, 10) + "|" + e.project;
+      (perDay[k] = perDay[k] || { day: e.date, pr: pr, list: [] }).list.push(e);
+    });
+    Object.keys(perDay).forEach(function (k) {
+      var g = perDay[k], e = g.list[0];
+      add(g.day, "ongoing", g.pr.title + " · " + (g.list.length > 1 ? g.list.length + " new" : e.title || "No. " + (e.number || "")),
+        href("ongoing", g.list.length > 1 ? g.pr.id : g.pr.id + "/" + e.id));
+    });
+    mediaItems().forEach(function (m) { var i = mediaInfo(m); add(m.date, i.shelf, i.title || i.platform || "New", href(i.shelf, "m-" + m.id)); });
+    ((D.design || {}).items || []).forEach(function (x) { add(x.date, "design", x.title, href("design", "d-" + x.id)); });
+    ((D.visual || {}).series || []).forEach(function (x) { add(x.date, "visual", x.title, href("visual", "s-" + x.id)); });
+    return by;
+  }
+  function mark(key) { var t = title(key) || key; return t.charAt(0).toUpperCase(); }
+
+  var BLOCK_NAMES = { updates: "Updates calendar", hero: "Logo + line", index: "List of sections", daily: "Latest daily", ongoing: "Ongoing", watch: "Watch", listen: "Listen",
     visual: "Visual", design: "Design", store: "Store", books: "Books", follow: "Links to everywhere", text: "Text", image: "Picture", spacer: "Space" };
   function projectTile(p) {
     var meta = p.count + (p.count === 1 ? " entry" : " entries") + (p.updated ? " · " + fmtDay(p.updated) : "");
@@ -799,8 +876,11 @@
         '<button type="button" class="cal-arrow" data-act="month" data-dir="1" aria-label="Next month"' + (mi === -1 || mi >= ms.length - 1 ? " disabled" : "") + ">›</button></div>";
       var dayPosts = byDay[sel] || [];
       var panel = '<section class="day-panel" aria-live="polite"><h2 class="day-head">' + esc(fmtDay(sel)) + "</h2>" +
-        (dayPosts.length ? dayPosts.map(function (p) { return postCard(p); }).join("") : emptyNote("Nothing posted this day.")) + "</section>";
-      return pageHead("daily", tools) + dl + '<div class="daily-wrap"><div class="cal-col">' + nav + calendar(month, byDay, sel) + "</div>" + panel + "</div>";
+        (EDIT ? '<div id="journal-day"></div><h3 class="block-title j-pub">Public posts · everyone can see</h3>' : "") +
+        (dayPosts.length ? dayPosts.map(function (p) { return postCard(p); }).join("") : emptyNote(EDIT ? "No public post this day." : "Nothing posted this day.")) +
+        (EDIT ? '<p class="owner-tools"><button type="button" class="pill" data-act="new" data-kind="daily" data-day="' + sel + '">+ Public post for this day</button></p>' : "") + "</section>";
+      return pageHead("daily", tools) + dl + (EDIT ? '<div id="journal-month"></div>' : "") +
+        '<div class="daily-wrap"><div class="cal-col">' + nav + calendar(month, byDay, sel) + "</div>" + panel + "</div>";
     },
 
     ongoing: function () {
@@ -859,7 +939,7 @@
           '<p class="series-meta">' + esc([s.kind, imgs.length + (imgs.length === 1 ? " image" : " images")].filter(Boolean).join(" · ")) + "</p>" +
           (s.note || EDIT ? '<p class="intro"' + ed(vp + "note", s, "note", "A line about this series (optional)", true) + ">" + esc(s.note || "") + "</p>" : "") + dl +
           (EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="visual" data-id="' + esc(s.id) + '">+ Add images</button> ' +
-            '<button type="button" class="mini-btn" data-act="sheet" data-sheet="series" data-id="' + esc(s.id) + '">Series settings</button></p>' : "") + "</div>" +
+            '<button type="button" class="mini-btn" data-act="sheet" data-sheet="series" data-id="' + esc(s.id) + '">Series settings</button>' + deskBtn("content/visual/" + s.id + ".json", s) + "</p>" : "") + "</div>" +
           (imgs.length ? tiles(imgs.map(function (im, i) {
             return { title: im.title, image: im.image, i: i, act: 'data-act="lightbox" data-src="visual:' + esc(s.id) + '" data-i="' + i + '"' };
           }), shape("visual", "3 / 4"), cols("visual", 4), EDIT ? function (it) {
@@ -876,7 +956,7 @@
       var dl = OWNER && its.length ? downloadBar("design", ["zip", "pdf"], "Download all") : "";
       return pageHead("design") + dl + addButton("+ New sketch", 'data-act="new" data-kind="design"') + (its.length ? tiles(its.map(function (x) {
         var n = list(x.images).length;
-        return { id: x.id, title: x.title, note: [fmtDay(x.date), n > 1 ? n + " images" : ""].filter(Boolean).join(" · "), image: list(x.images)[0],
+        return { id: x.id, src: x, title: x.title, note: [fmtDay(x.date), n > 1 ? n + " images" : ""].filter(Boolean).join(" · "), image: list(x.images)[0],
                  act: 'data-act="lightbox" data-src="design:' + esc(x.id) + '" data-i="0"' };
       }), shape("design", "4 / 5"), cols("design", 3), ownerEdit("design")) : emptyNote());
     },
@@ -927,6 +1007,13 @@
       return pageHead("follow") + (groups || emptyNote()) + addButton("+ New group", 'data-act="item" data-file="follow"') + (s.email ? '<p class="follow-mail">' + esc(s.email) + "</p>" : "");
     },
 
+    locked: function () {
+      var s = D.settings || {};
+      return '<section class="curtain"><img class="curtain-logo" src="' + esc(asset(s.logo_large || "assets/img/logo.png")) + '" alt="' + esc(s.name) + '">' +
+        '<p class="curtain-line">' + esc(s.locked_note || "Private for now. Back soon.") + "</p>" +
+        (s.email ? '<p class="curtain-mail">' + esc(s.email) + "</p>" : "") + "</section>";
+    },
+
     notfound: function () {
       return '<div class="page-head"><h1>Not here</h1><p class="intro">This page doesn\'t exist.</p></div>' +
         '<p class="links"><a class="pill" href="' + esc(href("home")) + '">Back to the studio</a></p>';
@@ -954,7 +1041,8 @@
           return '<button type="button" role="tab" aria-selected="' + (m === x[0]) + '" class="chip' + (m === x[0] ? " on" : "") + '" data-act="readmode" data-val="' + x[0] + '">' + x[1] + "</button>";
         }).join("") + "</div>";
     }
-    if (OWNER && !PREVIEW) tools += '<p class="owner-tools"><button type="button" class="pill" data-act="edit" data-kind="entry" data-id="' + esc(e.id) + '">Edit</button></p>';
+    if (OWNER && !PREVIEW) tools += '<p class="owner-tools"><button type="button" class="pill" data-act="edit" data-kind="entry" data-id="' + esc(e.id) + '">Edit</button>' +
+      deskBtn("content/entries/" + e.id + ".json", e, e.title_zh || e.title) + "</p>";
     return tools;
   }
   function readerBody(e) {
@@ -985,7 +1073,7 @@
       '<p class="series-meta">' + esc([es.length + (es.length === 1 ? " entry" : " entries"), SORT_LABEL[p.sort] || "", p.status === "finished" ? "Finished" : "Ongoing"].filter(Boolean).join(" · ")) + "</p>" +
       (can && es.length ? downloadBar("project:" + p.id, formats, "Download") : "") +
       (EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="entry" data-project="' + esc(p.id) + '">+ New entry</button> ' +
-        '<button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(p.id) + '">Collection settings</button></p>' : "") + "</div>";
+        '<button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(p.id) + '">Collection settings</button>' + deskBtn("content/projects/" + p.id + ".json", p) + "</p>" : "") + "</div>";
 
     if (entryId) {
       var idx = -1; es.forEach(function (e, i) { if (e.id === entryId) idx = i; });
@@ -1014,7 +1102,7 @@
     }
     if (kind === "image") {
       return head + tiles(es.map(function (e, i) {
-        return { id: e.id, title: e.title, note: cut(plain(e.text), 80), image: list(e.images)[0], act: 'data-act="lightbox" data-src="project:' + esc(p.id) + '" data-i="' + i + '"' };
+        return { id: e.id, src: e, title: e.title, note: cut(plain(e.text), 80), image: list(e.images)[0], act: 'data-act="lightbox" data-src="project:' + esc(p.id) + '" data-i="' + i + '"' };
       }), "1 / 1", cols("visual", 4), ownerEdit("entry"));
     }
     return head + '<div class="entry-list">' + es.map(function (e, i) {
@@ -1225,6 +1313,13 @@
     if (act === "book-cat") { STATE.bookCat = t.getAttribute("data-val"); draw(true); }
     if (act === "store-cat") { STATE.storeCat = t.getAttribute("data-val"); draw(true); }
     if (act === "visual-kind") { STATE.visualKind = t.getAttribute("data-val"); draw(true); }
+    if (act === "u-day") { STATE.uDay = t.getAttribute("data-day"); draw(true); }
+    if (act === "u-month") {
+      var bym = activity(), ms2 = {}; Object.keys(bym).forEach(function (d) { ms2[d.slice(0, 7)] = 1; }); ms2[today().slice(0, 7)] = 1;
+      var ml = Object.keys(ms2).sort(), cur2 = STATE.uMonth && ml.indexOf(STATE.uMonth) > -1 ? STATE.uMonth : ml[ml.length - 1];
+      var nx = ml[ml.indexOf(cur2) + (+t.getAttribute("data-dir"))];
+      if (nx) { STATE.uMonth = nx; STATE.uDay = ""; draw(true); }
+    }
     if (act === "watch-plat") { STATE.watchPlat = t.getAttribute("data-val"); draw(true); }
     if (act === "listen-cat") { STATE.listenCat = t.getAttribute("data-val"); draw(true); }
     if (act === "mplay") { e.preventDefault(); if (AUTO.el === t) AUTO.el = null; startVideo(t, false); }
@@ -1247,7 +1342,7 @@
         t.textContent = showing ? (LANG === "zh" ? "English" : "原文") : (LANG === "zh" ? "中文" : "English");
       }
     }
-    if (["sheet", "item", "item-move", "vimage-move", "rename-cat", "block"].indexOf(act) > -1) {
+    if (["sheet", "item", "item-move", "vimage-move", "rename-cat", "block", "desk"].indexOf(act) > -1) {
       e.preventDefault();
       openEditor({ mode: act, sheet: t.getAttribute("data-sheet"), file: t.getAttribute("data-file"), i: t.getAttribute("data-i"),
                    dir: +t.getAttribute("data-dir") || 0, id: t.getAttribute("data-id"), val: t.getAttribute("data-val") });
@@ -1319,7 +1414,13 @@
   }
   function withEditor(fn) {
     if (window.AlyxEditor) return fn();
-    loadScript(ROOT + "assets/js/editor.js?v=7").then(function () { if (window.AlyxEditor) fn(); });
+    loadScript(ROOT + "assets/js/editor.js?v=8").then(function () { if (window.AlyxEditor) fn(); });
+  }
+  function withJournal(fn) {
+    withEditor(function () {
+      if (window.AlyxJournal) return fn();
+      loadScript(ROOT + "assets/js/journal.js?v=1").then(function () { if (window.AlyxJournal) fn(); });
+    });
   }
   function openEditor(spec) { withEditor(function () { window.AlyxEditor.open(spec, editorCtx()); }); }
 
@@ -1328,6 +1429,14 @@
     var y = window.scrollY;
     var page = render[PAGE] ? PAGE : "notfound";
     var s = D.settings || {}, bar = "";
+    // the lock: while the studio is private, visitors only see a closed page
+    if (s.locked && !OWNER) {
+      QUEUES = {};
+      app.innerHTML = '<main id="main" class="page page-locked">' + render.locked() + "</main>";
+      document.title = s.name || "Alyx's Studio";
+      if (!document.querySelector('meta[name="robots"]')) { var mr = document.createElement("meta"); mr.name = "robots"; mr.content = "noindex"; document.head.appendChild(mr); }
+      return;
+    }
     if (s.announcement && s.announcement.text) {
       bar = '<div class="notice">' + (s.announcement.url ? a(s.announcement.url, esc(s.announcement.text) + arrow(s.announcement.url), "") : esc(s.announcement.text)) + "</div>";
     }
@@ -1346,6 +1455,9 @@
     });
     wireMedia(); markTracks();
     if (EDIT) withEditor(function () { window.AlyxEditor.decorate(editorCtx()); });
+    if (EDIT && page === "daily" && app.querySelector("#journal-day")) withJournal(function () {
+      window.AlyxJournal.mount({ app: app, day: STATE.selDay, month: STATE.month, redraw: function () { draw(true); } });
+    });
     if (keepScroll) window.scrollTo(0, y);
     else {
       var h = hash(), target = h && document.getElementById(h);

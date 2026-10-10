@@ -10,39 +10,11 @@
   },
   "home_blocks": [
     {
-      "type": "daily",
-      "title": "",
-      "count": 6
-    },
-    {
-      "type": "watch",
-      "title": "",
-      "count": 3
-    },
-    {
-      "type": "listen",
-      "title": "",
-      "count": 4
-    },
-    {
-      "type": "ongoing",
-      "title": "",
-      "count": 3
-    },
-    {
-      "type": "visual",
-      "title": "",
-      "count": 4
-    },
-    {
-      "type": "store",
-      "title": "",
-      "count": 4
-    },
-    {
-      "type": "follow",
+      "type": "updates",
       "title": ""
     }
   ],
-  "media_autoplay": true
+  "media_autoplay": true,
+  "english": "approved",
+  "locked": false
 }

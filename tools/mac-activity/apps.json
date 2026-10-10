@@ -1,0 +1,12 @@
+{
+  "about": "Which apps and websites count as work (w) or breaks & fun (r). Everything else is 'other'. Edit freely; names must match the app name in the menu bar.",
+  "work": ["Microsoft Word", "Pages", "Scrivener 3", "Scrivener", "Zotero", "Preview", "Notion", "Obsidian", "Ulysses", "Code", "Visual Studio Code", "Terminal", "Claude", "ChatGPT",
+    "Microsoft Excel", "Numbers", "Keynote", "Microsoft PowerPoint", "Adobe Acrobat Reader", "Adobe Acrobat", "Mail", "Calendar", "Notes", "DEVONthink 3", "Bear", "iA Writer",
+    "Pixelmator Pro", "Adobe Photoshop 2025", "Adobe Photoshop", "Adobe Illustrator", "Figma", "Procreate", "Affinity Designer 2", "Affinity Publisher 2", "Final Cut Pro", "Logic Pro",
+    "GarageBand", "Microsoft Teams", "zoom.us", "Slack", "Dictionary", "Kindle", "Books", "Microsoft Outlook"],
+  "rest": ["Music", "Spotify", "TV", "Netflix", "Photos", "Messages", "WeChat", "微信", "QQ", "Podcasts", "News", "Steam", "Chess", "Discord", "FaceTime", "Telegram", "WhatsApp", "Instagram", "IINA", "VLC"],
+  "work_sites": ["docs.google.com", "scholar.google", "jstor.org", "claude.ai", "chatgpt.com", "github.com", "overleaf.com", "alyxsstudio.com", "notion.so", "zotero.org", "academia.edu",
+    "muse.jhu.edu", "deepl.com", "mail.google.com", "outlook.", "drive.google.com", "canvas", "library", "proquest.com", "tandfonline.com", "cambridge.org", "oup.com", "kdp.amazon.com"],
+  "rest_sites": ["youtube.com", "netflix.com", "bilibili.com", "weibo.com", "xiaohongshu.com", "instagram.com", "x.com", "twitter.com", "tiktok.com", "douyin.com", "reddit.com",
+    "taobao.com", "tmall.com", "jd.com", "amazon.com", "facebook.com", "threads.net", "pinterest.com", "shein.com", "temu.com", "iqiyi.com", "youku.com", "spotify.com"]
+}

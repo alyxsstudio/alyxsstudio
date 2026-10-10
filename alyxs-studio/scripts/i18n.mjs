@@ -40,17 +40,26 @@ export async function writeCache(file, items) {
 
 // Apply cached translations to an object in place: English goes into the field,
 // the original Chinese is kept in <field>_zh. A hand-written <field>_en always wins.
-export function applyTranslations(obj, cache) {
+// approvedOnly: show only English you wrote or approved (<field>_en); otherwise the Chinese stays.
+export function applyTranslations(obj, cache, approvedOnly) {
   let missing = 0;
   walk(obj, (holder, key, value) => {
     const manual = holder[key + "_en"];
     if (Array.isArray(value)) {
       holder[key + "_zh"] = value.slice();
+      if (Array.isArray(manual) && manual.length === value.length) { holder[key] = value.map((s, i) => manual[i] || s); return; }
+      if (approvedOnly) return;
       holder[key] = value.map((s) => { if (!hasCJK(s)) return s; const c = cache[hash(s)]; if (!c) missing++; return c ? c.en : s; });
       return;
     }
     holder[key + "_zh"] = value;
-    if (manual) { holder[key] = manual; return; }
+    if (manual && typeof manual === "string") {
+      // paragraph by paragraph, so a paragraph not translated yet keeps its Chinese
+      const zh = paragraphs(value), en = paragraphs(manual);
+      holder[key] = en.length === zh.length ? zh.map((p, i) => (en[i].trim() ? en[i] : p)).join("\n\n") : manual;
+      return;
+    }
+    if (approvedOnly) return;
     holder[key] = paragraphs(value).map((p) => {
       if (!hasCJK(p)) return p;
       const c = cache[hash(p)];
@@ -59,4 +68,19 @@ export function applyTranslations(obj, cache) {
     }).join("\n\n");
   });
   return missing;
+}
+
+// English conventions for a translated paragraph: titles in 《》 become *italics*, Chinese punctuation
+// becomes English punctuation. Also used by the translation desk on the page (assets/js/editor.js).
+export function englishTypography(text) {
+  return String(text || "")
+    .replace(/[《〈]\s*([^》〉]+?)\s*[》〉]/g, "*$1*")
+    .replace(/……|\.{6}/g, "…").replace(/——/g, "—")
+    .replace(/，/g, ", ").replace(/。/g, ". ").replace(/；/g, "; ").replace(/：/g, ": ")
+    .replace(/！/g, "! ").replace(/？/g, "? ").replace(/、/g, ", ")
+    .replace(/（/g, " (").replace(/）/g, ") ")
+    .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/[ \t]+([,.;:!?)])/g, "$1").replace(/\( +/g, "(")
+    .replace(/([.!?,;:…]) (["'])(?=\s|$)/g, "$1$2")
+    .replace(/[ \t]{2,}/g, " ").replace(/ +\n/g, "\n").replace(/\n +/g, "\n").trim();
 }

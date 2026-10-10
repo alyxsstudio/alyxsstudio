@@ -27,5 +27,6 @@
   "shape_store": "4 / 5",
   "shape_books": "2 / 3",
   "font_cjk": "sans",
-  "cjk_scale": 85
+  "cjk_scale": 85,
+  "image_fit": "natural"
 }

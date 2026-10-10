@@ -67,8 +67,12 @@ async function main() {
   await fs.mkdir(gen, { recursive: true });
   // English versions of Chinese text (made by translate.mjs); the original stays in <field>_zh
   const cache = await readCache(path.join(SITE, "data", "translations.json"));
+  let settings = {};
+  try { settings = JSON.parse(await fs.readFile(path.join(SITE, "data", "settings.json"), "utf8")); } catch {}
+  // "approved" (default): visitors only see English you approved in the translation desk; "auto": machine English too
+  const approvedOnly = settings.english !== "auto";
   let untranslated = 0;
-  const tr = (data) => { untranslated += applyTranslations(data, cache); return data; };
+  const tr = (data) => { untranslated += applyTranslations(data, cache, approvedOnly); return data; };
   const write = (name, data) => fs.writeFile(path.join(gen, name), JSON.stringify(data));
   // translate as content is read, so sorting by title uses the English the site shows
   const read = async (name) => tr(await readFolder(name));
@@ -111,7 +115,7 @@ async function main() {
   }
   summary.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
   // latest updates across all projects, for the home page
-  const recent = entries.slice().sort(byDateDesc).slice(0, 24)
+  const recent = entries.slice().sort(byDateDesc).slice(0, 600)
     .map((e) => ({ project: e.project, id: e.id, date: e.date, title: e.title, number: e.number, image: e.images[0] || "" }));
   await write("ongoing.json", { projects: summary, recent });
 
@@ -131,6 +135,8 @@ async function main() {
   await write("media.json", { items: media });
 
   await write("build.json", { built: new Date().toISOString() });
+  // locked: ask search engines to stay away
+  if (settings.locked) await fs.writeFile(path.join(OUT, "robots.txt"), "User-agent: *\nDisallow: /\n");
   if (untranslated) console.log(`${untranslated} paragraph(s) still waiting for English; they show in Chinese for now.`);
   console.log(`Built ${OUT}: ${daily.length} posts, ${projects.length} projects, ${entries.length} entries, ${visual.length} series, ${design.length} sketches, ${media.length} videos and songs.`);
 }
