@@ -24,7 +24,7 @@ const SYSTEM = [
   "Keep her voice, rhythm and line breaks. Keep Markdown (**bold**, *italics*, headings, lists, links) exactly where it is.",
   "Keep names, brand names, URLs, emoji and any English words as they are. If a string is partly English, translate only the Chinese.",
   "Short strings are titles, captions or single dictionary words: translate them as titles or words, not sentences.",
-  "Answer with a JSON array of strings only: the same number of items, in the same order as the input."
+  "The input is a JSON object of numbered strings. Answer with a JSON object only, with exactly the same keys, each holding the English for that string."
 ].join(" ");
 
 async function collect() {
@@ -52,7 +52,32 @@ async function collect() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Reads the model's answer: {"1": "...", "2": "..."} (asked for), or a plain list, or — for a
+// single item — just the English text.
+function parseAnswer(raw, n) {
+  const text = String(raw || "").replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
+  let v = null;
+  try { v = JSON.parse(text); } catch {
+    const m = text.match(/[\[{][\s\S]*[\]}]/);
+    if (m) try { v = JSON.parse(m[0]); } catch {}
+  }
+  if (v && !Array.isArray(v) && typeof v === "object") {
+    const inner = Object.values(v).find(Array.isArray);
+    if (inner && Object.keys(v).length === 1) v = inner;
+  }
+  if (Array.isArray(v)) return v.length === n ? v.map(String) : null;
+  if (v && typeof v === "object") {
+    const out = [];
+    for (let i = 1; i <= n; i++) { const x = v[String(i)]; if (typeof x !== "string") return null; out.push(x); }
+    return out;
+  }
+  if (n === 1 && text && !/^[\[{]/.test(text)) return [text];
+  return null;
+}
+
 async function ask(batch) {
+  const input = {};
+  batch.forEach((t, i) => { input[String(i + 1)] = t; });
   for (const model of MODELS) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(ENDPOINT, {
@@ -60,19 +85,18 @@ async function ask(batch) {
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + TOKEN },
         body: JSON.stringify({
           model, temperature: 0.3,
-          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify(batch) }]
+          response_format: { type: "json_object" },
+          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify(input) }]
         })
       }).catch((e) => ({ ok: false, status: 0, text: async () => String(e) }));
       if (res.ok) {
-        const j = await res.json().catch(() => ({}));
-        const raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
-        const m = raw.match(/\[[\s\S]*\]/);
-        try {
-          const arr = JSON.parse(m ? m[0] : raw);
-          if (Array.isArray(arr) && arr.length === batch.length) return arr.map(String);
-        } catch {}
-        console.warn(`  ${model}: answer was not a matching JSON array, retrying`);
-        status.problems.push(model + ": answer was not a matching list");
+        const body = await res.text();
+        let raw = "";
+        try { const j = JSON.parse(body); raw = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ""; } catch {}
+        const out = parseAnswer(raw, batch.length);
+        if (out) return out;
+        console.warn(`  ${model}: answer did not match, retrying: ${(raw || body).slice(0, 200)}`);
+        status.problems.push(model + ": answer did not match: " + (raw || body).slice(0, 300));
         continue;
       }
       const body = await res.text();
