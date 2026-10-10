@@ -19,6 +19,16 @@
       "count": 6
     },
     {
+      "type": "watch",
+      "title": "",
+      "count": 3
+    },
+    {
+      "type": "listen",
+      "title": "",
+      "count": 4
+    },
+    {
       "type": "ongoing",
       "title": "",
       "count": 3
@@ -37,5 +47,6 @@
       "type": "follow",
       "title": ""
     }
-  ]
+  ],
+  "media_autoplay": true
 }

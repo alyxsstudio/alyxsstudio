@@ -38,7 +38,7 @@ async function collect() {
   const addFile = async (file) => {
     try { sources.push(JSON.parse(await fs.readFile(file, "utf8"))); } catch {}
   };
-  for (const dir of ["daily", "entries", "projects", "visual", "design"]) {
+  for (const dir of ["daily", "entries", "projects", "visual", "design", "media"]) {
     const d = path.join(SITE, "content", dir);
     let files = [];
     try { files = (await fs.readdir(d)).filter((f) => f.endsWith(".json")); } catch {}

@@ -15,6 +15,20 @@
       "in_menu": true
     },
     {
+      "key": "watch",
+      "title": "Watch",
+      "short": "Videos from everywhere I post.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "listen",
+      "title": "Listen",
+      "short": "Music and podcasts.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
       "key": "books",
       "title": "Books",
       "short": "Published on Amazon and Apple Books.",

@@ -355,6 +355,80 @@ collections:
     label: 先不公开
     widget: boolean
     default: false
+- name: media
+  label: Watch · Listen 视频和音乐
+  label_singular: 视频 / 音乐
+  icon: play_circle
+  folder: alyxs-studio/content/media
+  create: true
+  format: json
+  extension: json
+  identifier_field: title
+  slug: '{{year}}{{month}}{{day}}-{{hour}}{{minute}}{{second}}'
+  summary: '{{fields.title}} {{fields.url}}'
+  sortable_fields:
+    fields:
+    - date
+    - title
+    default:
+      field: date
+      direction: descending
+  fields:
+  - name: url
+    label: 链接（YouTube、TikTok、Instagram、B站、抖音、Spotify、Apple Music、Apple Podcasts、SoundCloud、Bandcamp、网易云……）
+    widget: string
+    required: false
+    hint: 粘贴作品页面的链接就行，网站会显示成播放器；标题和封面在发布时自动获取。
+  - name: file
+    label: 或者上传文件（自己的歌、录音、短视频，95MB 以内）
+    widget: file
+    required: false
+  - name: title
+    label: 标题（链接可以留空，自动用平台上的标题）
+    widget: string
+    required: false
+  - name: note
+    label: 一句话（可选）
+    widget: text
+    required: false
+  - name: cover
+    label: 封面（可选，链接会自动获取）
+    widget: image
+    required: false
+  - name: date
+    label: 时间
+    widget: datetime
+    default: '{{now}}'
+    format: YYYY-MM-DDTHH:mm
+    picker_utc: false
+  - name: shelf
+    label: 放在哪个栏目
+    widget: select
+    options:
+    - label: 自动（视频→Watch，音乐和播客→Listen）
+      value: auto
+    - label: Watch
+      value: watch
+    - label: Listen
+      value: listen
+    default: auto
+  - name: category
+    label: 类型（Listen 里的分类）
+    widget: select
+    options:
+    - label: 自动
+      value: auto
+    - label: Music 音乐
+      value: Music
+    - label: Podcasts 播客
+      value: Podcasts
+    - label: Video 视频
+      value: Video
+    default: auto
+  - name: hidden
+    label: 先不公开
+    widget: boolean
+    default: false
 - name: pages
   label: Books · Store · Traces
   icon: view_list
@@ -525,6 +599,10 @@ collections:
           value: daily
         - label: Ongoing 进行中的合集
           value: ongoing
+        - label: Watch 视频
+          value: watch
+        - label: Listen 音乐和播客
+          value: listen
         - label: Books 出版的书
           value: books
         - label: Visual 壁纸·头像·封面
@@ -570,6 +648,10 @@ collections:
       label: 邮箱
       widget: string
       required: false
+    - name: media_autoplay
+      label: 视频滑到屏幕中间时自动静音播放
+      widget: boolean
+      default: true
     - name: language_switch
       label: 让访客也能切换 English / 中文
       widget: boolean
@@ -686,6 +768,36 @@ collections:
           default: 4
       - name: books
         label: Books 出版
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 4
+      - name: watch
+        label: Watch 视频
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 3
+      - name: listen
+        label: Listen 音乐和播客
         widget: object
         fields:
         - name: title

@@ -7,7 +7,7 @@
 
   var ROOT = app.getAttribute("data-root") || "";
   var PAGE = app.getAttribute("data-page") || "home";
-  var SECTIONS = ["daily", "ongoing", "books", "visual", "design", "store", "traces", "follow"];
+  var SECTIONS = ["daily", "ongoing", "watch", "listen", "books", "visual", "design", "store", "traces", "follow"];
   var D = {};          // everything loaded: D.settings, D.theme, D.sections, D.daily …
   var STATE = {};      // per-page view state (calendar month, filters …)
 
@@ -240,6 +240,7 @@
     if (PAGE === "home" || PAGE === "daily") spec = 'data-kind="daily"';
     if (PAGE === "design") spec = 'data-kind="design"';
     if (PAGE === "visual") spec = 'data-kind="visual"';
+    if (PAGE === "watch" || PAGE === "listen") spec = 'data-kind="media" data-shelf="' + PAGE + '"';
     if (PAGE === "ongoing") {
       var pid = hash().split("/")[0];
       spec = pid && D.project && D.project.project.id === pid ? 'data-kind="entry" data-project="' + esc(pid) + '"' : 'data-kind="project"';
@@ -274,7 +275,10 @@
           return '<button type="button" class="post-img" data-act="lightbox" data-src="post:' + esc(p.id) + '" data-i="' + i + '">' + pic(src, "") + "</button>";
         }).join("") + "</div>"
       : "";
-    var link = p.link && p.link.url
+    var li = p.link && p.link.url ? mediaInfo({ id: "", url: p.link.url, meta: p.link.meta }) : null;
+    var link = li && li.type !== "card"
+      ? (p.link.quote ? '<p class="repost-quote solo">' + esc(p.link.quote) + "</p>" : "") + '<div class="post-media">' + player(li, { queue: "post-" + p.id }) + "</div>"
+      : p.link && p.link.url
       ? '<a class="repost" href="' + esc(p.link.url) + '" target="_blank" rel="noopener">' +
           (p.link.quote ? '<span class="repost-quote">' + esc(p.link.quote) + "</span>" : "") +
           '<span class="repost-src">' + esc(p.link.title || hostOf(p.link.url)) + ' <span class="ext">↗</span></span></a>'
@@ -299,6 +303,10 @@
   }
   function thumbFor(dayPosts) {
     for (var i = 0; i < dayPosts.length; i++) if (list(dayPosts[i].images).length) return { img: list(dayPosts[i].images)[0] };
+    for (var j = 0; j < dayPosts.length; j++) {
+      var l = dayPosts[j].link;
+      if (l && l.url) { var mi = mediaInfo({ url: l.url, meta: l.meta }); if (mi.cover) return { img: mi.cover }; }
+    }
     var p = dayPosts[0];
     if (p.text) return { text: cut(plain(p.text), 28) };
     if (p.audio) return { text: "♪" };
@@ -333,6 +341,187 @@
     posts().forEach(function (p) { if (p.day) set[p.day.slice(0, 7)] = 1; });
     set[today().slice(0, 7)] = 1;
     return Object.keys(set).sort();
+  }
+
+
+  /* ---------- Watch & Listen: a pasted link becomes a player ---------- */
+  function mediaItems() { return ((D.media || {}).items || []); }
+  function mediaInfo(it) {
+    var M = window.AlyxMedia;
+    var meta = it.meta || {};
+    var info = M ? M.parse(it.file || it.url, meta) : { type: "card", shelf: "watch", category: "Video", platform: "", ratio: "16 / 9" };
+    if (it.file && !/^https?:/.test(it.file)) info.file = it.file;
+    if (it.shelf && it.shelf !== "auto") info.shelf = it.shelf;
+    if (it.category && it.category !== "auto") info.category = it.category;
+    info.cover = it.cover || meta.cover || info.thumb || "";
+    info.title = it.title || meta.title || "";
+    info.author = meta.author || "";
+    info.link = it.url || "";
+    info.id = it.id;
+    return info;
+  }
+  function mediaOn(shelf) { return mediaItems().map(function (it) { var i = mediaInfo(it); i.item = it; return i; }).filter(function (i) { return i.shelf === shelf; }); }
+  var AUTOPLAY_OK = true;
+  try { AUTOPLAY_OK = !window.matchMedia("(prefers-reduced-motion: reduce)").matches && !(navigator.connection && navigator.connection.saveData); } catch (e) {}
+  /* the player itself: a cover you tap (videos), the platform's own player (music), or a card */
+  function player(info, opts) {
+    opts = opts || {};
+    var M = window.AlyxMedia || { ALLOW: "autoplay; encrypted-media; fullscreen; picture-in-picture" };
+    var tag = info.platform ? '<span class="m-tag">' + esc(info.platform) + "</span>" : "";
+    if ((info.type === "video" || info.type === "short") && (info.src || info.file)) {
+      var auto = opts.auto !== false && AUTOPLAY_OK && (D.settings || {}).media_autoplay !== false && (info.auto || info.file) ? ' data-auto="' + esc(info.file ? "file" : info.auto) + '"' : "";
+      var cover = info.cover ? '<img src="' + esc(asset(info.cover)) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : '<span class="m-blank">' + esc(info.platform || "Video") + "</span>";
+      return '<div class="mplay' + (info.type === "short" ? " tall" : "") + '" style="--r:' + esc(info.ratio) + '" data-act="mplay"' +
+        (info.file ? ' data-file="' + esc(asset(info.file)) + '"' : ' data-src="' + esc(info.src) + '"') + auto +
+        ' role="button" tabindex="0" aria-label="Play ' + esc(info.title || info.platform || "video") + '">' + cover +
+        '<span class="m-play" aria-hidden="true"></span>' + tag + "</div>";
+    }
+    if (info.type === "audio" && info.src) {
+      return '<iframe class="m-audio" src="' + esc(info.src) + '" height="' + (info.height || 152) + '" loading="lazy" allow="' + M.ALLOW + '" title="' + esc(info.title || info.platform) + '" frameborder="0"></iframe>';
+    }
+    if (info.type === "audio" && info.file) return trackRow(info, opts.queue || "one", opts.index || 0);
+    // anything else: a picture card that opens the original
+    return '<a class="m-card" href="' + esc(info.link) + '" target="_blank" rel="noopener">' +
+      (info.cover ? '<span class="m-card-pic">' + pic(info.cover, "") + "</span>" : "") +
+      '<span class="m-card-text"><span class="m-card-title">' + esc(info.title || hostOf(info.link)) + "</span>" +
+      '<span class="m-card-src">' + esc(info.platform || hostOf(info.link)) + ' <span class="ext">↗</span></span></span></a>';
+  }
+  /* songs and recordings uploaded to the site: a row with a play button, played by the bar at the bottom */
+  var QUEUES = {};
+  function trackRow(info, q, i) {
+    (QUEUES[q] = QUEUES[q] || [])[i] = { src: asset(info.file), title: info.title || "Untitled", cover: info.cover ? asset(info.cover) : "", by: info.author || (D.settings || {}).name || "" };
+    var on = PLAYER.q === q && PLAYER.i === i;
+    return '<div class="track' + (on ? " on" : "") + '" data-q="' + esc(q) + '" data-i="' + i + '">' +
+      '<button type="button" class="t-play" data-act="track" data-q="' + esc(q) + '" data-i="' + i + '" aria-label="Play ' + esc(info.title) + '">' +
+        (info.cover ? pic(info.cover, "") : '<span class="t-blank">♪</span>') + '<span class="t-btn" aria-hidden="true"></span></button>' +
+      '<span class="t-text"><span class="t-title">' + esc(info.title || "Untitled") + "</span>" +
+      '<span class="t-by">' + esc([info.author || (info.platform !== "File" && info.platform) || (D.settings || {}).name || "", info.item && info.item.date ? fmtDay(info.item.date) : ""].filter(Boolean).join(" · ")) + "</span></span></div>";
+  }
+  function mediaCaption(info, withEdit) {
+    var it = info.item || {};
+    var bits = it.date ? fmtDay(it.date) : "";
+    return '<div class="m-cap">' +
+      (info.title && info.type !== "card" ? '<p class="m-title">' + esc(info.title) + "</p>" : "") +
+      (it.note ? '<p class="m-note">' + esc(it.note) + "</p>" : "") +
+      '<p class="m-meta">' + esc(bits) + (info.link && info.type !== "card" ? (bits ? " · " : "") + '<a href="' + esc(info.link) + '" target="_blank" rel="noopener">' + esc(info.platform || "Open") + " ↗</a>" : "") +
+      (withEdit && OWNER && !PREVIEW && it.id ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="media" data-id="' + esc(it.id) + '">Edit</button>' : "") + "</p></div>";
+  }
+  function mediaFigure(info, cls, opts) {
+    return '<figure class="m-item ' + (cls || "") + '" id="m-' + esc(info.id || "") + '">' + player(info, opts) + mediaCaption(info, true) + "</figure>";
+  }
+  function watchGrid(list, opts) {
+    opts = opts || {};
+    var wide = list.filter(function (i) { return i.type !== "short"; }), tall = list.filter(function (i) { return i.type === "short"; });
+    var html = "";
+    if (opts.feature && wide.length) html += mediaFigure(wide.shift(), "feature");
+    if (wide.length) html += '<div class="mgrid">' + wide.map(function (i) { return mediaFigure(i, ""); }).join("") + "</div>";
+    if (tall.length) html += (opts.label !== false && wide.length + (opts.feature ? 1 : 0) ? '<h2 class="block-title m-sub">Shorts</h2>' : "") +
+      '<div class="mshorts">' + tall.map(function (i) { return mediaFigure(i, ""); }).join("") + "</div>";
+    return html;
+  }
+  function listenList(list, q) {
+    var files = list.filter(function (i) { return i.type === "audio" && i.file && !i.src; });
+    var others = list.filter(function (i) { return files.indexOf(i) < 0; });
+    var html = "";
+    if (files.length) {
+      html += '<div class="tracks">' + (files.length > 1 ? '<p class="t-all"><button type="button" class="pill solid" data-act="track" data-q="' + esc(q) + '" data-i="0">▶ Play all</button></p>' : "") +
+        files.map(function (i, k) {
+          var it = i.item || {}, edit = OWNER && !PREVIEW && it.id ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="media" data-id="' + esc(it.id) + '">Edit</button>' : "";
+          return '<div class="t-wrap">' + trackRow(i, q, k) + (it.note || edit ? '<p class="m-note t-note">' + esc(it.note || "") + edit + "</p>" : "") + "</div>";
+        }).join("") + "</div>";
+    }
+    if (others.length) html += '<div class="mlisten">' + others.map(function (i) { return mediaFigure(i, i.type === "card" ? "is-card" : ""); }).join("") + "</div>";
+    return html;
+  }
+
+  /* the bar at the bottom that plays uploaded songs, one after another */
+  var PLAYER = { q: "", i: -1, el: null, audio: null };
+  function playTrack(q, i) {
+    var list = QUEUES[q] || [], t = list[i];
+    if (!t) return;
+    if (!PLAYER.el) {
+      PLAYER.el = document.createElement("div");
+      PLAYER.el.className = "mbar"; PLAYER.el.hidden = true;
+      PLAYER.el.innerHTML = '<span class="mb-pic"></span><span class="mb-text"><span class="mb-title"></span><span class="mb-by"></span></span>' +
+        '<span class="mb-btns"><button type="button" data-mb="prev" aria-label="Previous">⏮</button><button type="button" data-mb="toggle" class="mb-main" aria-label="Pause">❚❚</button><button type="button" data-mb="next" aria-label="Next">⏭</button></span>' +
+        '<input class="mb-seek" type="range" min="0" max="1000" value="0" aria-label="Position"><button type="button" class="mb-x" data-mb="close" aria-label="Close">×</button>';
+      document.body.appendChild(PLAYER.el);
+      PLAYER.audio = new Audio();
+      PLAYER.audio.preload = "metadata";
+      var seek = PLAYER.el.querySelector(".mb-seek"), main = PLAYER.el.querySelector(".mb-main");
+      PLAYER.audio.addEventListener("timeupdate", function () { if (PLAYER.audio.duration) seek.value = Math.round(PLAYER.audio.currentTime / PLAYER.audio.duration * 1000); });
+      PLAYER.audio.addEventListener("play", function () { main.textContent = "❚❚"; main.setAttribute("aria-label", "Pause"); markTracks(); });
+      PLAYER.audio.addEventListener("pause", function () { main.textContent = "▶"; main.setAttribute("aria-label", "Play"); markTracks(); });
+      PLAYER.audio.addEventListener("ended", function () { if ((QUEUES[PLAYER.q] || [])[PLAYER.i + 1]) playTrack(PLAYER.q, PLAYER.i + 1); });
+      seek.addEventListener("input", function () { if (PLAYER.audio.duration) PLAYER.audio.currentTime = seek.value / 1000 * PLAYER.audio.duration; });
+      PLAYER.el.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-mb]"); if (!b) return;
+        var k = b.getAttribute("data-mb");
+        if (k === "toggle") { if (PLAYER.audio.paused) PLAYER.audio.play(); else PLAYER.audio.pause(); }
+        if (k === "next" && (QUEUES[PLAYER.q] || [])[PLAYER.i + 1]) playTrack(PLAYER.q, PLAYER.i + 1);
+        if (k === "prev") { if (PLAYER.audio.currentTime > 3 || PLAYER.i === 0) PLAYER.audio.currentTime = 0; else playTrack(PLAYER.q, PLAYER.i - 1); }
+        if (k === "close") { PLAYER.audio.pause(); PLAYER.el.hidden = true; document.documentElement.classList.remove("has-mbar"); PLAYER.q = ""; PLAYER.i = -1; markTracks(); }
+      });
+    }
+    if (PLAYER.q === q && PLAYER.i === i && PLAYER.audio.src) { if (PLAYER.audio.paused) PLAYER.audio.play(); else PLAYER.audio.pause(); return; }
+    PLAYER.q = q; PLAYER.i = i;
+    stopAutoVideo();
+    PLAYER.audio.src = t.src;
+    PLAYER.audio.play().catch(function () {});
+    PLAYER.el.querySelector(".mb-pic").innerHTML = t.cover ? '<img src="' + esc(t.cover) + '" alt="">' : "♪";
+    PLAYER.el.querySelector(".mb-title").textContent = t.title;
+    PLAYER.el.querySelector(".mb-by").textContent = t.by;
+    PLAYER.el.hidden = false;
+    document.documentElement.classList.add("has-mbar");
+    if ("mediaSession" in navigator) {
+      try { navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.by, artwork: t.cover ? [{ src: t.cover }] : [] });
+        navigator.mediaSession.setActionHandler("nexttrack", function () { playTrack(PLAYER.q, PLAYER.i + 1); });
+        navigator.mediaSession.setActionHandler("previoustrack", function () { if (PLAYER.i > 0) playTrack(PLAYER.q, PLAYER.i - 1); }); } catch (e) {}
+    }
+  }
+  function markTracks() {
+    var playing = PLAYER.audio && !PLAYER.audio.paused;
+    app.querySelectorAll(".track").forEach(function (el) {
+      var on = el.getAttribute("data-q") === PLAYER.q && +el.getAttribute("data-i") === PLAYER.i;
+      el.classList.toggle("on", on); el.classList.toggle("playing", on && playing);
+    });
+  }
+
+  /* videos: tap to play with sound; the one in the middle of the screen plays by itself, silently */
+  var AUTO = { el: null, io: null };
+  function frameHTML(src) {
+    return '<iframe src="' + esc(src) + '" allow="' + ((window.AlyxMedia || {}).ALLOW || "autoplay; fullscreen") + '" allowfullscreen frameborder="0" title="Video"></iframe>';
+  }
+  function startVideo(el, muted) {
+    if (el.getAttribute("data-live") === (muted ? "auto" : "user")) return;
+    stopVideoIn(el);
+    var file = el.getAttribute("data-file"), layer = document.createElement("div");
+    layer.className = "m-live";
+    if (file) layer.innerHTML = '<video src="' + esc(file) + '" playsinline ' + (muted ? "muted loop autoplay" : "controls autoplay") + "></video>";
+    else layer.innerHTML = frameHTML(muted ? el.getAttribute("data-auto") : el.getAttribute("data-src"));
+    el.appendChild(layer);
+    el.setAttribute("data-live", muted ? "auto" : "user");
+    if (!muted && PLAYER.audio && !PLAYER.audio.paused) PLAYER.audio.pause();
+  }
+  function stopVideoIn(el) { var l = el.querySelector(".m-live"); if (l) l.remove(); el.removeAttribute("data-live"); }
+  function stopAutoVideo() { if (AUTO.el && AUTO.el.getAttribute("data-live") === "auto") stopVideoIn(AUTO.el); AUTO.el = null; }
+  function wireMedia() {
+    if (AUTO.io) AUTO.io.disconnect();
+    AUTO.el = null;
+    var els = app.querySelectorAll(".mplay[data-auto]");
+    if (!els.length || !("IntersectionObserver" in window)) return;
+    AUTO.io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        var el = en.target;
+        if (el.getAttribute("data-live") === "user") return;
+        if (en.intersectionRatio >= 0.7) {
+          if (PLAYER.audio && !PLAYER.audio.paused) return; // a song is playing: don't start videos
+          if (AUTO.el && AUTO.el !== el) stopAutoVideo();
+          AUTO.el = el; startVideo(el, true);
+        } else if (en.intersectionRatio < 0.3 && AUTO.el === el) stopAutoVideo();
+      });
+    }, { threshold: [0, 0.3, 0.7, 1] });
+    els.forEach(function (el) { AUTO.io.observe(el); });
   }
 
   /* ---------- lightbox ---------- */
@@ -403,7 +592,7 @@
       var ps = posts().slice(0, num(b.count, 6));
       if (!ps.length) return "";
       var cards = ps.map(function (p) {
-        var img = list(p.images)[0];
+        var img = list(p.images)[0] || (p.link && p.link.url ? mediaInfo({ url: p.link.url, meta: p.link.meta }).cover : "");
         return '<li><a class="mini-post" href="' + esc(href("daily", "p-" + p.id)) + '">' +
           (img ? '<span class="mini-pic">' + pic(img, "") + "</span>" : '<span class="mini-text">' + esc(cut(plain(p.text) || (p.audio ? "♪ Voice note" : p.link && p.link.title) || "", 90)) + "</span>") +
           '<span class="mini-date">' + esc(fmtDay(p.day)) + "</span></a></li>";
@@ -444,6 +633,16 @@
       if (!its.length) return "";
       return '<section class="block">' + blockHead(b.title || title("books"), href("books"), "See all") +
         tiles(its, shape("books", "2 / 3"), 4, function (it) { return linkPills(it.links); }) + "</section>";
+    },
+    watch: function (b) {
+      var its = mediaOn("watch").slice(0, num(b.count, 3));
+      if (!its.length) return "";
+      return '<section class="block">' + blockHead(b.title || title("watch"), href("watch"), "See all") + watchGrid(its, { label: false }) + "</section>";
+    },
+    listen: function (b) {
+      var its = mediaOn("listen").slice(0, num(b.count, 4));
+      if (!its.length) return "";
+      return '<section class="block">' + blockHead(b.title || title("listen"), href("listen"), "See all") + listenList(its, "home-listen") + "</section>";
     },
     follow: function (b) {
       var ls = followLinks();
@@ -545,6 +744,22 @@
       }
       var all = OWNER ? '<div class="dl-bar"><span class="dl-label">Owner</span><button type="button" class="pill" data-act="export-all">Download everything</button></div>' : "";
       return pageHead("ongoing") + all + (projects.length ? tiles(projects.map(projectTile), "4 / 5", 3) : emptyNote());
+    },
+
+    watch: function () {
+      var all = mediaOn("watch"), plats = [];
+      all.forEach(function (i) { if (i.platform && plats.indexOf(i.platform) < 0) plats.push(i.platform); });
+      var cur = plats.indexOf(STATE.watchPlat) > -1 ? STATE.watchPlat : "All";
+      var shown = all.filter(function (i) { return cur === "All" || i.platform === cur; });
+      return pageHead("watch") + chips(plats, cur, "watch-plat") + (shown.length ? watchGrid(shown, { feature: true }) : emptyNote());
+    },
+
+    listen: function () {
+      var all = mediaOn("listen"), cats = [];
+      all.forEach(function (i) { if (i.category && cats.indexOf(i.category) < 0) cats.push(i.category); });
+      var cur = cats.indexOf(STATE.listenCat) > -1 ? STATE.listenCat : "All";
+      var shown = all.filter(function (i) { return cur === "All" || i.category === cur; });
+      return pageHead("listen") + chips(cats, cur, "listen-cat") + (shown.length ? listenList(shown, "listen:" + cur) : emptyNote());
     },
 
     books: function () {
@@ -757,7 +972,7 @@
   function runExport(fn, arg) {
     var go = function () { window.AlyxExport[fn](arg, { root: ROOT, getJSON: getJSON, absUrl: absUrl, settings: D.settings || {} }); };
     if (window.AlyxExport) return go();
-    loadScript(ROOT + "assets/js/export.js?v=4").then(go);
+    loadScript(ROOT + "assets/js/export.js?v=5").then(go);
   }
 
   /* ---------- sharing ---------- */
@@ -922,6 +1137,10 @@
     if (act === "book-cat") { STATE.bookCat = t.getAttribute("data-val"); draw(true); }
     if (act === "store-cat") { STATE.storeCat = t.getAttribute("data-val"); draw(true); }
     if (act === "visual-kind") { STATE.visualKind = t.getAttribute("data-val"); draw(true); }
+    if (act === "watch-plat") { STATE.watchPlat = t.getAttribute("data-val"); draw(true); }
+    if (act === "listen-cat") { STATE.listenCat = t.getAttribute("data-val"); draw(true); }
+    if (act === "mplay") { e.preventDefault(); if (AUTO.el === t) AUTO.el = null; startVideo(t, false); }
+    if (act === "track") { e.preventDefault(); playTrack(t.getAttribute("data-q"), +t.getAttribute("data-i") || 0); }
     if (act === "export") {
       e.preventDefault();
       var col = collectionFor(t.getAttribute("data-col"));
@@ -942,8 +1161,12 @@
     }
     if (act === "edit" || act === "new") {
       e.preventDefault();
-      openEditor({ mode: act, kind: t.getAttribute("data-kind"), id: t.getAttribute("data-id"), project: t.getAttribute("data-project") });
+      openEditor({ mode: act, kind: t.getAttribute("data-kind"), id: t.getAttribute("data-id"), project: t.getAttribute("data-project"), shelf: t.getAttribute("data-shelf") });
     }
+  });
+  app.addEventListener("keydown", function (e) {
+    var t = e.target.closest && e.target.closest('.mplay[data-act="mplay"]');
+    if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); startVideo(t, false); }
   });
 
   /* ---------- editing on the page (owner) ---------- */
@@ -979,6 +1202,11 @@
       D.design.items = drop(D.design.items);
       if (!removed) D.design.items.unshift(item);
     }
+    if (kind === "media") {
+      D.media = D.media || { items: [] };
+      D.media.items = drop(D.media.items);
+      if (!removed) { D.media.items.push(item); D.media.items.sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); }); }
+    }
     if (kind === "visual") {
       D.visual = D.visual || { series: [] };
       var i = -1; D.visual.series.forEach(function (x, k) { if (x.id === item.id) i = k; });
@@ -991,11 +1219,11 @@
       window.AlyxEditor.open(spec, {
         root: ROOT, D: D, asset: asset, md: md, onSaved: onSaved,
         project: D.project ? D.project.project : null,
-        posts: posts, fmtDay: fmtDay
+        posts: posts, fmtDay: fmtDay, player: player, mediaInfo: mediaInfo
       });
     };
     if (window.AlyxEditor) return go();
-    loadScript(ROOT + "assets/js/editor.js?v=4").then(go);
+    loadScript(ROOT + "assets/js/editor.js?v=5").then(go);
   }
 
   /* ---------- drawing ---------- */
@@ -1006,6 +1234,7 @@
     if (s.announcement && s.announcement.text) {
       bar = '<div class="notice">' + (s.announcement.url ? a(s.announcement.url, esc(s.announcement.text) + arrow(s.announcement.url), "") : esc(s.announcement.text)) + "</div>";
     }
+    QUEUES = {};
     app.innerHTML = bar + header(page) + '<main id="main" class="page page-' + page + '">' + render[page]() + "</main>" + footer() +
       (PREVIEW ? '<p class="preview-badge">Preview · not saved yet</p>' : "") + fab();
     var name = s.name || "Alyx's Studio";
@@ -1018,6 +1247,7 @@
       btn.textContent = open ? "Menu" : "Close";
       nav.classList.toggle("open", !open);
     });
+    wireMedia(); markTracks();
     if (keepScroll) window.scrollTo(0, y);
     else {
       var h = hash(), target = h && document.getElementById(h);
@@ -1035,10 +1265,10 @@
     });
   }
   var FILES = ["settings", "theme", "sections", "follow", "books", "store", "traces"];
-  var GEN = ["daily", "ongoing", "visual", "design"];
+  var GEN = ["daily", "ongoing", "visual", "design", "media"];
 
   /* drafts from the editor's preview (unsaved changes) */
-  var COLLECTION_TARGET = { daily: "daily", projects: "ongoing", visual: "visual", design: "design" };
+  var COLLECTION_TARGET = { daily: "daily", projects: "ongoing", visual: "visual", design: "design", media: "watch" };
   function upsert(arr, item) {
     var i = -1; arr.forEach(function (x, k) { if (x.id === item.id) i = k; });
     if (i > -1) arr[i] = item; else arr.unshift(item);
@@ -1070,6 +1300,9 @@
       D.visual = D.visual || { series: [] }; upsert(D.visual.series, item);
     } else if (m.collection === "design") {
       D.design = D.design || { items: [] }; upsert(D.design.items, item);
+    } else if (m.collection === "media") {
+      D.media = D.media || { items: [] }; upsert(D.media.items, item);
+      D.media.items.sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); });
     }
   }
   function mergeDraftsInto(which) {
@@ -1084,7 +1317,7 @@
   Promise.all(
     FILES.map(function (f) { return getJSON("data/" + f + ".json").then(function (j) { D[f] = j || {}; }); })
       .concat(GEN.map(function (f) { return getJSON("data/gen/" + f + ".json").then(function (j) { D[f] = j || {}; }); }))
-      .concat([loadScript(ROOT + "assets/js/vendor/marked.min.js")])
+      .concat([loadScript(ROOT + "assets/js/vendor/marked.min.js"), loadScript(ROOT + "assets/js/media.js?v=5")])
   ).then(function () {
     mergeDraftsInto("all");
     localize(D);

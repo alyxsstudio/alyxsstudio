@@ -310,16 +310,25 @@
         '<label class="ed-field"><span class="ed-label">Text</span><textarea class="ed-input ed-text-area" name="text" rows="6" placeholder="写点什么… Write in Chinese or English.">' + esc(p.text) + "</textarea></label>" +
         '<div data-slot="images"></div><div data-slot="audio"></div>' +
         '<details class="ed-more"' + (p.link && p.link.url ? " open" : "") + '><summary>Repost / link</summary>' +
-          field("Link", input("lurl", p.link && p.link.url, "url")) + field("Source name", input("ltitle", p.link && p.link.title)) +
+          field("Link (a YouTube, TikTok, Instagram, Spotify… link shows as a player)", input("lurl", p.link && p.link.url, "url")) + '<p class="ed-found" data-lfound></p><div class="ed-preview" data-lprev></div>' +
+          field("Source name", input("ltitle", p.link && p.link.title)) +
           '<label class="ed-field"><span class="ed-label">Quote</span><textarea class="ed-input" name="lquote" rows="2">' + esc(p.link && p.link.quote) + "</textarea></label></details>" +
         field("Tags (comma separated)", input("tags", list(p.tags).join(", "))) +
         '<label class="ed-check"><input type="checkbox" name="hidden"' + (p.hidden ? " checked" : "") + "> Keep as a draft (not shown on the site)</label>");
       var imgs = imagePicker(p.images), aud = audioPicker(p.audio);
       $("[data-slot=images]", wrap).appendChild(imgs.el);
       $("[data-slot=audio]", wrap).appendChild(aud.el);
-      wrap.addEventListener("paste", imgs.onPaste);
+      wrap.addEventListener("paste", function (e) { if (e.target.name !== "lurl") imgs.onPaste(e); });
       autoGrow($("textarea[name=text]", wrap));
       var f = $("form", wrap);
+      var lprev = function () {
+        var u = f.lurl.value.trim(), box = $("[data-lprev]", wrap), note = $("[data-lfound]", wrap);
+        if (!u || !window.AlyxMedia || !window.AlyxMedia.looksLikeLink(u) || !CTX.mediaInfo) { box.innerHTML = ""; note.textContent = ""; return; }
+        var info = CTX.mediaInfo({ url: u, meta: p.link && p.link.url === u ? p.link.meta : null });
+        note.textContent = info.type === "card" ? "Shows as a link card" : (info.platform || "") + " · shows as a player";
+        box.innerHTML = info.type === "card" ? "" : CTX.player(info, { auto: false, queue: "editor" });
+      };
+      f.lurl.addEventListener("input", lprev); lprev();
       var save = function () {
         return saveFlow(wrap, function () {
           var date = f.date.value || nowLocal();
@@ -626,6 +635,114 @@
     actions(wrap, [{ label: "Cancel", run: close }, { label: "Add", solid: true, submit: true }]);
   }
 
+
+  /* ---------- Watch & Listen: paste a link, or upload a song / video ---------- */
+  function mediaExt(file) {
+    var n = (file.name.split(".").pop() || "").toLowerCase();
+    if (/^(mp3|m4a|aac|wav|ogg|oga|opus|flac|webm|mp4|m4v|mov)$/.test(n)) return n;
+    return /video/.test(file.type) ? "mp4" : audioExt(file);
+  }
+  function editMedia(id, shelf) {
+    var path = id ? BASE + "content/media/" + id + ".json" : "";
+    (id ? readJSON(path) : Promise.resolve(null)).then(function (raw) {
+      var x = raw || { date: nowLocal(), url: "", file: "", title: "", note: "", cover: "", shelf: "auto", category: "auto" };
+      var known = ((CTX.D.media || {}).items || []).filter(function (m) { return m.id === id; })[0] || {};
+      var mode = x.file && !x.url ? "file" : "link";
+      var wrap = sheet(id ? "Edit" : (shelf === "listen" ? "Add music or a podcast" : "Add a video"),
+        '<div class="ed-tabs" role="tablist"><button type="button" class="pill" data-mode="link">Paste a link</button><button type="button" class="pill" data-mode="file">Upload a file</button></div>' +
+        '<div data-part="link">' + field("Link", input("url", x.url, "url", ' placeholder="YouTube, TikTok, Instagram, Bilibili, Spotify, Apple Music, SoundCloud…" autocomplete="off"')) +
+          '<p class="ed-found"></p><div class="ed-preview"></div></div>' +
+        '<div data-part="file" hidden><div class="ed-field"><span class="ed-label">Song, recording or video</span><div class="ed-file-box"></div>' +
+          '<div class="ed-row"><label class="pill">Choose a file<input type="file" name="upload" accept="audio/*,video/*" hidden></label></div>' +
+          '<span class="ed-hint">MP3, M4A, WAV, MP4… up to 95 MB. Longer videos: upload them to YouTube and paste the link instead.</span></div></div>' +
+        field("Title (optional for links: the platform's title is used)", input("title", x.title)) +
+        '<label class="ed-field"><span class="ed-label">A line about it (optional)</span><textarea class="ed-input" name="note" rows="2">' + esc(x.note) + "</textarea></label>" +
+        '<div data-slot="cover"></div>' +
+        '<div class="ed-row2">' + field("When", input("date", x.date, "datetime-local")) +
+          field("Show it in", select("shelf", x.shelf || "auto", [["auto", "Automatic"], ["watch", "Watch"], ["listen", "Listen"]])) + "</div>" +
+        field("Kind (for Listen)", select("category", x.category || "auto", [["auto", "Automatic"], ["Music", "Music"], ["Podcasts", "Podcasts"], ["Video", "Video"]])) +
+        '<label class="ed-check"><input type="checkbox" name="hidden"' + (x.hidden ? " checked" : "") + "> Keep as a draft (not shown on the site)</label>");
+      var cover = imagePicker(x.cover ? [x.cover] : [], "Cover picture (optional — links get one automatically)");
+      $("[data-slot=cover]", wrap).appendChild(cover.el);
+      wrap.addEventListener("paste", function (e) { if (e.target.name !== "url") cover.onPaste(e); });
+      var f = $("form", wrap), upload = { blob: null };
+      function setMode(m) {
+        mode = m;
+        wrap.querySelectorAll("[data-mode]").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-mode") === m); });
+        $("[data-part=link]", wrap).hidden = m !== "link";
+        $("[data-part=file]", wrap).hidden = m !== "file";
+      }
+      wrap.querySelectorAll("[data-mode]").forEach(function (b) { b.addEventListener("click", function () { setMode(b.getAttribute("data-mode")); }); });
+      setMode(mode);
+      // live preview: what the link will look like on the site
+      var preview = $(".ed-preview", wrap), found = $(".ed-found", wrap);
+      function showLink() {
+        var u = f.url.value.trim();
+        if (!u || !window.AlyxMedia || !window.AlyxMedia.looksLikeLink(u)) { preview.innerHTML = ""; found.textContent = u ? "Paste the whole link, starting with https://" : ""; return; }
+        var info = CTX.mediaInfo({ url: u, meta: u === known.url ? known.meta : null, shelf: f.shelf.value, category: f.category.value });
+        var what = { video: "video", short: "vertical video", audio: "player", card: "link card" }[info.type];
+        found.textContent = (info.platform || "Link") + " · " + what + " · shows in " + (info.shelf === "listen" ? "Listen" : "Watch") +
+          (info.type === "card" ? " · the cover and title are fetched when the site updates" : "");
+        preview.innerHTML = CTX.player(info, { auto: false, queue: "editor" });
+      }
+      f.url.addEventListener("input", showLink);
+      f.shelf.addEventListener("change", showLink);
+      preview.addEventListener("click", function (e) {
+        var m = e.target.closest(".mplay"); if (!m || m.querySelector("iframe, video")) return;
+        var src = m.getAttribute("data-src"), file = m.getAttribute("data-file");
+        m.insertAdjacentHTML("beforeend", '<div class="m-live">' + (file ? '<video src="' + esc(file) + '" controls autoplay playsinline></video>' :
+          '<iframe src="' + esc(src) + '" allow="' + window.AlyxMedia.ALLOW + '" allowfullscreen frameborder="0"></iframe>') + "</div>");
+        m.setAttribute("data-live", "user");
+      });
+      showLink();
+      // uploaded file
+      var box = $(".ed-file-box", wrap);
+      function showFile() {
+        var src = upload.blob ? URL.createObjectURL(upload.blob) : x.file ? CTX.asset(x.file) : "";
+        var isVideo = upload.blob ? /video/.test(upload.blob.type) : /\.(mp4|m4v|mov)$/i.test(x.file || "");
+        box.innerHTML = src ? (isVideo ? '<video controls playsinline src="' + esc(src) + '" style="width:100%;max-height:320px"></video>' : '<audio controls src="' + esc(src) + '"></audio>') +
+          (upload.blob ? '<span class="ed-hint">' + esc(upload.blob.name) + " · " + (upload.blob.size / 1048576).toFixed(1) + " MB</span>" : "") : '<span class="ed-hint">No file yet</span>';
+      }
+      f.upload.addEventListener("change", function (e) {
+        var file = e.target.files[0]; if (!file) return;
+        if (file.size > 95 * 1048576) { toast("That file is over 95 MB. Upload it to YouTube or SoundCloud and paste the link instead."); e.target.value = ""; return; }
+        upload.blob = file;
+        if (!f.title.value) f.title.value = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
+        showFile();
+      });
+      showFile();
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var url = f.url.value.trim();
+        if (mode === "link" && !url) { $(".ed-status", wrap).textContent = "Paste a link first."; return; }
+        if (mode === "file" && !upload.blob && !x.file) { $(".ed-status", wrap).textContent = "Choose a file first."; return; }
+        var info = mode === "link" ? CTX.mediaInfo({ url: url }) : null;
+        var mid = id || (slugify(f.title.value) || slugify(info && info.platform) || "media") + "-" + stamp();
+        saveFlow(wrap, function () {
+          return collectMedia(cover, "cover-" + mid).then(function (c) {
+            var files = c.files, filePath = mode === "file" ? x.file : "";
+            if (mode === "file" && upload.blob) {
+              var name = "media-" + mid + "-" + Math.random().toString(36).slice(2, 6) + "." + mediaExt(upload.blob);
+              files = files.concat([{ path: BASE + "assets/uploads/" + name, blob: upload.blob }]);
+              filePath = "/assets/uploads/" + name;
+            }
+            var out = { date: f.date.value || nowLocal(), url: mode === "link" ? url : "", file: filePath, title: f.title.value.trim(), note: f.note.value,
+                        cover: c.paths[0] || "", shelf: f.shelf.value, category: f.category.value };
+            if (f.hidden.checked) out.hidden = true;
+            return commit(files.concat([{ path: BASE + "content/media/" + mid + ".json", text: JSON.stringify(out, null, 2) + "\n" }]), [],
+              (id ? "Update" : "Add") + " media “" + mid + "”").then(function () {
+              CTX.onSaved("media", Object.assign({ id: mid, meta: out.url && out.url === known.url ? known.meta : null }, out), !!out.hidden);
+            });
+          });
+        });
+      });
+      var btns = [{ label: "Cancel", run: close }, { label: id ? "Save" : "Add", solid: true, submit: true }];
+      if (id) btns.unshift({ label: "Delete", danger: true, run: function () { remove(wrap, path, "media", id); } });
+      actions(wrap, btns);
+      (mode === "link" ? f.url : f.title).focus();
+    }).catch(function (err) { toast(explain(err)); });
+  }
+
   /* ---------- entry point ---------- */
   function open(spec, ctx) {
     CTX = ctx || CTX;
@@ -636,6 +753,7 @@
     if (k === "project") return editProject();
     if (k === "design") return editDesign(spec.mode === "edit" ? spec.id : null);
     if (k === "visual") return addVisual(spec.id);
+    if (k === "media") return editMedia(spec.mode === "edit" ? spec.id : null, spec.shelf);
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && $(".ed-sheet")) close(); });
   window.AlyxEditor = { open: open, toMarkdown: toMarkdown };

@@ -14,9 +14,9 @@
   var PAGES = {
     theme: "", settings: "", sections: "", follow: "follow/",
     books: "books/", store: "store/", traces: "traces/",
-    daily: "daily/", projects: "ongoing/", entries: "ongoing/", visual: "visual/", design: "design/"
+    daily: "daily/", projects: "ongoing/", entries: "ongoing/", visual: "visual/", design: "design/", media: "watch/"
   };
-  var COLLECTIONS = { daily: 1, projects: 1, entries: 1, visual: 1, design: 1 };
+  var COLLECTIONS = { daily: 1, projects: 1, entries: 1, visual: 1, design: 1, media: 1 };
   var DESKTOP = 1280, PHONE = 390;
   var ORIGIN = window.location.origin;
 

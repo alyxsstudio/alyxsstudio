@@ -12,7 +12,7 @@ import { readCache, applyTranslations } from "./i18n.mjs";
 const SITE = path.resolve(process.argv[2] || ".");
 const OUT = path.resolve(process.argv[3] || "_site");
 const SKIP = new Set(["scripts", "content", "netlify.toml", "README.md", "node_modules", ".DS_Store"]);
-const SKIP_DATA = new Set(["translations.json"]);
+const SKIP_DATA = new Set(["translations.json", "embeds.json"]);
 
 async function copyDir(src, dst) {
   await fs.mkdir(dst, { recursive: true });
@@ -77,10 +77,24 @@ async function main() {
     try { await fs.writeFile(file, JSON.stringify(tr(JSON.parse(await fs.readFile(file, "utf8"))))); } catch {}
   }
 
+  // titles and covers of pasted links, fetched by scripts/embeds.mjs
+  let embeds = {};
+  try { embeds = JSON.parse(await fs.readFile(path.join(SITE, "data", "embeds.json"), "utf8")).items || {}; } catch {}
+  const metaFor = (url) => {
+    const m = url && embeds[String(url).trim()];
+    if (!m || !m.ok) return undefined;
+    const { ok, checked, tries, ...rest } = m;
+    return rest;
+  };
+
   // Daily
   const daily = (await read("daily"))
     .filter((p) => p.date && !p.hidden)
-    .map((p) => ({ ...p, day: dayOf(p.date), images: asList(p.images) }))
+    .map((p) => {
+      const out = { ...p, day: dayOf(p.date), images: asList(p.images) };
+      if (p.link && p.link.url && metaFor(p.link.url)) out.link = { ...p.link, meta: metaFor(p.link.url) };
+      return out;
+    })
     .sort(byDateDesc);
   await write("daily.json", { posts: daily });
 
@@ -111,9 +125,14 @@ async function main() {
     .map((s) => ({ ...s, images: asList(s.images) })).sort(byDateDesc);
   await write("design.json", { items: design });
 
+  // Watch & Listen
+  const media = (await read("media")).filter((m) => !m.hidden && (m.url || m.file))
+    .map((m) => ({ ...m, meta: metaFor(m.url) })).sort(byDateDesc);
+  await write("media.json", { items: media });
+
   await write("build.json", { built: new Date().toISOString() });
   if (untranslated) console.log(`${untranslated} paragraph(s) still waiting for English; they show in Chinese for now.`);
-  console.log(`Built ${OUT}: ${daily.length} posts, ${projects.length} projects, ${entries.length} entries, ${visual.length} series, ${design.length} sketches.`);
+  console.log(`Built ${OUT}: ${daily.length} posts, ${projects.length} projects, ${entries.length} entries, ${visual.length} series, ${design.length} sketches, ${media.length} videos and songs.`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

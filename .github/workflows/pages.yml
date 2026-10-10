@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Titles and covers of pasted links
+        run: node alyxs-studio/scripts/embeds.mjs alyxs-studio
+        continue-on-error: true
       - name: English versions of Chinese text
         run: node alyxs-studio/scripts/translate.mjs alyxs-studio
         env:
@@ -40,14 +43,15 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
-      - name: Keep the translations
+      - name: Keep the translations, titles and covers
         continue-on-error: true
         run: |
-          if [ -n "$(git status --porcelain -- alyxs-studio/data/translations.json)" ]; then
+          for f in alyxs-studio/data/translations.json alyxs-studio/data/embeds.json; do if [ -f "$f" ]; then git add "$f"; fi; done
+          if [ -d alyxs-studio/assets/uploads/covers ]; then git add -A alyxs-studio/assets/uploads/covers; fi
+          if ! git diff --cached --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add alyxs-studio/data/translations.json
-            git commit -m "Update English translations [skip ci]"
+            git commit -m "Update translations, titles and covers [skip ci]"
             git pull --rebase origin main && git push origin HEAD:main
           fi
 

@@ -254,7 +254,7 @@
       var files = ["settings", "theme", "sections", "follow", "books", "store", "traces"];
       var raw = {};
       return Promise.all(files.map(function (f) { return get("data/" + f + ".json").then(function (j) { raw[f] = j; }); }))
-        .then(function () { return Promise.all(["daily", "ongoing", "visual", "design"].map(function (f) { return get("data/gen/" + f + ".json").then(function (j) { raw[f] = j || {}; }); })); })
+        .then(function () { return Promise.all(["daily", "ongoing", "visual", "design", "media"].map(function (f) { return get("data/gen/" + f + ".json").then(function (j) { raw[f] = j || {}; }); })); })
         .then(function () {
           Object.keys(raw).forEach(function (k) { z.folder("data").file(k + ".json", JSON.stringify(raw[k], null, 2)); });
           var cols = [];
@@ -265,6 +265,11 @@
           ((raw.visual || {}).series || []).forEach(function (s) {
             cols.push(["visual/" + s.id, { title: s.title, items: (s.images || []).map(function (im) { return { title: im.title || "", images: [im.image, im.phone, im.desktop].filter(Boolean) }; }) }]);
           });
+          var media = (raw.media || {}).items || [];
+          if (media.length) cols.push(["watch-listen", { title: "Watch & Listen", items: media.map(function (m) {
+            return { title: m.title || (m.meta && m.meta.title) || m.url || "", date: m.date, text: [m.note, m.url].filter(Boolean).join("\n\n"),
+                     images: [m.cover || (m.meta && m.meta.cover)].filter(function (x) { return x && !/^https?:/.test(x); }), audio: m.file || "" };
+          }) }]);
           cols.push(["books", { title: "Books", items: ((raw.books || {}).items || []).map(function (b) { return { title: b.title, text: (b.note || "") + "\n\n" + (b.links || []).map(function (l) { return "- " + l.label + ": " + (l.url || ""); }).join("\n"), images: [b.image].filter(Boolean) }; }) }]);
           cols.push(["store", { title: "Store", items: ((raw.store || {}).items || []).map(function (b) { return { title: b.title, text: [b.category, b.price, b.note, b.url].filter(Boolean).join("\n\n"), images: [b.image].filter(Boolean) }; }) }]);
           var projects = (raw.ongoing || {}).projects || [];
