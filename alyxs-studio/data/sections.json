@@ -2,14 +2,14 @@
   "sections": [
     {
       "key": "daily",
-      "title": "X",
+      "title": "Feed",
       "short": "Notes, photos and voice, day by day.",
       "intro": "",
       "in_menu": true
     },
     {
       "key": "ongoing",
-      "title": "Novel",
+      "title": "Draft",
       "short": "Things that grow a little every day.",
       "intro": "",
       "in_menu": true
@@ -23,28 +23,28 @@
     },
     {
       "key": "listen",
-      "title": "Podcast & Music",
+      "title": "Audio",
       "short": "Music and podcasts.",
       "intro": "",
       "in_menu": true
     },
     {
       "key": "books",
-      "title": "Textbook",
+      "title": "Books",
       "short": "Published on Amazon and Apple Books.",
       "intro": "",
       "in_menu": true
     },
     {
       "key": "visual",
-      "title": "Photo",
+      "title": "Gallery",
       "short": "Wallpapers, avatars and covers.",
       "intro": "",
       "in_menu": true
     },
     {
       "key": "design",
-      "title": "Design",
+      "title": "Concepts",
       "short": "Sketches and ideas for things I make.",
       "intro": "",
       "in_menu": true
@@ -58,14 +58,14 @@
     },
     {
       "key": "traces",
-      "title": "Collab",
+      "title": "Press",
       "short": "Where the work has been.",
       "intro": "",
       "in_menu": true
     },
     {
       "key": "follow",
-      "title": "Social Media",
+      "title": "Connect",
       "short": "Everywhere else I post.",
       "intro": "",
       "in_menu": true
