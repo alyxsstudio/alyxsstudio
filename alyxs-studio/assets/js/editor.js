@@ -75,7 +75,12 @@
     });
   }
   /* One commit with every changed file: text, pictures and audio together. */
+  function remember(files) {
+    window.AlyxUploads = window.AlyxUploads || {};
+    (files || []).forEach(function (f) { if (f.blob) try { window.AlyxUploads[f.path.slice(BASE.length - 1)] = URL.createObjectURL(f.blob); } catch (e) {} });
+  }
   function commit(files, deletes, message, retry) {
+    if (!retry) remember(files);
     var ref, base;
     return gh("/repos/" + REPO + "/git/ref/heads/" + BRANCH).then(function (r) {
       ref = r.object.sha;
@@ -276,9 +281,44 @@
     wrap.querySelectorAll("button, input, select, textarea").forEach(function (x) { x.disabled = on; });
     $(".ed-status", wrap).textContent = msg || "";
   }
+  /* Every form keeps what you type on this device until it is saved, like a draft in Google Docs.
+     Close it, reload, come back tomorrow: it opens where you left off. */
+  function autosave(wrap, key) {
+    var f = $("form", wrap), k = "alyx-form:" + key;
+    wrap.draftKey = k;
+    var fields = function () { return Array.prototype.filter.call(f.elements, function (el) { return el.name && el.type !== "file" && el.type !== "button"; }); };
+    var read = function () { var o = {}; fields().forEach(function (el) { o[el.name] = el.type === "checkbox" ? el.checked : el.value; }); return o; };
+    var write = function (o) { fields().forEach(function (el) { if (!(el.name in o)) return; if (el.type === "checkbox") el.checked = !!o[el.name]; else el.value = o[el.name]; el.dispatchEvent(new Event("input", { bubbles: true })); }); };
+    var original = read(), saved = null;
+    try { saved = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) {}
+    if (saved && saved.v && JSON.stringify(saved.v) !== JSON.stringify(original)) {
+      write(saved.v);
+      var note = document.createElement("p");
+      note.className = "ed-restored";
+      note.innerHTML = "Restored what you were writing (" + esc(new Date(saved.t).toLocaleString()) + ") · <button type=\"button\" class=\"linkish\">Start over</button>";
+      $(".ed-body", wrap).insertBefore(note, $(".ed-body", wrap).firstChild);
+      $("button", note).addEventListener("click", function () { write(original); try { localStorage.removeItem(k); } catch (e) {} note.remove(); });
+    }
+    var timer;
+    var keep = function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var v = read();
+        try {
+          if (JSON.stringify(v) === JSON.stringify(original)) localStorage.removeItem(k);
+          else localStorage.setItem(k, JSON.stringify({ v: v, t: Date.now() }));
+        } catch (e) {}
+        var st = $(".ed-status", wrap);
+        if (st && !st.textContent.match(/Saving|Couldn/)) st.textContent = "Draft kept on this device";
+      }, 500);
+    };
+    f.addEventListener("input", keep); f.addEventListener("change", keep);
+  }
+  function dropDraft(wrap) { if (wrap && wrap.draftKey) try { localStorage.removeItem(wrap.draftKey); } catch (e) {} }
   function saveFlow(wrap, run) {
     busy(wrap, true, "Saving…");
     return run().then(function () {
+      dropDraft(wrap);
       close();
       toast("Saved. The site updates in about a minute; Chinese gets its English version then too.");
     }).catch(function (e) {
@@ -301,10 +341,11 @@
   }
 
   /* ---------- Daily ---------- */
-  function editDaily(id) {
+  function editDaily(id, day) {
     var path = id ? BASE + "content/daily/" + id + ".json" : "";
     (id ? readJSON(path) : Promise.resolve(null)).then(function (raw) {
-      var p = raw || { date: nowLocal(), text: "", images: [], audio: "", link: { url: "", title: "", quote: "" }, tags: [] };
+      var when = day ? day + "T" + nowLocal().slice(11) : nowLocal();
+      var p = raw || { date: when, text: "", images: [], audio: "", link: { url: "", title: "", quote: "" }, tags: [] };
       var wrap = sheet(id ? "Edit post" : "New post",
         field("When", input("date", p.date, "datetime-local")) +
         '<label class="ed-field"><span class="ed-label">Text</span><textarea class="ed-input ed-text-area" name="text" rows="6" placeholder="写点什么… Write in Chinese or English.">' + esc(p.text) + "</textarea></label>" +
@@ -329,6 +370,7 @@
         box.innerHTML = info.type === "card" ? "" : CTX.player(info, { auto: false, queue: "editor" });
       };
       f.lurl.addEventListener("input", lprev); lprev();
+      autosave(wrap, "daily:" + (id || "new"));
       var save = function () {
         return saveFlow(wrap, function () {
           var date = f.date.value || nowLocal();
@@ -394,6 +436,7 @@
       $("[data-slot=audio]", wrap).appendChild(aud.el);
       wrap.addEventListener("paste", imgs.onPaste);
       autoGrow($("textarea[name=text]", wrap));
+      autosave(wrap, "entry:" + (id || "new:" + (pid || "")));
       var f = $("form", wrap);
       f.addEventListener("submit", function (ev) {
         ev.preventDefault();
@@ -547,6 +590,7 @@
       field("What's inside", select("kind", "mixed", [["text", "Mostly writing (novel, essays)"], ["image", "Mostly pictures (dictionary, image serial)"], ["mixed", "Both"]])) +
       field("Order", select("sort", "date-asc", [["date-asc", "Oldest first"], ["date-desc", "Newest first"], ["title", "A–Z by title"], ["number", "By number"]])) +
       field("Who can download it", select("download", "private", [["private", "Only me"], ["public", "Everyone"]])));
+    autosave(wrap, "project:new");
     var f = $("form", wrap);
     f.addEventListener("submit", function (ev) {
       ev.preventDefault();
@@ -578,6 +622,7 @@
       var imgs = imagePicker(x.images, "Sketches");
       $("[data-slot=images]", wrap).appendChild(imgs.el);
       wrap.addEventListener("paste", imgs.onPaste);
+      autosave(wrap, "design:" + (id || "new"));
       var f = $("form", wrap);
       f.addEventListener("submit", function (ev) {
         ev.preventDefault();
@@ -711,6 +756,7 @@
         showFile();
       });
       showFile();
+      autosave(wrap, "media:" + (id || "new:" + (shelf || "")));
       f.addEventListener("submit", function (ev) {
         ev.preventDefault();
         var url = f.url.value.trim();
@@ -743,12 +789,734 @@
     }).catch(function (err) { toast(explain(err)); });
   }
 
+
+  /* =====================================================================
+     Owner mode: change anything on the page
+     ===================================================================== */
+
+  /* ---------- small form helpers ---------- */
+  function area(name, value, rows, ph) { return '<textarea class="ed-input" name="' + name + '" rows="' + (rows || 3) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + ">" + esc(value || "") + "</textarea>"; }
+  function check(name, on, label) { return '<label class="ed-check"><input type="checkbox" name="' + name + '"' + (on ? " checked" : "") + "> " + esc(label) + "</label>"; }
+  function datalist(id, values) { return '<datalist id="' + id + '">' + values.map(function (v) { return '<option value="' + esc(v) + '">'; }).join("") + "</datalist>"; }
+  function clone(o) { return JSON.parse(JSON.stringify(o == null ? null : o)); }
+  // the site's files carry the automatic English next to the original (<field>_zh); give back the original
+  function original(o) {
+    if (Array.isArray(o)) return o.map(original);
+    if (!o || typeof o !== "object") return o;
+    var out = {};
+    Object.keys(o).forEach(function (k) {
+      if (/_zh$/.test(k) || k === "__en") return;
+      out[k] = original(o[k + "_zh"] !== undefined && typeof o[k + "_zh"] === typeof o[k] ? o[k + "_zh"] : o[k]);
+    });
+    return out;
+  }
+  /* rows of small inputs (links, platforms): add, remove, reorder */
+  function rowsEditor(rows, cols, addLabel) {
+    var el = document.createElement("div");
+    el.className = "ed-rows";
+    var data = (rows || []).map(function (r) { return Object.assign({}, r); });
+    function render() {
+      el.innerHTML = data.map(function (r, i) {
+        return '<div class="ed-rowline">' + cols.map(function (c) {
+          return '<input class="ed-input" data-r="' + i + '" data-c="' + c.key + '" placeholder="' + esc(c.label) + '" value="' + esc(r[c.key] || "") + '"' + (c.wide ? ' style="flex:2"' : "") + ">";
+        }).join("") +
+        (i > 0 ? '<button type="button" class="ed-ic" data-up="' + i + '" aria-label="Move up">↑</button>' : '<span class="ed-ic"></span>') +
+        '<button type="button" class="ed-ic" data-rm="' + i + '" aria-label="Remove">×</button></div>';
+      }).join("") + '<button type="button" class="pill" data-add>' + esc(addLabel || "+ Add") + "</button>";
+    }
+    el.addEventListener("input", function (e) { var t = e.target; if (t.hasAttribute("data-r")) data[+t.getAttribute("data-r")][t.getAttribute("data-c")] = t.value; });
+    el.addEventListener("click", function (e) {
+      var t = e.target;
+      if (t.hasAttribute("data-add")) { var o = {}; cols.forEach(function (c) { o[c.key] = ""; }); data.push(o); render(); var ins = el.querySelectorAll("input"); if (ins.length) ins[ins.length - cols.length].focus(); }
+      if (t.hasAttribute("data-rm")) { data.splice(+t.getAttribute("data-rm"), 1); render(); }
+      if (t.hasAttribute("data-up")) { var i = +t.getAttribute("data-up"), x = data[i]; data[i] = data[i - 1]; data[i - 1] = x; render(); }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    render();
+    return { el: el, value: function () { return data.filter(function (r) { return cols.some(function (c) { return String(r[c.key] || "").trim(); }); }); } };
+  }
+  /* commit one JSON file after changing a fresh copy of it */
+  function changeFile(file, change, message, extraFiles) {
+    return readJSON(BASE + file).then(function (obj) {
+      obj = obj || {};
+      var out = change(obj) || obj;
+      return commit((extraFiles || []).concat([{ path: BASE + file, text: JSON.stringify(out, null, 2) + "\n" }]), [], message).then(function () { return out; });
+    });
+  }
+  function once(fn) { var running = false; return function () { if (running) return; running = true; var args = arguments; Promise.resolve(fn.apply(null, args)).then(function () { running = false; }, function () { running = false; }); }; }
+
+  /* ---------- text changed by clicking on it: kept on this device until Publish ---------- */
+  var PKEY = "alyx-pending";
+  function pending() { try { return JSON.parse(localStorage.getItem(PKEY) || "[]"); } catch (e) { return []; } }
+  function savePending(list) { try { if (list.length) localStorage.setItem(PKEY, JSON.stringify(list)); else localStorage.removeItem(PKEY); } catch (e) {} }
+  function splitPath(p) { var i = p.indexOf("#"); return { file: p.slice(0, i), field: p.slice(i + 1) }; }
+  function segs(field) {
+    var out = [], re = /([^.[\]]+)|\[(\d+)\]|\[(\w+)=([^\]]+)\]/g, m;
+    while ((m = re.exec(field))) out.push(m[1] ? { k: m[1] } : m[2] ? { i: +m[2] } : { by: m[3], val: m[4] });
+    return out;
+  }
+  function setAt(obj, field, value) {
+    var s = segs(field), o = obj;
+    for (var n = 0; n < s.length; n++) {
+      var g = s[n], last = n === s.length - 1, key;
+      if (g.by) { var arr = Array.isArray(o) ? o : []; key = -1; arr.forEach(function (x, j) { if (x && String(x[g.by]) === g.val) key = j; }); if (key < 0) return false; }
+      else key = g.k != null ? g.k : g.i;
+      if (last) { o[key] = value; return true; }
+      if (o[key] == null || typeof o[key] !== "object") o[key] = s[n + 1].k != null ? {} : [];
+      o = o[key];
+    }
+    return false;
+  }
+  function getAt(obj, field) {
+    var o = obj;
+    segs(field).forEach(function (g) {
+      if (o == null) return;
+      if (g.by) { o = (Array.isArray(o) ? o : []).filter(function (x) { return x && String(x[g.by]) === g.val; })[0]; return; }
+      o = o[g.k != null ? g.k : g.i];
+    });
+    return o;
+  }
+  function viewTargets(file) {
+    // where the same text lives in what the page is showing now (and in the untranslated copy)
+    var D = CTX.D, R = rawData(), m, out = [];
+    if ((m = file.match(/^data\/(\w+)\.json$/))) { out.push(D[m[1]] = D[m[1]] || {}); if (R[m[1]]) out.push(R[m[1]]); return out; }
+    if ((m = file.match(/^content\/visual\/(.+)\.json$/))) {
+      [D, R].forEach(function (src) { ((src.visual || {}).series || []).forEach(function (x) { if (x.id === m[1]) out.push(x); }); });
+      return out;
+    }
+    if ((m = file.match(/^content\/projects\/(.+)\.json$/))) {
+      [D, R].forEach(function (src) { ((src.ongoing || {}).projects || []).forEach(function (x) { if (x.id === m[1]) out.push(x); }); });
+      if (D.project && D.project.project && D.project.project.id === m[1]) out.push(D.project.project);
+      return out;
+    }
+    return out;
+  }
+  function applyToView(op) {
+    var sp = splitPath(op.path);
+    viewTargets(sp.file).forEach(function (t) {
+      setAt(t, sp.field, op.value);
+      // drop the stale translation so the page shows what was typed
+      if (typeof op.value === "string" && getAt(t, sp.field + "_zh") !== undefined) setAt(t, sp.field + "_zh", op.value);
+    });
+  }
+  function addPending(path, value, translated) {
+    var list = pending(), sp = splitPath(path);
+    var real = translated ? sp.file + "#" + sp.field + "_en" : path;
+    if (list.length && list[list.length - 1].path === real) list[list.length - 1].value = value;
+    else list.push({ path: real, value: value });
+    savePending(list);
+    applyToView({ path: path, value: value });
+    pendingBar();
+  }
+  function publishPending() {
+    var list = pending();
+    if (!list.length) return Promise.resolve();
+    if (!token()) { signIn(publishPending); return Promise.resolve(); }
+    var files = {};
+    list.forEach(function (op) { var f = splitPath(op.path).file; (files[f] = files[f] || []).push(op); });
+    var names = Object.keys(files);
+    setBar("Publishing…");
+    return Promise.all(names.map(function (f) { return readJSON(BASE + f).then(function (o) { return { f: f, o: o || {} }; }); })).then(function (got) {
+      var out = [];
+      got.forEach(function (g) {
+        files[g.f].forEach(function (op) { setAt(g.o, splitPath(op.path).field, clone(op.value)); });
+        out.push({ path: BASE + g.f, text: JSON.stringify(g.o, null, 2) + "\n" });
+      });
+      return commit(out, [], "Edit on the page: " + names.map(function (n) { return n.split("/").pop().replace(".json", ""); }).join(", "));
+    }).then(function () {
+      savePending([]); pendingBar();
+      toast("Published. The site updates in about a minute.");
+    }).catch(function (e) { console.error(e); setBar(explain(e)); });
+  }
+
+  /* ---------- the owner bar (bottom left) ---------- */
+  function ownerBar() {
+    var bar = $(".own-bar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "own-bar";
+      bar.innerHTML = '<button type="button" class="own-btn" data-own="menu" aria-label="Owner tools">✎ <span>Owner</span></button><span class="own-pending" hidden></span>';
+      document.body.appendChild(bar);
+      bar.addEventListener("click", function (e) {
+        var t = e.target.closest("[data-own]"); if (!t) return;
+        var k = t.getAttribute("data-own");
+        if (k === "menu") ownerMenu();
+        if (k === "publish") publishPending();
+        if (k === "undo") { if (window.confirm("Undo the changes you haven't published?")) { savePending([]); location.reload(); } }
+      });
+    }
+    pendingBar();
+  }
+  function setBar(msg) { var p = $(".own-pending"); if (p) { p.hidden = false; p.innerHTML = '<span class="own-msg">' + esc(msg) + "</span>"; } }
+  function pendingBar() {
+    var p = $(".own-pending"); if (!p) return;
+    var n = pending().length;
+    p.hidden = !n;
+    p.innerHTML = n ? '<span class="own-msg">' + n + (n === 1 ? " change" : " changes") + ' · kept on this device</span>' +
+      '<button type="button" class="own-link" data-own="undo">Undo</button><button type="button" class="own-pub" data-own="publish">Publish</button>' : "";
+  }
+  function ownerMenu() {
+    var zh = CTX.lang === "zh";
+    var wrap = sheet("Owner tools",
+      '<p class="ed-text">Click any text with a dotted line under it to change it. Use the buttons on each section to add, edit and move things. Every form keeps your draft on this device until you save.</p>' +
+      '<div class="ed-field"><span class="ed-label">You are looking at</span><div class="ed-tabs">' +
+        '<button type="button" class="pill' + (zh ? " on" : "") + '" data-lang="zh">中文 · only you</button>' +
+        '<button type="button" class="pill' + (!zh ? " on" : "") + '" data-lang="en">English · what visitors see</button></div>' +
+        '<span class="ed-hint">You write in Chinese; visitors only see the English version made when the site updates. In English view, text you change is kept as the English version.</span></div>' +
+      '<div class="ed-menu">' +
+        '<button type="button" class="pill" data-go="menu">Menu & page names</button>' +
+        '<button type="button" class="pill" data-go="site">Name, logo, email</button>' +
+        '<button type="button" class="pill" data-go="look">Fonts, colours, sizes</button>' +
+        '<button type="button" class="pill" data-go="export">Download everything</button>' +
+        '<a class="pill" href="' + esc(location.pathname) + '?me=0">Leave owner mode</a></div>');
+    wrap.addEventListener("click", function (e) {
+      var l = e.target.closest("[data-lang]"); if (l) { CTX.setLang(l.getAttribute("data-lang")); return; }
+      var g = e.target.closest("[data-go]"); if (!g) return;
+      var k = g.getAttribute("data-go");
+      if (k === "menu") menuSheet();
+      if (k === "site") siteSheet();
+      if (k === "look") lookSheet();
+      if (k === "export") { close(); var b = document.querySelector('[data-act="export-all"]'); if (b) b.click(); else { var x = document.createElement("button"); x.setAttribute("data-act", "export-all"); x.hidden = true; document.getElementById("app").appendChild(x); x.click(); x.remove(); } }
+    });
+    actions(wrap, [{ label: "Close", run: close }]);
+  }
+
+  /* ---------- decorate the page after each drawing ---------- */
+  var RAWV = null;   // the loaded files with the original (untranslated) text
+  function rawData() { if (!RAWV) RAWV = original(CTX.RAW || {}); return RAWV; }
+  var started = false;
+  function decorate(ctx) {
+    CTX = ctx;
+    if (!started) {
+      started = true;
+      rawData();
+      var list = pending();
+      if (list.length) { list.forEach(function (op) { var sp = splitPath(op.path); applyToView({ path: sp.file + "#" + sp.field.replace(/_en$/, ""), value: op.value }); }); ownerBar(); CTX.redraw(); return; }
+    }
+    ownerBar();
+    var app = document.getElementById("app");
+    app.querySelectorAll("[data-edit]").forEach(function (el) {
+      if (el.getAttribute("data-wired")) return;
+      el.setAttribute("data-wired", "1");
+      el.classList.add("editable");
+      try { el.contentEditable = "plaintext-only"; } catch (e) {}
+      if (el.contentEditable !== "plaintext-only") el.contentEditable = "true";
+      el.spellcheck = true;
+      var before = el.textContent;
+      el.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); });
+      el.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !(el.getAttribute("data-multi") && e.shiftKey)) { e.preventDefault(); el.blur(); }
+        if (e.key === "Escape") { el.textContent = before; el.blur(); }
+      });
+      el.addEventListener("paste", function (e) {
+        var t = e.clipboardData && e.clipboardData.getData("text/plain");
+        if (t == null) return;
+        e.preventDefault();
+        document.execCommand("insertText", false, el.getAttribute("data-multi") ? t : t.replace(/\s*\n\s*/g, " "));
+      });
+      el.addEventListener("blur", function () {
+        var v = el.innerText.replace(/ /g, " ").replace(/\n{3,}/g, "\n\n").trim();
+        if (v === before.trim()) return;
+        before = v;
+        addPending(el.getAttribute("data-edit"), v, el.getAttribute("data-tr") === "1");
+        CTX.redraw();
+      });
+    });
+    if (CTX.page === "home") homeTools(app);
+  }
+
+  /* ---------- home: move, add, change and remove blocks ---------- */
+  function blocksRaw() {
+    var RD = rawData(), R = RD.settings = RD.settings || {};
+    if (!Array.isArray(R.home_blocks)) R.home_blocks = clone(((CTX.D.settings || {}).home_blocks) || []);
+    return R.home_blocks;
+  }
+  function blocksView() { var s = CTX.D.settings = CTX.D.settings || {}; if (!Array.isArray(s.home_blocks)) s.home_blocks = []; return s.home_blocks; }
+  function setBlocks(fn) {
+    var r = blocksRaw(), v = blocksView();
+    fn(r); fn(v);
+    var list = pending();
+    list.push({ path: "data/settings.json#home_blocks", value: clone(r) });
+    savePending(list);
+    pendingBar();
+    CTX.redraw();
+  }
+  function homeTools(app) {
+    var blks = app.querySelectorAll(".blk[data-blk]"), n = blks.length;
+    blks.forEach(function (el) {
+      if (el.querySelector(".blk-bar")) return;
+      var i = +el.getAttribute("data-blk"), type = el.getAttribute("data-type");
+      var bar = document.createElement("div");
+      bar.className = "blk-bar";
+      bar.innerHTML = '<span class="blk-name">' + esc((CTX.blockNames || {})[type] || type) + "</span>" +
+        (i > 0 ? '<button type="button" data-b="up" aria-label="Move up">↑</button>' : "") +
+        (i < n - 1 ? '<button type="button" data-b="down" aria-label="Move down">↓</button>' : "") +
+        '<button type="button" data-b="edit">Edit</button><button type="button" data-b="remove" aria-label="Remove">×</button>';
+      el.insertBefore(bar, el.firstChild);
+      var add = document.createElement("button");
+      add.type = "button"; add.className = "blk-add"; add.textContent = "+ Add a block here";
+      add.addEventListener("click", function () { addBlockMenu(i); });
+      el.parentNode.insertBefore(add, el);
+      bar.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-b]"); if (!b) return;
+        var k = b.getAttribute("data-b");
+        if (k === "up" || k === "down") setBlocks(function (arr) { var j = k === "up" ? i - 1 : i + 1, x = arr[i]; arr[i] = arr[j]; arr[j] = x; });
+        if (k === "remove" && window.confirm("Remove this block from the home page?")) setBlocks(function (arr) { arr.splice(i, 1); });
+        if (k === "edit") blockSheet(i);
+      });
+    });
+    var end = app.querySelector(".blk-add-end");
+    if (end && !end.firstChild) {
+      var add = document.createElement("button");
+      add.type = "button"; add.className = "blk-add"; add.textContent = "+ Add a block";
+      add.addEventListener("click", function () { addBlockMenu(n); });
+      end.appendChild(add);
+    }
+  }
+  var BLOCK_HELP = {
+    text: "A title and a few paragraphs", image: "One large picture, with a caption and link", hero: "Your logo and a line under it",
+    daily: "The latest Daily posts", watch: "The latest videos", listen: "Songs and podcasts", ongoing: "Ongoing collections",
+    visual: "Pictures from Visual", design: "Latest sketches", store: "Things from the Store", books: "Your books",
+    follow: "Links to every platform", index: "A list of all sections", spacer: "Some empty space"
+  };
+  function addBlockMenu(at) {
+    var names = CTX.blockNames || {};
+    var wrap = sheet("Add a block", '<div class="ed-blocks">' + Object.keys(BLOCK_HELP).map(function (t) {
+      return '<button type="button" class="ed-blockpick" data-t="' + t + '"><b>' + esc(names[t] || t) + "</b><span>" + esc(BLOCK_HELP[t]) + "</span></button>";
+    }).join("") + "</div>");
+    wrap.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-t]"); if (!b) return;
+      var t = b.getAttribute("data-t"), blk = { type: t };
+      if (/daily|watch|listen|ongoing|visual|design|store|books/.test(t)) { blk.title = ""; blk.count = t === "daily" ? 6 : t === "ongoing" || t === "watch" ? 3 : 4; }
+      if (t === "text") { blk.title = ""; blk.body = ""; blk.align = "left"; }
+      if (t === "image") { blk.image = ""; blk.caption = ""; blk.url = ""; blk.size = "wide"; }
+      if (t === "spacer") blk.size = "medium";
+      if (t === "hero") { blk.show_logo = true; blk.show_tagline = true; }
+      close();
+      setBlocks(function (arr) { arr.splice(at, 0, clone(blk)); });
+      if (t === "text" || t === "image") blockSheet(at);
+    });
+    actions(wrap, [{ label: "Cancel", run: close }]);
+  }
+  function blockSheet(i) {
+    var b = clone(blocksRaw()[i] || {}), t = b.type, body = "";
+    var name = (CTX.blockNames || {})[t] || t;
+    if (/daily|watch|listen|ongoing|visual|design|store|books|follow|index/.test(t))
+      body += field("Title (empty: the section's name)", input("title", b.title));
+    if (/daily|watch|listen|ongoing|visual|design|store|books/.test(t))
+      body += field("How many to show", input("count", b.count || 4, "number", ' min="1" max="24"'));
+    if (t === "text") body += field("Title (optional)", input("title", b.title)) + field("Text (Markdown: **bold**, *italic*, [link](https://…))", area("body", b.body, 8)) +
+      field("Align", select("align", b.align || "left", [["left", "Left"], ["center", "Centre"]]));
+    if (t === "image") body += '<div data-slot="img"></div>' + field("Caption (optional)", input("caption", b.caption)) +
+      field("Opens this link when clicked (optional)", input("url", b.url, "url")) + field("Width", select("size", b.size || "wide", [["full", "Full width"], ["wide", "Wide"], ["narrow", "Narrow"]]));
+    if (t === "hero") body += check("show_logo", b.show_logo !== false, "Show the big logo") + check("show_tagline", b.show_tagline !== false, "Show the line under it") +
+      '<p class="ed-hint">The logo picture and the line are changed in Owner → Name, logo, email.</p>';
+    if (t === "spacer") body += field("Size", select("size", b.size || "medium", [["small", "Small"], ["medium", "Medium"], ["large", "Large"]]));
+    var wrap = sheet(name, body || '<p class="ed-text">Nothing to set for this block.</p>');
+    var pic = null;
+    if (t === "image") { pic = imagePicker(b.image ? [b.image] : [], "Picture"); $("[data-slot=img]", wrap).appendChild(pic.el); wrap.addEventListener("paste", pic.onPaste); }
+    autosave(wrap, "block:" + i + ":" + t);
+    var f = $("form", wrap);
+    f.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var apply = function (imgPath) {
+        Array.prototype.forEach.call(f.elements, function (el) {
+          if (!el.name || el.type === "file") return;
+          b[el.name] = el.type === "checkbox" ? el.checked : el.name === "count" ? Math.max(1, Math.min(24, +el.value || 1)) : el.value;
+        });
+        if (imgPath !== undefined) b.image = imgPath;
+        dropDraft(wrap); close();
+        setBlocks(function (arr) { arr[i] = clone(b); });
+      };
+      if (!pic) return apply();
+      if (!pic.items.length) return apply("");
+      if (typeof pic.items[0] === "string") return apply(pic.items[0]);
+      // a new picture is uploaded right away; the block itself waits for Publish
+      busy(wrap, true, "Uploading the picture…");
+      collectMedia(pic, "home").then(function (r) { return commit(r.files, [], "Upload a picture for the home page").then(function () { apply(r.paths[0]); }); })
+        .catch(function (e) { busy(wrap, false, explain(e)); });
+    });
+    actions(wrap, [{ label: "Cancel", run: close }, { label: "Done", solid: true, submit: true }]);
+  }
+
+  /* ---------- Menu & page names ---------- */
+  function menuSheet() {
+    readJSON(BASE + "data/sections.json").then(function (raw) {
+      var list = ((raw || {}).sections || []).slice();
+      var wrap = sheet("Menu & page names",
+        '<p class="ed-text">The names are used in the menu, on the home page and as page titles. Use ↑ to change the menu order.</p><div class="ed-secs"></div>');
+      var box = $(".ed-secs", wrap);
+      function render() {
+        box.innerHTML = list.map(function (s, i) {
+          return '<div class="ed-sec"><div class="ed-sec-top"><span class="ed-sec-key">' + esc(s.key) + "</span>" +
+            (i > 0 ? '<button type="button" class="ed-ic" data-up="' + i + '" aria-label="Move up">↑</button>' : "") +
+            '<label class="ed-check"><input type="checkbox" data-i="' + i + '" data-f="in_menu"' + (s.in_menu !== false ? " checked" : "") + "> In the menu</label></div>" +
+            '<input class="ed-input" data-i="' + i + '" data-f="title" value="' + esc(s.title || "") + '" placeholder="Name">' +
+            '<input class="ed-input" data-i="' + i + '" data-f="short" value="' + esc(s.short || "") + '" placeholder="One line (shown in the list of sections)"></div>';
+        }).join("");
+      }
+      box.addEventListener("input", function (e) { var t = e.target, i = t.getAttribute("data-i"); if (i == null) return; list[+i][t.getAttribute("data-f")] = t.type === "checkbox" ? t.checked : t.value; });
+      box.addEventListener("click", function (e) { var u = e.target.getAttribute("data-up"); if (u == null) return; var i = +u, x = list[i]; list[i] = list[i - 1]; list[i - 1] = x; render(); });
+      render();
+      var f = $("form", wrap);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        saveFlow(wrap, function () {
+          return changeFile("data/sections.json", function (o) { o.sections = list; return o; }, "Menu and page names").then(function (o) {
+            CTX.D.sections = clone(o); rawData().sections = clone(o); CTX.redraw();
+          });
+        });
+      });
+      actions(wrap, [{ label: "Cancel", run: close }, { label: "Save", solid: true, submit: true }]);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+
+  /* ---------- Name, logo, email ---------- */
+  function siteSheet() {
+    readJSON(BASE + "data/settings.json").then(function (s) {
+      s = s || {};
+      var ann = s.announcement || {};
+      var wrap = sheet("Name, logo, email",
+        field("Site name", input("name", s.name)) +
+        field("Line under the big logo (optional)", input("tagline", s.tagline)) +
+        field("Email or contact line (bottom of every page)", input("email", s.email)) +
+        '<div data-slot="logo"></div><div data-slot="logo_large"></div>' +
+        field("Notice at the very top (optional)", input("ann_text", ann.text)) + field("Notice link (optional)", input("ann_url", ann.url, "url")) +
+        check("media_autoplay", s.media_autoplay !== false, "Videos play silently when they reach the middle of the screen") +
+        check("language_switch", !!s.language_switch, "Let visitors switch to Chinese too (otherwise they only see English)"));
+      var small = imagePicker(s.logo ? [s.logo] : [], "Small logo (top left of every page; empty = the smiley)");
+      var big = imagePicker(s.logo_large ? [s.logo_large] : [], "Big logo (home page; empty = the smiley)");
+      $("[data-slot=logo]", wrap).appendChild(small.el); $("[data-slot=logo_large]", wrap).appendChild(big.el);
+      autosave(wrap, "site");
+      var f = $("form", wrap);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        saveFlow(wrap, function () {
+          return Promise.all([collectMedia(small, "logo"), collectMedia(big, "logo-large")]).then(function (r) {
+            return changeFile("data/settings.json", function (o) {
+              o.name = f.name.value.trim() || "Alyx's Studio"; o.tagline = f.tagline.value; o.email = f.email.value;
+              o.logo = r[0].paths[0] || ""; o.logo_large = r[1].paths[0] || "";
+              o.announcement = { text: f.ann_text.value, url: f.ann_url.value.trim() };
+              o.media_autoplay = f.media_autoplay.checked; o.language_switch = f.language_switch.checked;
+              return o;
+            }, "Site name, logo and contact", r[0].files.concat(r[1].files));
+          }).then(function (o) {
+            ["name", "tagline", "email", "logo", "logo_large", "announcement", "media_autoplay", "language_switch"].forEach(function (k) { CTX.D.settings[k] = clone(o[k]); });
+            CTX.redraw();
+          });
+        });
+      });
+      actions(wrap, [{ label: "Cancel", run: close }, { label: "Save", solid: true, submit: true }]);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+
+  /* ---------- Fonts, colours, sizes (changes show at once) ---------- */
+  function lookSheet() {
+    readJSON(BASE + "data/theme.json").then(function (g) {
+      g = g || {};
+      var before = clone(CTX.D.theme || g);
+      var fonts = CTX.fonts || [];
+      var fopts = fonts.map(function (x) { return [x, x]; }), same = [["Same as body", "Same as main text"]].concat(fopts);
+      var color = function (k, label, d) { return '<label class="ed-color"><input type="color" name="' + k + '" value="' + esc(g[k] || d) + '"> ' + esc(label) + "</label>"; };
+      var range = function (k, label, min, max, d, unit) {
+        return '<label class="ed-field"><span class="ed-label">' + esc(label) + ' · <output data-for="' + k + '">' + esc(g[k] != null ? g[k] : d) + "</output>" + (unit || "") + "</span>" +
+          '<input type="range" name="' + k + '" min="' + min + '" max="' + max + '" value="' + esc(g[k] != null ? g[k] : d) + '"></label>';
+      };
+      var wrap = sheet("Fonts, colours, sizes",
+        '<p class="ed-text">Changes show on the page right away. Save to publish them.</p>' +
+        '<div class="ed-row2">' + field("Main font", select("font_body", g.font_body || "Geist", fopts)) + field("Titles", select("font_heading", g.font_heading || "Same as body", same)) + "</div>" +
+        '<div class="ed-row2">' + field("Small text (dates, prices)", select("font_small", g.font_small || "Same as body", same)) +
+          field("Chinese characters", select("font_cjk", g.font_cjk || "sans", [["sans", "黑体 · Sans"], ["serif", "宋体 · Serif"], ["kai", "楷体 · Handwritten"]])) + "</div>" +
+        range("cjk_scale", "Chinese size next to English", 60, 120, 85, "%") +
+        field("Any Google font instead (optional, e.g. Noto Serif SC)", input("font_custom", g.font_custom)) +
+        range("size_body", "Main text size", 12, 28, 15, "px") + range("size_heading", "Page title size", 24, 110, 46, "px") + range("size_nav", "Menu size", 11, 26, 13, "px") +
+        '<div class="ed-colors">' + color("color_background", "Background", "#ffffff") + color("color_text", "Text", "#111111") + color("color_muted", "Grey text", "#8a8984") +
+          color("color_line", "Lines", "#e7e6e1") + color("color_tile", "Empty pictures, calendar", "#f4f3ef") + color("color_highlight", "Highlight (today, selected text)", "#f5e47c") + "</div>" +
+        range("page_width", "Page width", 860, 1800, 1240, "px") + range("image_corners", "Picture corners", 0, 32, 0, "px") +
+        range("logo_header_width", "Small logo width", 36, 140, 64, "px") + range("logo_home_width", "Big logo width", 120, 520, 300, "px") +
+        '<div class="ed-row2">' + range("cols_visual", "Per row: Visual", 1, 6, 4) + range("cols_store", "Per row: Store", 1, 6, 4) + "</div>" +
+        '<div class="ed-row2">' + range("cols_books", "Per row: Books", 1, 6, 4) + range("cols_design", "Per row: Design", 1, 6, 3) + "</div>" +
+        range("cols_mobile", "Per row on phones", 1, 3, 2) +
+        check("uppercase_labels", g.uppercase_labels !== false, "Small labels in CAPITALS"));
+      var f = $("form", wrap);
+      var read = function () {
+        var o = clone(g);
+        Array.prototype.forEach.call(f.elements, function (el) {
+          if (!el.name) return;
+          o[el.name] = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value : el.value;
+        });
+        return o;
+      };
+      f.addEventListener("input", function (e) {
+        var out = wrap.querySelector('output[data-for="' + e.target.name + '"]'); if (out) out.textContent = e.target.value;
+        CTX.applyTheme(read());
+      });
+      autosave(wrap, "look");
+      var cancel = function () { CTX.applyTheme(before); close(); };
+      $("[data-close]", wrap).addEventListener("click", function () { CTX.applyTheme(before); });
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var o = read();
+        saveFlow(wrap, function () {
+          return changeFile("data/theme.json", function (cur) { return Object.assign(cur, o); }, "Fonts, colours and sizes").then(function (x) { CTX.D.theme = x; CTX.applyTheme(x); CTX.redraw(); });
+        });
+      });
+      actions(wrap, [{ label: "Cancel", run: cancel }, { label: "Save", solid: true, submit: true }]);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+
+  /* ---------- Books, Store, Traces, Follow: one item at a time ---------- */
+  var LISTS = {
+    books: { key: "items", name: "book", first: true },
+    store: { key: "items", name: "item", first: true },
+    traces: { key: "items", name: "trace", first: false },
+    follow: { key: "groups", name: "group", first: false }
+  };
+  var TRACE_KINDS = ["Published", "Shown", "Talks", "Collaborations", "Memberships", "Mentions"];
+  function viewList(file) { var d = CTX.D[file] = CTX.D[file] || {}; var k = LISTS[file].key; if (!Array.isArray(d[k])) d[k] = []; return d[k]; }
+  function categoriesOf(file, field) {
+    var seen = [];
+    viewList(file).forEach(function (x) { var c = x[field + "_zh"] || x[field]; if (c && seen.indexOf(c) < 0) seen.push(c); });
+    if (file === "traces") TRACE_KINDS.forEach(function (k) { if (seen.indexOf(k) < 0) seen.push(k); });
+    return seen;
+  }
+  function editItem(file, index) {
+    var L = LISTS[file]; if (!L) return;
+    readJSON(BASE + "data/" + file + ".json").then(function (obj) {
+      obj = obj || {};
+      var arr = obj[L.key] || [], isNew = index == null || index === "" || isNaN(+index), i = +index;
+      var it = isNew ? {} : clone(arr[i] || {});
+      var body = "", pic = null, rows = null;
+      if (file === "books") {
+        if (isNew) it.links = [{ label: "Kindle", url: "" }, { label: "Apple Books", url: "" }, { label: "Amazon", url: "" }];
+        body = field("Title", input("title", it.title)) +
+          field("Category (pick one or type a new one)", input("category", it.category, "text", ' list="cats-books"')) + datalist("cats-books", categoriesOf("books", "category")) +
+          field("One line (optional)", input("note", it.note)) + '<div data-slot="img"></div><div class="ed-field"><span class="ed-label">Where to buy or read</span><div data-slot="rows"></div></div>';
+      }
+      if (file === "store") {
+        body = field("Name", input("title", it.title)) +
+          '<div class="ed-row2">' + field("Category (pick or type a new one)", input("category", it.category, "text", ' list="cats-store"')) + field("Price", input("price", it.price, "text", ' placeholder="$38"')) + "</div>" +
+          datalist("cats-store", categoriesOf("store", "category")) +
+          field("Status", select("status", it.status || "available", [["available", "Available"], ["soon", "Coming soon"], ["sold out", "Sold out"]])) +
+          field("Link to buy (Shopify, Etsy, Taobao…)", input("url", it.url, "url")) + '<div data-slot="img"></div>' + field("One line (optional)", input("note", it.note));
+      }
+      if (file === "traces") {
+        body = '<div class="ed-row2">' + field("Kind (pick or type)", input("kind", it.kind || "Published", "text", ' list="cats-traces"')) + field("Year", input("year", it.year, "text", ' placeholder="2026"')) + "</div>" +
+          datalist("cats-traces", categoriesOf("traces", "kind")) +
+          field("What", input("title", it.title)) + field("Where (journal, gallery, event…)", input("where", it.where)) + field("Link (optional)", input("url", it.url, "url"));
+      }
+      if (file === "follow") {
+        body = field("Group name (Social, Watch, Listen, Read…)", input("name", it.name)) + '<div class="ed-field"><span class="ed-label">Platforms (empty link = hidden from visitors)</span><div data-slot="rows"></div></div>';
+      }
+      var wrap = sheet((isNew ? "New " : "Edit ") + L.name, body);
+      if (file === "books" || file === "store") { pic = imagePicker(it.image ? [it.image] : [], file === "books" ? "Cover" : "Picture"); $("[data-slot=img]", wrap).appendChild(pic.el); wrap.addEventListener("paste", pic.onPaste); }
+      if (file === "books") { rows = rowsEditor(it.links, [{ key: "label", label: "Kindle" }, { key: "url", label: "https://…", wide: true }], "+ Add a link"); $("[data-slot=rows]", wrap).appendChild(rows.el); }
+      if (file === "follow") { rows = rowsEditor(it.links, [{ key: "label", label: "Platform" }, { key: "url", label: "https://…", wide: true }, { key: "handle", label: "@name (optional)" }], "+ Add a platform"); $("[data-slot=rows]", wrap).appendChild(rows.el); }
+      autosave(wrap, "item:" + file + ":" + (isNew ? "new" : i));
+      var f = $("form", wrap);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        saveFlow(wrap, function () {
+          return (pic ? collectMedia(pic, file) : Promise.resolve({ files: [], paths: [] })).then(function (m) {
+            Array.prototype.forEach.call(f.elements, function (el) { if (el.name && el.type !== "file" && !el.hasAttribute("data-r")) it[el.name] = el.value.trim ? el.value.trim() : el.value; });
+            if (pic) it.image = m.paths[0] || "";
+            if (rows) it.links = rows.value();
+            return changeFile("data/" + file + ".json", function (o) {
+              var a = o[L.key] = o[L.key] || [];
+              if (isNew) { if (L.first) a.unshift(it); else a.push(it); } else a[i] = it;
+              return o;
+            }, (isNew ? "Add " : "Update ") + L.name + " “" + (it.title || it.name || "") + "”", m.files);
+          }).then(function (o) { CTX.D[file] = clone(o); rawData()[file] = clone(o); CTX.redraw(); });
+        });
+      });
+      var btns = [{ label: "Cancel", run: close }, { label: "Save", solid: true, submit: true }];
+      if (!isNew) btns.unshift({ label: "Delete", danger: true, run: function () {
+        if (!window.confirm("Delete this " + L.name + "?")) return;
+        saveFlow(wrap, function () {
+          return changeFile("data/" + file + ".json", function (o) { (o[L.key] || []).splice(i, 1); return o; }, "Delete " + L.name)
+            .then(function (o) { CTX.D[file] = clone(o); rawData()[file] = clone(o); CTX.redraw(); });
+        });
+      } });
+      actions(wrap, btns);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+  var moveItem = once(function (file, i, dir) {
+    var L = LISTS[file], j = i + dir, view = viewList(file);
+    if (j < 0 || j >= view.length) return;
+    var x = view[i]; view[i] = view[j]; view[j] = x; CTX.redraw();
+    toast("Moving…", true);
+    return changeFile("data/" + file + ".json", function (o) { var a = o[L.key] || []; var y = a[i]; a[i] = a[j]; a[j] = y; return o; }, "Move a " + L.name)
+      .then(function () { toast("Moved. The site updates in about a minute."); })
+      .catch(function (e) { toast(explain(e)); });
+  });
+  function renameCategory(file, oldName) {
+    var field_ = file === "traces" ? "kind" : "category";
+    var wrap = sheet("Rename “" + oldName + "”", field("New name", input("name", oldName)) +
+      '<p class="ed-hint">Every ' + (file === "books" ? "book" : "item") + " in “" + esc(oldName) + "” moves to the new name. To add a new category, type it when you add or edit an item.</p>");
+    var f = $("form", wrap);
+    f.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var nn = f.name.value.trim(); if (!nn || nn === oldName) { close(); return; }
+      saveFlow(wrap, function () {
+        return changeFile("data/" + file + ".json", function (o) {
+          (o.items || []).forEach(function (x) { if (x[field_] === oldName) x[field_] = nn; });
+          return o;
+        }, "Rename category “" + oldName + "” to “" + nn + "”").then(function (o) {
+          viewList(file).forEach(function (x) { if (x[field_] === oldName || x[field_ + "_zh"] === oldName) { x[field_] = nn; delete x[field_ + "_zh"]; } });
+          CTX.redraw();
+        });
+      });
+    });
+    actions(wrap, [{ label: "Cancel", run: close }, { label: "Rename", solid: true, submit: true }]);
+    $("[name=name]", wrap).select();
+  }
+  function tracesNote() {
+    readJSON(BASE + "data/traces.json").then(function (o) {
+      o = o || {};
+      var wrap = sheet("Lines at the top of Traces", field("Text (Markdown; optional)", area("note", o.note, 8)));
+      autosave(wrap, "traces-note");
+      var f = $("form", wrap);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        saveFlow(wrap, function () {
+          return changeFile("data/traces.json", function (x) { x.note = f.note.value; return x; }, "Traces note").then(function (x) { CTX.D.traces = clone(x); CTX.redraw(); });
+        });
+      });
+      actions(wrap, [{ label: "Cancel", run: close }, { label: "Save", solid: true, submit: true }]);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+
+  /* ---------- Visual series and their pictures ---------- */
+  function seriesSheet(id) {
+    var file = "content/visual/" + id + ".json";
+    readJSON(BASE + file).then(function (s) {
+      s = s || {};
+      var wrap = sheet("Series settings",
+        field("Name", input("title", s.title)) + field("One line (optional)", area("note", s.note, 2)) +
+        '<div class="ed-row2">' + field("Type (pick or type)", input("kind", s.kind, "text", ' list="vkinds"')) + field("Date", input("date", s.date, "date")) + "</div>" +
+        datalist("vkinds", ["Wallpaper", "Avatar", "Cover", "Drawing", "Other"]) +
+        field("Who can download", select("download", s.download || "public", [["public", "Everyone"], ["private", "Only me"]])) +
+        check("hidden", !!s.hidden, "Hide this series (draft)"));
+      autosave(wrap, "series:" + id);
+      var f = $("form", wrap);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        saveFlow(wrap, function () {
+          return changeFile(file, function (o) {
+            o.title = f.title.value.trim(); o.note = f.note.value; o.kind = f.kind.value.trim(); o.date = f.date.value; o.download = f.download.value;
+            if (f.hidden.checked) o.hidden = true; else delete o.hidden;
+            return o;
+          }, "Update series “" + id + "”").then(function (o) { CTX.onSaved("visual", Object.assign({ id: id }, o), !!o.hidden); });
+        });
+      });
+      actions(wrap, [{ label: "Delete series", danger: true, run: function () { remove(wrap, BASE + file, "visual", id); } }, { label: "Cancel", run: close }, { label: "Save", solid: true, submit: true }]);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+  function vImageSheet(id, i) {
+    var file = "content/visual/" + id + ".json";
+    readJSON(BASE + file).then(function (s) {
+      s = s || {}; var im = clone((s.images || [])[i] || {});
+      var wrap = sheet("Picture", field("Name (optional)", input("title", im.title)) + '<div data-slot="img"></div><div data-slot="phone"></div><div data-slot="desktop"></div>');
+      var main = imagePicker(im.image ? [im.image] : [], "Picture"), phone = imagePicker(im.phone ? [im.phone] : [], "Phone size (optional download)"), desk = imagePicker(im.desktop ? [im.desktop] : [], "Computer size (optional download)");
+      $("[data-slot=img]", wrap).appendChild(main.el); $("[data-slot=phone]", wrap).appendChild(phone.el); $("[data-slot=desktop]", wrap).appendChild(desk.el);
+      autosave(wrap, "vimage:" + id + ":" + i);
+      var f = $("form", wrap);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        saveFlow(wrap, function () {
+          var pre = "visual-" + id;
+          return Promise.all([collectMedia(main, pre), collectMedia(phone, pre + "-phone"), collectMedia(desk, pre + "-desktop")]).then(function (r) {
+            return changeFile(file, function (o) {
+              o.images = o.images || [];
+              o.images[i] = { image: r[0].paths[0] || "", title: f.title.value.trim(), phone: r[1].paths[0] || "", desktop: r[2].paths[0] || "" };
+              return o;
+            }, "Update a picture in “" + id + "”", r[0].files.concat(r[1].files, r[2].files));
+          }).then(function (o) { CTX.onSaved("visual", Object.assign({ id: id }, o)); });
+        });
+      });
+      actions(wrap, [{ label: "Delete", danger: true, run: function () {
+        if (!window.confirm("Remove this picture from the series?")) return;
+        saveFlow(wrap, function () {
+          return changeFile(file, function (o) { (o.images || []).splice(i, 1); return o; }, "Remove a picture from “" + id + "”").then(function (o) { CTX.onSaved("visual", Object.assign({ id: id }, o)); });
+        });
+      } }, { label: "Cancel", run: close }, { label: "Save", solid: true, submit: true }]);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+  var moveVImage = once(function (id, i, dir) {
+    var j = i + dir, ser = ((CTX.D.visual || {}).series || []).filter(function (x) { return x.id === id; })[0];
+    if (!ser || j < 0 || j >= (ser.images || []).length) return;
+    var x = ser.images[i]; ser.images[i] = ser.images[j]; ser.images[j] = x; CTX.redraw();
+    toast("Moving…", true);
+    return changeFile("content/visual/" + id + ".json", function (o) { var a = o.images || []; var y = a[i]; a[i] = a[j]; a[j] = y; return o; }, "Reorder pictures in “" + id + "”")
+      .then(function () { toast("Moved. The site updates in about a minute."); }).catch(function (e) { toast(explain(e)); });
+  });
+
+  /* ---------- Ongoing collection settings ---------- */
+  function projectSheet(id) {
+    var file = "content/projects/" + id + ".json";
+    readJSON(BASE + file).then(function (p) {
+      p = p || {};
+      var wrap = sheet("Collection settings",
+        field("Name", input("title", p.title)) + field("One line about it", area("note", p.note, 3)) +
+        '<div class="ed-row2">' + field("What's inside", select("kind", p.kind || "mixed", [["text", "Mostly writing"], ["image", "Mostly pictures"], ["mixed", "Both"]])) +
+          field("Order", select("sort", p.sort || "date-asc", [["date-asc", "Oldest first"], ["date-desc", "Newest first"], ["title", "A–Z"], ["number", "By number"]])) + "</div>" +
+        '<div class="ed-row2">' + field("Status", select("status", p.status || "ongoing", [["ongoing", "Ongoing"], ["finished", "Finished"]])) +
+          field("Who can download", select("download", p.download || "private", [["private", "Only me"], ["public", "Everyone"]])) + "</div>" +
+        '<div data-slot="cover"></div>' + check("hidden", !!p.hidden, "Hide this collection (draft)"));
+      var cover = imagePicker(p.cover ? [p.cover] : [], "Cover (optional; otherwise the first picture)");
+      $("[data-slot=cover]", wrap).appendChild(cover.el);
+      autosave(wrap, "project:" + id);
+      var f = $("form", wrap);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        saveFlow(wrap, function () {
+          return collectMedia(cover, "cover-" + id).then(function (m) {
+            return changeFile(file, function (o) {
+              ["title", "note", "kind", "sort", "status", "download"].forEach(function (k) { o[k] = f[k].value; });
+              o.cover = m.paths[0] || "";
+              if (f.hidden.checked) o.hidden = true; else delete o.hidden;
+              return o;
+            }, "Update collection “" + id + "”", m.files);
+          }).then(function (o) { CTX.onSaved("project", Object.assign({ id: id }, o), !!o.hidden); });
+        });
+      });
+      actions(wrap, [{ label: "Delete", danger: true, run: function () {
+        if (!window.confirm("Delete this collection? Its entries stay saved, but they won't show until you make a collection with the same name again.")) return;
+        saveFlow(wrap, function () { return commit([], [BASE + file], "Delete collection “" + id + "”").then(function () { CTX.onSaved("project", { id: id }, true); }); });
+      } }, { label: "Cancel", run: close }, { label: "Save", solid: true, submit: true }]);
+    }).catch(function (e) { toast(explain(e)); });
+  }
+
+  function ownerAction(spec) {
+    var m = spec.mode;
+    if (m === "item") return editItem(spec.file, spec.i);
+    if (m === "item-move") return moveItem(spec.file, +spec.i, spec.dir);
+    if (m === "rename-cat") return renameCategory(spec.file, spec.val);
+    if (m === "block") return blockSheet(+spec.i);
+    if (m === "vimage-move") return moveVImage(spec.id, +spec.i, spec.dir);
+    if (m === "sheet") {
+      if (spec.sheet === "menu") return menuSheet();
+      if (spec.sheet === "site") return siteSheet();
+      if (spec.sheet === "look") return lookSheet();
+      if (spec.sheet === "traces-note") return tracesNote();
+      if (spec.sheet === "series") return seriesSheet(spec.id);
+      if (spec.sheet === "vimage") return vImageSheet(spec.id, +spec.i);
+      if (spec.sheet === "project") return projectSheet(spec.id);
+    }
+  }
+
   /* ---------- entry point ---------- */
   function open(spec, ctx) {
     CTX = ctx || CTX;
+    if (["sheet", "item", "item-move", "rename-cat", "block", "vimage-move"].indexOf(spec.mode) > -1) {
+      // home blocks change on the page first and wait for Publish; no sign-in needed yet
+      if (spec.mode === "block") return ownerAction(spec);
+      if (!token()) return signIn(function () { open(spec, ctx); });
+      return ownerAction(spec);
+    }
     if (!token()) return signIn(function () { open(spec, ctx); });
     var k = spec.kind;
-    if (k === "daily") return editDaily(spec.mode === "edit" ? spec.id : null);
+    if (k === "daily") return editDaily(spec.mode === "edit" ? spec.id : null, spec.day);
     if (k === "entry") return editEntry(spec.mode === "edit" ? spec.id : null, spec.project);
     if (k === "project") return editProject();
     if (k === "design") return editDesign(spec.mode === "edit" ? spec.id : null);
@@ -756,5 +1524,5 @@
     if (k === "media") return editMedia(spec.mode === "edit" ? spec.id : null, spec.shelf);
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && $(".ed-sheet")) close(); });
-  window.AlyxEditor = { open: open, toMarkdown: toMarkdown };
+  window.AlyxEditor = { open: open, toMarkdown: toMarkdown, decorate: decorate };
 })();

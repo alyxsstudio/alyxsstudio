@@ -24,15 +24,25 @@
 - **字体、颜色、字号、每行几张图**：在「Site 网站设置 → Look」里改。
 
 ## 在网页上直接编辑（不用进后台）
-1. 在你的设备上打开一次 `alyxsstudio.com/?me`，进入"我"的模式。
-2. 第一次使用前，在同一个浏览器里打开 `/admin` 登录一次。网页编辑用的是同一个登录。
+1. 在你的设备上打开一次 `alyxsstudio.com/?me`，进入"我"的模式（Owner）。
+2. 第一次保存前，在同一个浏览器里打开 `/admin` 登录一次。网页编辑用的是同一个登录。
 
-之后在网站上可以直接操作：
-- **Daily** 和首页：右下角的 **+** 是发新日常。可以写文字、加图片（拖进来、粘贴截图都行）、录语音、加转载链接。每条日常旁边有 **Edit**，可以修改或删除。
-- **Ongoing**：进入一个合集，点 **+ New entry** 加一条。
-  - 文字类合集（比如小说）会打开整屏的写作页面：自动保存在这台设备上，按 **Publish**（或 ⌘S）发布到网站。
-- **Visual**：点 **+ Add pictures**，往系列里加图。
-- **Design**：右下角 **+** 新建草图。
+进入后，网站上能看到的几乎所有东西都可以直接改：
+- **带虚线下划线的字**：点一下直接改，比如栏目名（Ongoing、Traces……）、页面介绍、首页小标题、系列名、合集名、底部邮箱。改完按回车或点别处。
+  - 这类改动会先存在你的设备上，左下角出现 **"N changes · Publish"**，点 **Publish** 才发布到网站；点 **Undo** 撤销。
+- **首页**：每个模块上方有 ↑ ↓ 移动、**Edit** 设置、× 删除；模块之间有 **+ Add a block here**，可以加文字、大图、日常、视频等模块。
+- **各栏目**：
+  - Store、Books、Traces、Follow：每项下面有 **Edit** 和 ← → 移动，顶部有 **+ New**。
+  - 分类：Store、Books 的分类旁边有 ✎，可以改名；新分类在添加或编辑物品时直接输入。
+  - Visual：每张图有 Edit 和 ← →，系列有 Series settings。
+  - Ongoing：合集有 Collection settings。
+  - Daily：日历上点空白的一天就是在那天发新日常；点已有日常的文字就能修改。
+- **左下角 ✎ Owner**：
+  - **Menu & page names**：改菜单顺序和栏目名。
+  - **Name, logo, email**：网站名、logo、邮箱、顶部通知。
+  - **Fonts, colours, sizes**：字体、颜色、字号、中文字体和中文大小，改的时候页面马上变。
+  - 切换"你看到的语言"，下载全站备份，退出 Owner 模式。
+- **草稿自动保存**：所有表单（日常、章节、物品、设置……）边写边自动存在这台设备上，关掉或刷新再打开会接着写，保存成功后草稿自动清掉。
 
 保存后，网站大约 1 分钟后更新。
 
@@ -49,20 +59,16 @@
 - 抓取情况记在 `data/embeds.json`，想改某个标题可以直接改这里。
 
 ## 中文写，英文显示
-- 写的时候用中文就行，后台保存的也是中文原文。
-- 每次发布时会自动生成英文版。用哪个翻译，取决于你在 GitHub 存了哪把钥匙（仓库 Settings → Secrets and variables → Actions → New repository secret）：
-  - 什么都不存：用免费的 MyMemory，不用设置，但英文比较直白，每天大约 5000 字，超出的第二天继续翻。
-  - `GEMINI_API_KEY`：Google Gemini，在 aistudio.google.com 免费申请，英文自然很多。
-  - `ANTHROPIC_API_KEY`：Claude，英文最有文学感，按量付费，每月几美分到几美元。
-  - `DEEPL_API_KEY`：DeepL 免费版。
-  - 存了钥匙以后，之前用免费翻译翻过、你没手动改过的段落，会在下次发布时自动用新的重翻一遍。
-- 访客默认看到英文。
-- 页面底部有 **English / 中文** 切换（只在"我"的模式下显示，想让访客也能切换，可以在 settings 里加 `language_switch: true`）。
-- 每条日常旁边有 **原文** 按钮，可以看中文原文。
-- 小说章节可以切换 **English / 中文 / 对照**，对照模式下中英文逐段并排。
-- 想改某段英文：直接修改 `data/translations.json` 里对应的 "en"，以后会一直保留你改的版本。
-- 一次发布太多新内容时，剩下的会在下一次发布时继续翻译，在翻译完成之前暂时显示中文。
-- 翻译情况可以看 `alyxsstudio.com/data/translate-status.json`（用的哪个翻译、还剩几段、有没有出错）。
+- 你用中文写，后台保存中文原文；网站更新时自动生成英文。
+- **访客只看到英文**（除非在 Name, logo, email 里打开 "Let visitors switch to Chinese"）。
+- **Owner 模式下你默认看到中文**，章节可以切换 中文 / English / 对照，日常有 English 按钮看翻译。
+- 想看访客看到的样子：左下角 ✎ Owner → English · what visitors see。在英文视图里点字修改，改的是英文版本，以后一直保留你改的。
+- 翻译用哪个服务、怎么换：
+  - 什么都不设置：用免费的 MyMemory，英文比较直白，每天大约 5000 字，超出的第二天继续翻。
+  - 想要更好的英文，在仓库 Settings → Secrets and variables → Actions 里存一把钥匙：`GEMINI_API_KEY`（免费）、`DEEPL_API_KEY`（DeepL 免费版）或 `ANTHROPIC_API_KEY`（Claude，按量付费）。
+  - 存了钥匙后，免费翻译翻过、你没手动改过的段落会自动重翻。
+- 一次发布太多新内容时，剩下的下次发布继续翻，翻好之前暂时显示中文。翻译情况见 `alyxsstudio.com/data/translate-status.json`。
+- 中文字体和大小在 Fonts, colours, sizes 里调（"Chinese size next to English"），让中文和英文看起来一样大。
 
 ## 引用卡片
 在任何文章或章节里选中一段文字，会出现 **Quote card** 按钮，点一下生成一张 Story 尺寸的引用图。手机上会直接调出分享面板。

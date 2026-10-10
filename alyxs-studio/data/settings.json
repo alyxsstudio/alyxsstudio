@@ -10,10 +10,6 @@
   },
   "home_blocks": [
     {
-      "type": "hero",
-      "show_tagline": true
-    },
-    {
       "type": "daily",
       "title": "",
       "count": 6

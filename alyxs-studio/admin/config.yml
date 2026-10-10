@@ -447,13 +447,8 @@ collections:
         label: 书名
         widget: string
       - name: category
-        label: 分类
-        widget: select
-        options:
-        - Writing
-        - Language
-        - Art
-        - Other
+        label: 分类（Writing、Language、Art……可以自己写新的）
+        widget: string
         default: Writing
       - name: note
         label: 一句说明
@@ -491,16 +486,8 @@ collections:
         label: 名字
         widget: string
       - name: category
-        label: 分类
-        widget: select
-        options:
-        - Clothing
-        - Hats
-        - Bags & Charms
-        - Paper
-        - Books
-        - Picks
-        - Other
+        label: 分类（Clothing、Hats、Bags、Charms……可以自己写新的）
+        widget: string
         default: Other
       - name: price
         label: 价格（可留空）
@@ -687,6 +674,10 @@ collections:
         label: Logo + 一句话
         widget: object
         fields:
+        - name: show_logo
+          label: 显示大 logo
+          widget: boolean
+          default: true
         - name: show_tagline
           label: 显示一句话
           widget: boolean
@@ -1026,6 +1017,24 @@ collections:
       - JetBrains Mono
       - Courier Prime
       default: Same as body
+    - name: font_cjk
+      label: 中文字体
+      widget: select
+      options:
+      - label: 黑体
+        value: sans
+      - label: 宋体
+        value: serif
+      - label: 楷体
+        value: kai
+      default: sans
+    - name: cjk_scale
+      label: 中文大小（相对英文，%）
+      widget: number
+      value_type: int
+      min: 60
+      max: 120
+      default: 85
     - name: font_custom
       label: 自定义 Google 字体（可选）
       widget: string

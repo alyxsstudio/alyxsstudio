@@ -9,6 +9,7 @@
   var PAGE = app.getAttribute("data-page") || "home";
   var SECTIONS = ["daily", "ongoing", "watch", "listen", "books", "visual", "design", "store", "traces", "follow"];
   var D = {};          // everything loaded: D.settings, D.theme, D.sections, D.daily …
+  var RAW = {};        // owner mode: the same, as loaded (before the language swap)
   var STATE = {};      // per-page view state (calendar month, filters …)
 
   /* ---------- live preview inside /admin ---------- */
@@ -30,8 +31,12 @@
   if (PREVIEW) OWNER = true;
 
   /* ---------- language: Chinese is written, English is shown (the build makes the English) ---------- */
+  var EDIT = OWNER && !PREVIEW;   // owner mode: everything on the page can be changed
   var LANG = "en";
-  try { LANG = localStorage.getItem("alyx-lang") === "zh" ? "zh" : "en"; } catch (e) {}
+  try {
+    var savedLang = localStorage.getItem("alyx-lang");
+    LANG = savedLang ? (savedLang === "zh" ? "zh" : "en") : (EDIT ? "zh" : "en");
+  } catch (e) {}
   function localize(o) {
     if (LANG !== "zh" || !o || typeof o !== "object") return o;
     if (Array.isArray(o)) { o.forEach(localize); return o; }
@@ -43,6 +48,9 @@
     return o;
   }
 
+  // the text was written in Chinese and an English version exists
+  function hasEnglish(o) { return !!(o && o.text_zh && (LANG === "zh" ? o.__en : o.text) && (LANG === "zh" ? o.__en : o.text) !== o.text_zh); }
+
   /* ---------- helpers ---------- */
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -50,9 +58,18 @@
     });
   }
   function num(v, d) { v = parseFloat(v); return isNaN(v) ? d : v; }
+  /* owner mode: marks text that can be changed by clicking on it.
+     path = file#field; when the page shows an automatic English version, the change is kept as the English one. */
+  function ed(path, holder, key, ph, multi) {
+    if (!EDIT) return "";
+    var tr = holder && key && LANG === "en" && holder[key + "_zh"] && holder[key + "_zh"] !== holder[key] ? ' data-tr="1"' : "";
+    return ' data-edit="' + esc(path) + '"' + tr + (ph ? ' data-ph="' + esc(ph) + '"' : "") + (multi ? ' data-multi="1"' : "");
+  }
   function list(v) { return Array.isArray(v) ? v.filter(Boolean) : v ? [v] : []; }
   function asset(p) {
     if (!p) return "";
+    // just uploaded from this page: show it from this device until the site has it
+    if (window.AlyxUploads && window.AlyxUploads[p]) return window.AlyxUploads[p];
     if (/^(https?:|blob:|data:)/.test(p) || p.charAt(0) === "/") return p;
     return ROOT + p;
   }
@@ -107,7 +124,18 @@
     sans: '"Helvetica Neue", Helvetica, Arial, sans-serif', serif: 'Georgia, "Times New Roman", serif',
     hand: '"Comic Sans MS", "Marker Felt", cursive', mono: 'ui-monospace, "SFMono-Regular", Menlo, monospace'
   };
-  function stack(name) { return '"' + name.replace(/"/g, "") + '", ' + FALLBACK[FONTS[name] || "sans"]; }
+  function stack(name) { return '"AlyxCJK", "' + name.replace(/"/g, "") + '", ' + FALLBACK[FONTS[name] || "sans"]; }
+  var CJK_LOCAL = {
+    sans: ["PingFang SC", "PingFangSC-Regular", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "Noto Sans CJK TC"],
+    serif: ["Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC", "Noto Serif CJK TC"],
+    kai: ["Kaiti SC", "STKaiti", "KaiTi", "BiauKai", "Kai", "Noto Serif CJK SC", "Noto Serif CJK TC"]
+  };
+  function cjkFace(g) {
+    var names = CJK_LOCAL[g.font_cjk] || CJK_LOCAL.sans;
+    var scale = Math.max(60, Math.min(120, num(g.cjk_scale, 85)));
+    return '@font-face{font-family:"AlyxCJK";src:' + names.map(function (n) { return 'local("' + n + '")'; }).join(",") +
+      ";size-adjust:" + scale + "%;unicode-range:U+2E80-2FDF,U+3000-303F,U+3100-312F,U+31A0-31EF,U+3200-9FFF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF,U+20000-2FA1F;}";
+  }
   function loadFont(name) {
     if (!name || document.querySelector('link[data-font="' + name + '"]')) return;
     var base = "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(name).replace(/%20/g, "+");
@@ -125,7 +153,7 @@
     var small = !g.font_small || g.font_small === "Same as body" ? body : g.font_small;
     [body, head, small].forEach(loadFont);
     STATE.fontBody = body;
-    var css = ":root{" +
+    var css = cjkFace(g) + ":root{" +
       "--ink:" + (g.color_text || "#111111") + ";--paper:" + (g.color_background || "#ffffff") + ";" +
       "--mute:" + (g.color_muted || "#8a8984") + ";--line:" + (g.color_line || "#e7e6e1") + ";" +
       "--tile:" + (g.color_tile || "#f4f3ef") + ";--sun:" + (g.color_highlight || "#f5e47c") + ";" +
@@ -171,28 +199,27 @@
     var links = followLinks().map(function (l) {
       return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + "</a>";
     }).join("");
-    var owner = OWNER && !PREVIEW
-      ? '<p class="owner-bar"><span class="pill tiny">Owner mode</span> ' +
-        '<button type="button" class="linkish" data-act="export-all">Download everything</button> · ' +
-        '<a href="' + esc(location.pathname) + '?me=0">Leave owner mode</a></p>'
-      : "";
+    var owner = "";
     return (
       '<footer class="site-foot">' +
         (links ? '<p class="foot-links">' + links + "</p>" : "") +
         '<div class="foot-row">' +
           "<p>© " + new Date().getFullYear() + " " + esc(s.name) + "</p>" +
-          (s.email ? '<p class="mail">' + esc(s.email) + "</p>" : "") +
+          (s.email || EDIT ? '<p class="mail"' + ed("data/settings.json#email", s, "email", "Email or a short line") + ">" + esc(s.email || "") + "</p>" : "") +
         "</div>" + owner +
-        (OWNER || s.language_switch ? '<p class="lang-switch">' +
+        (!EDIT && s.language_switch ? '<p class="lang-switch">' +
           '<button type="button" class="linkish' + (LANG === "en" ? " on" : "") + '" data-act="lang" data-val="en">English</button>' +
           '<button type="button" class="linkish' + (LANG === "zh" ? " on" : "") + '" data-act="lang" data-val="zh">中文</button></p>' : "") +
       "</footer>"
     );
   }
+  function secPath(key, field) { return "data/sections.json#sections[key=" + key + "]." + field; }
   function pageHead(key, extra) {
     var s = sec(key);
-    return '<div class="page-head"><h1>' + esc(s.title) + "</h1>" +
-      (s.intro ? '<p class="intro">' + esc(s.intro) + "</p>" : "") + (extra || "") + "</div>";
+    return '<div class="page-head"><h1' + ed(secPath(key, "title"), s, "title", "Page name") + ">" + esc(s.title) + "</h1>" +
+      (s.intro || EDIT ? '<p class="intro"' + ed(secPath(key, "intro"), s, "intro", "Add a line about this page…", true) + ">" + esc(s.intro || "") + "</p>" : "") +
+      (EDIT ? '<p class="owner-tools"><button type="button" class="mini-btn" data-act="sheet" data-sheet="menu">Menu & page names</button></p>' : "") +
+      (extra || "") + "</div>";
   }
   function pic(img, alt, attrs) {
     return img
@@ -216,7 +243,15 @@
           "</div></li>";
       }).join("") + "</ul>";
   }
-  function chips(all, current, actName) {
+  function chips(all, current, actName, renameFile) {
+    if (EDIT && renameFile && all.length) {
+      return '<div class="chips" role="tablist">' + ["All"].concat(all).map(function (c) {
+        var on = (current || "All") === c;
+        return '<span class="chip-wrap"><button type="button" role="tab" aria-selected="' + on + '" class="chip' + (on ? " on" : "") +
+          '" data-act="' + actName + '" data-val="' + esc(c) + '">' + esc(c) + "</button>" +
+          (c !== "All" ? '<button type="button" class="chip-ed" data-act="rename-cat" data-file="' + renameFile + '" data-val="' + esc(c) + '" aria-label="Rename ' + esc(c) + '">✎</button>' : "") + "</span>";
+      }).join("") + "</div>";
+    }
     if (all.length < 2) return "";
     return '<div class="chips" role="tablist">' + ["All"].concat(all).map(function (c) {
       var on = (current || "All") === c;
@@ -230,8 +265,18 @@
     return '<p class="links">' + links.map(function (l) { return a(l.url, esc(l.label) + arrow(l.url), "pill"); }).join("") + "</p>";
   }
   function ownerEdit(kind) {
-    if (!OWNER || PREVIEW) return null;
+    if (!EDIT) return null;
     return function (it) { return it.id ? '<p class="tile-more"><button type="button" class="mini-btn" data-act="edit" data-kind="' + kind + '" data-id="' + esc(it.id) + '">Edit</button></p>' : ""; };
+  }
+  /* Edit / ← / → under items kept in one list file (books, store) */
+  function listTools(file, i, n) {
+    if (!EDIT) return "";
+    return '<p class="tile-more owner-row"><button type="button" class="mini-btn" data-act="item" data-file="' + file + '" data-i="' + i + '">Edit</button>' +
+      (i > 0 ? '<button type="button" class="mini-btn" data-act="item-move" data-file="' + file + '" data-i="' + i + '" data-dir="-1" aria-label="Move earlier">←</button>' : "") +
+      (i < n - 1 ? '<button type="button" class="mini-btn" data-act="item-move" data-file="' + file + '" data-i="' + i + '" data-dir="1" aria-label="Move later">→</button>' : "") + "</p>";
+  }
+  function addButton(label, attrs) {
+    return EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" ' + attrs + ">" + esc(label) + "</button></p>" : "";
   }
   /* the round + button: what it makes depends on the page */
   function fab() {
@@ -287,10 +332,10 @@
     var tags = list(p.tags).length ? '<p class="post-tags">' + list(p.tags).map(function (t) { return "#" + esc(t); }).join(" ") + "</p>" : "";
     var meta = '<p class="post-meta"><a href="' + esc(href("daily", "p-" + p.id)) + '">' +
       (opts.showDay ? esc(fmtDay(p.day)) + " · " : "") + esc(timeOf(p.date)) + "</a>" +
-      (p.text_zh && p.text_zh !== p.text ? ' <button type="button" class="mini-btn" data-act="orig" data-id="' + esc(p.id) + '">' + (LANG === "zh" ? "English" : "原文") + "</button>" : "") +
+      (hasEnglish(p) && (OWNER || (D.settings || {}).language_switch) ? ' <button type="button" class="mini-btn" data-act="orig" data-id="' + esc(p.id) + '">' + (LANG === "zh" ? "English" : "原文") + "</button>" : "") +
       (OWNER && !PREVIEW ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '">Edit</button>' : "") + "</p>";
     return '<article class="post" id="p-' + esc(p.id) + '">' + meta +
-      (p.text ? '<div class="prose post-text">' + md(p.text) + "</div>" : "") +
+      (p.text ? '<div class="prose post-text"' + (EDIT ? ' data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '" title="Click to edit"' : "") + ">" + md(p.text) + "</div>" : "") +
       gallery + audio + link + tags + shareRow(p) + "</article>";
   }
   function shareRow(p) {
@@ -329,7 +374,9 @@
           (t.img ? '<span class="cal-thumb">' + pic(t.img, "") + "</span>" : '<span class="cal-text">' + esc(t.text) + "</span>") +
           (ps.length > 1 ? '<span class="cal-count">' + ps.length + "</span>" : "") + "</a>";
       } else {
-        cells += '<span class="' + cls + '"><span class="cal-num">' + d + "</span></span>";
+        cells += EDIT
+          ? '<button type="button" class="' + cls + ' cal-new" data-act="new" data-kind="daily" data-day="' + key + '" aria-label="New post on ' + esc(fmtDay(key)) + '"><span class="cal-num">' + d + '</span><span class="cal-plus" aria-hidden="true">+</span></button>'
+          : '<span class="' + cls + '"><span class="cal-num">' + d + "</span></span>";
       }
     }
     return '<div class="cal" role="grid">' +
@@ -575,20 +622,21 @@
   /* ---------- pages ---------- */
   var TILE_LIMIT = 4;
   var BLOCK = {
-    hero: function (b, s) {
-      return '<section class="hero">' +
-        '<img class="hero-logo" src="' + esc(asset(s.logo_large || "assets/img/logo.png")) + '" alt="' + esc(s.name) + '">' +
-        (b.show_tagline !== false && s.tagline ? '<p class="hero-line">' + esc(s.tagline) + "</p>" : "") +
-      "</section>";
+    hero: function (b, s, i) {
+      var line = b.show_tagline !== false && (s.tagline || EDIT) ? '<p class="hero-line"' + ed("data/settings.json#tagline", s, "tagline", "A line under the logo (optional)") + ">" + esc(s.tagline || "") + "</p>" : "";
+      if (b.show_logo === false && !line) return "";
+      return '<section class="hero' + (b.show_logo === false ? " no-logo" : "") + '">' +
+        (b.show_logo === false ? "" : '<img class="hero-logo" src="' + esc(asset(s.logo_large || "assets/img/logo.png")) + '" alt="' + esc(s.name) + '">') +
+        line + "</section>";
     },
-    index: function (b) {
+    index: function (b, s, i) {
       var items = sections().filter(function (x) { return x.in_menu !== false; }).map(function (x) {
         return '<li><a href="' + esc(href(x.key)) + '"><span class="ix-name">' + esc(x.title) +
           '</span><span class="ix-note">' + esc(x.short || "") + "</span></a></li>";
       }).join("");
-      return '<section class="block">' + blockHead(b.title) + '<ul class="index">' + items + "</ul></section>";
+      return '<section class="block">' + blockHead(b.title || (EDIT ? "" : ""), null, null, bt(b, i)) + '<ul class="index">' + items + "</ul></section>";
     },
-    daily: function (b) {
+    daily: function (b, s, i) {
       var ps = posts().slice(0, num(b.count, 6));
       if (!ps.length) return "";
       var cards = ps.map(function (p) {
@@ -597,85 +645,89 @@
           (img ? '<span class="mini-pic">' + pic(img, "") + "</span>" : '<span class="mini-text">' + esc(cut(plain(p.text) || (p.audio ? "♪ Voice note" : p.link && p.link.title) || "", 90)) + "</span>") +
           '<span class="mini-date">' + esc(fmtDay(p.day)) + "</span></a></li>";
       }).join("");
-      return '<section class="block">' + blockHead(b.title || title("daily"), href("daily"), "Calendar") + '<ul class="mini-posts">' + cards + "</ul></section>";
+      return '<section class="block">' + blockHead(b.title || title("daily"), href("daily"), "Calendar", bt(b, i)) + '<ul class="mini-posts">' + cards + "</ul></section>";
     },
-    ongoing: function (b) {
+    ongoing: function (b, s, i) {
       var ps = ((D.ongoing || {}).projects || []).slice(0, num(b.count, 3));
       if (!ps.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("ongoing"), href("ongoing"), "See all") +
+      return '<section class="block">' + blockHead(b.title || title("ongoing"), href("ongoing"), "See all", bt(b, i)) +
         tiles(ps.map(projectTile), "4 / 5", 3) + "</section>";
     },
-    visual: function (b) {
+    visual: function (b, s, i) {
       var imgs = [];
       ((D.visual || {}).series || []).forEach(function (s) {
         list(s.images).forEach(function (im) { imgs.push({ title: im.title, image: im.image, url: href("visual", "s-" + s.id) }); });
       });
       imgs = imgs.slice(0, num(b.count, 4));
       if (!imgs.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("visual"), href("visual"), "See all") +
+      return '<section class="block">' + blockHead(b.title || title("visual"), href("visual"), "See all", bt(b, i)) +
         tiles(imgs, shape("visual", "3 / 4"), 4) + "</section>";
     },
-    design: function (b) {
+    design: function (b, s, i) {
       var its = ((D.design || {}).items || []).slice(0, num(b.count, 3));
       if (!its.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("design"), href("design"), "See all") +
+      return '<section class="block">' + blockHead(b.title || title("design"), href("design"), "See all", bt(b, i)) +
         tiles(its.map(function (x) { return { title: x.title, note: fmtDay(x.date), image: list(x.images)[0], url: href("design", "d-" + x.id) }; }),
           shape("design", "4 / 5"), 4) + "</section>";
     },
-    store: function (b) {
+    store: function (b, s, i) {
       var its = ((D.store || {}).items || []).slice(0, num(b.count, 4));
       if (!its.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("store"), href("store"), "See all") +
+      return '<section class="block">' + blockHead(b.title || title("store"), href("store"), "See all", bt(b, i)) +
         tiles(its, shape("store", "4 / 5"), 4, storeAction) + "</section>";
     },
-    books: function (b) {
+    books: function (b, s, i) {
       var its = ((D.books || {}).items || []).slice(0, num(b.count, 4));
       if (!its.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("books"), href("books"), "See all") +
+      return '<section class="block">' + blockHead(b.title || title("books"), href("books"), "See all", bt(b, i)) +
         tiles(its, shape("books", "2 / 3"), 4, function (it) { return linkPills(it.links); }) + "</section>";
     },
-    watch: function (b) {
+    watch: function (b, s, i) {
       var its = mediaOn("watch").slice(0, num(b.count, 3));
       if (!its.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("watch"), href("watch"), "See all") + watchGrid(its, { label: false }) + "</section>";
+      return '<section class="block">' + blockHead(b.title || title("watch"), href("watch"), "See all", bt(b, i)) + watchGrid(its, { label: false }) + "</section>";
     },
-    listen: function (b) {
+    listen: function (b, s, i) {
       var its = mediaOn("listen").slice(0, num(b.count, 4));
       if (!its.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("listen"), href("listen"), "See all") + listenList(its, "home-listen") + "</section>";
+      return '<section class="block">' + blockHead(b.title || title("listen"), href("listen"), "See all", bt(b, i)) + listenList(its, "home-listen") + "</section>";
     },
-    follow: function (b) {
+    follow: function (b, s, i) {
       var ls = followLinks();
       if (!ls.length) return "";
-      return '<section class="block">' + blockHead(b.title || title("follow"), href("follow"), "All") +
+      return '<section class="block">' + blockHead(b.title || title("follow"), href("follow"), "All", bt(b, i)) +
         '<p class="links big">' + ls.map(function (l) { return a(l.url, esc(l.label) + arrow(l.url), "pill"); }).join("") + "</p></section>";
     },
-    text: function (b) {
-      if (!b.title && !b.body) return "";
+    text: function (b, s, i) {
+      if (!b.title && !b.body && !EDIT) return "";
       return '<section class="block text-block' + (b.align === "center" ? " center" : "") + '">' +
-        (b.title ? '<h2 class="text-title">' + esc(b.title) + "</h2>" : "") +
-        (b.body ? '<div class="prose">' + md(b.body) + "</div>" : "") + "</section>";
+        (b.title || EDIT ? '<h2 class="text-title"' + ed("data/settings.json#home_blocks[" + i + "].title", b, "title", "Title (optional)") + ">" + esc(b.title || "") + "</h2>" : "") +
+        (b.body ? '<div class="prose"' + (EDIT ? ' data-act="block" data-i="' + i + '" title="Click to edit"' : "") + ">" + md(b.body) + "</div>"
+          : EDIT ? '<p class="blk-hint" data-act="block" data-i="' + i + '">Click to write…</p>' : "") + "</section>";
     },
-    image: function (b) {
-      if (!b.image) return "";
+    image: function (b, s, i) {
+      if (!b.image) return EDIT ? '<section class="block"><p class="blk-hint" data-act="block" data-i="' + i + '">Click to add a picture</p></section>' : "";
       var img = '<img src="' + esc(asset(b.image)) + '" alt="' + esc(b.caption || "") + '" loading="lazy">';
       return '<section class="block image-block ' + esc(b.size || "wide") + '"><figure>' +
         (b.url ? a(b.url, img, "image-link") : img) +
-        (b.caption ? "<figcaption>" + esc(b.caption) + "</figcaption>" : "") + "</figure></section>";
+        (b.caption || EDIT ? "<figcaption" + ed("data/settings.json#home_blocks[" + i + "].caption", b, "caption", "Caption (optional)") + ">" + esc(b.caption || "") + "</figcaption>" : "") + "</figure></section>";
     },
-    spacer: function (b) {
+    spacer: function (b, s, i) {
       var h = { small: 24, medium: 64, large: 128 }[b.size || "medium"] || 64;
       return '<div class="spacer" style="height:' + h + 'px" aria-hidden="true"></div>';
     }
   };
-  function blockHead(t, moreHref, moreLabel) {
-    if (!t && !moreHref) return "";
-    return '<div class="block-head"><h2 class="block-title">' + esc(t || "") + "</h2>" +
+  function bt(b, i) { return ed("data/settings.json#home_blocks[" + i + "].title", b, "title", "Title"); }
+  function blockHead(t, moreHref, moreLabel, attrs) {
+    if (!t && !moreHref && !attrs) return "";
+    return '<div class="block-head"><h2 class="block-title"' + (attrs || "") + ">" + esc(t || "") + "</h2>" +
       (moreHref ? '<a class="more" href="' + esc(moreHref) + '">' + esc(moreLabel) + "</a>" : "") + "</div>";
   }
+  var BLOCK_NAMES = { hero: "Logo + line", index: "List of sections", daily: "Latest daily", ongoing: "Ongoing", watch: "Watch", listen: "Listen",
+    visual: "Visual", design: "Design", store: "Store", books: "Books", follow: "Links to everywhere", text: "Text", image: "Picture", spacer: "Space" };
   function projectTile(p) {
     var meta = p.count + (p.count === 1 ? " entry" : " entries") + (p.updated ? " · " + fmtDay(p.updated) : "");
-    return { title: p.title, note: meta, image: p.cover, url: href("ongoing", p.id), badge: p.status === "finished" ? "Finished" : "" };
+    return { pid: p.id, title: p.title, note: meta, image: p.cover, url: href("ongoing", p.id), badge: p.status === "finished" ? "Finished" : "" };
   }
   function storeAction(it) {
     var st = (it.status || "available").toLowerCase();
@@ -689,7 +741,12 @@
     home: function () {
       var s = D.settings || {};
       var blocks = s.home_blocks && s.home_blocks.length ? s.home_blocks : [{ type: "hero" }, { type: "daily" }, { type: "ongoing" }, { type: "visual" }, { type: "store" }, { type: "follow" }];
-      return blocks.map(function (b) { var fn = b && BLOCK[b.type]; return fn ? fn(b, s) : ""; }).join("");
+      return blocks.map(function (b, i) {
+        var fn = b && BLOCK[b.type], html = fn ? fn(b, s, i) : "";
+        if (!EDIT) return html;
+        return '<div class="blk" data-blk="' + i + '" data-type="' + esc(b.type) + '">' +
+          (html || '<p class="blk-empty">' + esc(BLOCK_NAMES[b.type] || b.type) + " · nothing to show yet</p>") + "</div>";
+      }).join("") + (EDIT ? '<div class="blk-add-end"></div>' : "");
     },
 
     daily: function () {
@@ -704,7 +761,7 @@
         '<a class="pill' + (view === "calendar" ? " on" : "") + '" href="#">Calendar</a>' +
         '<a class="pill' + (view === "list" ? " on" : "") + '" href="#list">All posts</a></div>';
       var dl = OWNER ? downloadBar("daily", ["zip", "epub", "pdf"], "Download all posts") : "";
-      if (!posts().length) return pageHead("daily", tools) + emptyNote("First post soon.");
+      if (!posts().length && !EDIT) return pageHead("daily", tools) + emptyNote("First post soon.");
 
       if (view === "list") {
         var limit = STATE.dailyLimit || 30, shown = posts().slice(0, limit), lastDay = "";
@@ -717,7 +774,7 @@
         return pageHead("daily", tools) + dl + '<div class="timeline">' + html + "</div>" + more;
       }
 
-      var sel = /^\d{4}-\d{2}-\d{2}$/.test(h) ? h : (STATE.selDay || posts()[0].day);
+      var sel = /^\d{4}-\d{2}-\d{2}$/.test(h) ? h : (STATE.selDay || (posts()[0] || {}).day || today());
       STATE.selDay = sel;
       var month = STATE.month && !/^\d{4}-\d{2}-\d{2}$/.test(h) ? STATE.month : sel.slice(0, 7);
       STATE.month = month;
@@ -743,7 +800,10 @@
         return projectView(D.project, parts[1]);
       }
       var all = OWNER ? '<div class="dl-bar"><span class="dl-label">Owner</span><button type="button" class="pill" data-act="export-all">Download everything</button></div>' : "";
-      return pageHead("ongoing") + all + (projects.length ? tiles(projects.map(projectTile), "4 / 5", 3) : emptyNote());
+      return pageHead("ongoing") + all + addButton("+ New collection", 'data-act="new" data-kind="project"') +
+        (projects.length ? tiles(projects.map(projectTile), "4 / 5", 3, EDIT ? function (it) {
+          return '<p class="tile-more"><button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(it.pid) + '">Settings</button></p>';
+        } : null) : emptyNote());
     },
 
     watch: function () {
@@ -751,7 +811,7 @@
       all.forEach(function (i) { if (i.platform && plats.indexOf(i.platform) < 0) plats.push(i.platform); });
       var cur = plats.indexOf(STATE.watchPlat) > -1 ? STATE.watchPlat : "All";
       var shown = all.filter(function (i) { return cur === "All" || i.platform === cur; });
-      return pageHead("watch") + chips(plats, cur, "watch-plat") + (shown.length ? watchGrid(shown, { feature: true }) : emptyNote());
+      return pageHead("watch") + chips(plats, cur, "watch-plat") + addButton("+ Add a video", 'data-act="new" data-kind="media" data-shelf="watch"') + (shown.length ? watchGrid(shown, { feature: true }) : emptyNote());
     },
 
     listen: function () {
@@ -759,7 +819,7 @@
       all.forEach(function (i) { if (i.category && cats.indexOf(i.category) < 0) cats.push(i.category); });
       var cur = cats.indexOf(STATE.listenCat) > -1 ? STATE.listenCat : "All";
       var shown = all.filter(function (i) { return cur === "All" || i.category === cur; });
-      return pageHead("listen") + chips(cats, cur, "listen-cat") + (shown.length ? listenList(shown, "listen:" + cur) : emptyNote());
+      return pageHead("listen") + chips(cats, cur, "listen-cat") + addButton("+ Add music or a podcast", 'data-act="new" data-kind="media" data-shelf="listen"') + (shown.length ? listenList(shown, "listen:" + cur) : emptyNote());
     },
 
     books: function () {
@@ -767,8 +827,8 @@
       var cats = []; its.forEach(function (i) { if (i.category && cats.indexOf(i.category) < 0) cats.push(i.category); });
       var cur = STATE.bookCat || "All";
       var shown = its.filter(function (i) { return cur === "All" || i.category === cur; });
-      return pageHead("books") + chips(cats, cur, "book-cat") +
-        (shown.length ? tiles(shown, shape("books", "2 / 3"), cols("books", 4), function (it) { return linkPills(it.links); }) : emptyNote());
+      return pageHead("books") + chips(cats, cur, "book-cat", "books") + addButton("+ New book", 'data-act="item" data-file="books"') +
+        (shown.length ? tiles(shown, shape("books", "2 / 3"), cols("books", 4), function (it) { return linkPills(it.links) + listTools("books", its.indexOf(it), its.length); }) : emptyNote());
     },
 
     visual: function () {
@@ -779,22 +839,28 @@
         var imgs = list(s.images);
         var can = s.download === "public" || OWNER;
         var dl = can && imgs.length ? downloadBar("visual:" + s.id, ["zip"], "Download series") : "";
+        var vp = "content/visual/" + s.id + ".json#";
         return '<section class="series" id="s-' + esc(s.id) + '">' +
-          '<div class="series-head"><h2 class="series-title">' + esc(s.title) + "</h2>" +
+          '<div class="series-head"><h2 class="series-title"' + ed(vp + "title", s, "title", "Series name") + ">" + esc(s.title) + "</h2>" +
           '<p class="series-meta">' + esc([s.kind, imgs.length + (imgs.length === 1 ? " image" : " images")].filter(Boolean).join(" · ")) + "</p>" +
-          (s.note ? '<p class="intro">' + esc(s.note) + "</p>" : "") + dl +
-          (OWNER && !PREVIEW ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="visual" data-id="' + esc(s.id) + '">+ Add images</button></p>' : "") + "</div>" +
+          (s.note || EDIT ? '<p class="intro"' + ed(vp + "note", s, "note", "A line about this series (optional)", true) + ">" + esc(s.note || "") + "</p>" : "") + dl +
+          (EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="visual" data-id="' + esc(s.id) + '">+ Add images</button> ' +
+            '<button type="button" class="mini-btn" data-act="sheet" data-sheet="series" data-id="' + esc(s.id) + '">Series settings</button></p>' : "") + "</div>" +
           (imgs.length ? tiles(imgs.map(function (im, i) {
-            return { title: im.title, image: im.image, act: 'data-act="lightbox" data-src="visual:' + esc(s.id) + '" data-i="' + i + '"' };
-          }), shape("visual", "3 / 4"), cols("visual", 4)) : emptyNote()) + "</section>";
+            return { title: im.title, image: im.image, i: i, act: 'data-act="lightbox" data-src="visual:' + esc(s.id) + '" data-i="' + i + '"' };
+          }), shape("visual", "3 / 4"), cols("visual", 4), EDIT ? function (it) {
+            return '<p class="tile-more owner-row"><button type="button" class="mini-btn" data-act="sheet" data-sheet="vimage" data-id="' + esc(s.id) + '" data-i="' + it.i + '">Edit</button>' +
+              (it.i > 0 ? '<button type="button" class="mini-btn" data-act="vimage-move" data-id="' + esc(s.id) + '" data-i="' + it.i + '" data-dir="-1" aria-label="Move earlier">←</button>' : "") +
+              (it.i < imgs.length - 1 ? '<button type="button" class="mini-btn" data-act="vimage-move" data-id="' + esc(s.id) + '" data-i="' + it.i + '" data-dir="1" aria-label="Move later">→</button>' : "") + "</p>";
+          } : null) : emptyNote()) + "</section>";
       }).join("");
-      return pageHead("visual") + chips(kinds, cur, "visual-kind") + (html || emptyNote());
+      return pageHead("visual") + chips(kinds, cur, "visual-kind") + addButton("+ New series", 'data-act="new" data-kind="visual" data-id="__new"') + (html || emptyNote());
     },
 
     design: function () {
       var its = (D.design || {}).items || [];
       var dl = OWNER && its.length ? downloadBar("design", ["zip", "pdf"], "Download all") : "";
-      return pageHead("design") + dl + (its.length ? tiles(its.map(function (x) {
+      return pageHead("design") + dl + addButton("+ New sketch", 'data-act="new" data-kind="design"') + (its.length ? tiles(its.map(function (x) {
         var n = list(x.images).length;
         return { id: x.id, title: x.title, note: [fmtDay(x.date), n > 1 ? n + " images" : ""].filter(Boolean).join(" · "), image: list(x.images)[0],
                  act: 'data-act="lightbox" data-src="design:' + esc(x.id) + '" data-i="0"' };
@@ -806,8 +872,8 @@
       var cats = []; its.forEach(function (i) { if (i.category && cats.indexOf(i.category) < 0) cats.push(i.category); });
       var cur = STATE.storeCat || "All";
       var shown = its.filter(function (i) { return cur === "All" || i.category === cur; });
-      return pageHead("store") + chips(cats, cur, "store-cat") +
-        (shown.length ? tiles(shown, shape("store", "4 / 5"), cols("store", 4), storeAction) : emptyNote());
+      return pageHead("store") + chips(cats, cur, "store-cat", "store") + addButton("+ New item", 'data-act="item" data-file="store"') +
+        (shown.length ? tiles(shown, shape("store", "4 / 5"), cols("store", 4), function (it) { return storeAction(it) + listTools("store", its.indexOf(it), its.length); }) : emptyNote());
     },
 
     traces: function () {
@@ -821,24 +887,30 @@
         var rows = groups[k].slice().sort(function (a, b) { return String(b.year || "").localeCompare(String(a.year || "")); });
         return '<section class="trace-group"><h2 class="block-title">' + esc(k) + '</h2><ol class="rows">' + rows.map(function (r) {
           return '<li class="row"><span class="row-date">' + esc(r.year || "") + '</span><span class="row-main">' +
-            a(r.url, esc(r.title) + arrow(r.url), "row-title") + (r.where ? '<span class="row-note">' + esc(r.where) + "</span>" : "") + "</span></li>";
+            a(r.url, esc(r.title) + arrow(r.url), "row-title") + (r.where ? '<span class="row-note">' + esc(r.where) + "</span>" : "") + "</span>" +
+            (EDIT ? '<span class="row-end"><button type="button" class="mini-btn" data-act="item" data-file="traces" data-i="' + its.indexOf(r) + '">Edit</button></span>' : "") + "</li>";
         }).join("") + "</ol></section>";
       }).join("");
-      return pageHead("traces") + (t.note ? '<div class="prose trace-note">' + md(t.note) + "</div>" : "") + summary + (body || emptyNote());
+      return pageHead("traces") +
+        (t.note ? '<div class="prose trace-note"' + (EDIT ? ' data-act="sheet" data-sheet="traces-note" title="Click to edit"' : "") + ">" + md(t.note) + "</div>"
+          : EDIT ? '<p class="blk-hint" data-act="sheet" data-sheet="traces-note">Click to write a few lines at the top (optional)</p>' : "") +
+        addButton("+ Add a trace", 'data-act="item" data-file="traces"') + summary + (body || emptyNote());
     },
 
     follow: function () {
-      var groups = ((D.follow || {}).groups || []).map(function (g) {
-        var ls = (g.links || []).filter(function (l) { return l && l.label && l.url; });
-        if (!ls.length) return "";
-        return '<section class="follow-group"><h2 class="block-title">' + esc(g.name || "") + '</h2><ul class="follow-list">' +
+      var groups = ((D.follow || {}).groups || []).map(function (g, gi) {
+        var ls = (g.links || []).filter(function (l) { return l && l.label && (l.url || EDIT); });
+        if (!ls.length && !EDIT) return "";
+        return '<section class="follow-group"><h2 class="block-title"' + ed("data/follow.json#groups[" + gi + "].name", g, "name", "Group name") + ">" + esc(g.name || "") + "</h2>" +
+          (EDIT ? '<p class="owner-tools"><button type="button" class="mini-btn" data-act="item" data-file="follow" data-i="' + gi + '">Edit links</button></p>' : "") + '<ul class="follow-list">' +
           ls.map(function (l) {
+            if (!l.url) return '<li class="f-off"><span class="f-name">' + esc(l.label) + '</span><span class="f-host">no link yet · not shown to visitors</span></li>';
             return '<li><a href="' + esc(l.url) + '" target="_blank" rel="noopener"><span class="f-name">' + esc(l.label) +
               '</span><span class="f-host">' + esc(l.handle || hostOf(l.url)) + ' ↗</span></a></li>';
           }).join("") + "</ul></section>";
       }).join("");
       var s = D.settings || {};
-      return pageHead("follow") + (groups || emptyNote()) + (s.email ? '<p class="follow-mail">' + esc(s.email) + "</p>" : "");
+      return pageHead("follow") + (groups || emptyNote()) + addButton("+ New group", 'data-act="item" data-file="follow"') + (s.email ? '<p class="follow-mail">' + esc(s.email) + "</p>" : "");
     },
 
     notfound: function () {
@@ -861,7 +933,7 @@
   /* English / 中文 / side by side, for text written in Chinese */
   function readerTools(e) {
     var tools = "";
-    if (e.text_zh && e.text_zh !== e.text) {
+    if (hasEnglish(e) && (OWNER || (D.settings || {}).language_switch)) {
       var m = STATE.readMode || "main";
       tools += '<div class="read-modes" role="tablist">' +
         [["main", LANG === "zh" ? "中文" : "English"], ["other", LANG === "zh" ? "English" : "中文"], ["both", "对照 · Side by side"]].map(function (x) {
@@ -894,10 +966,12 @@
     var kind = p.kind || "mixed";
     var formats = kind === "image" ? ["pdf", "epub", "zip"] : ["epub", "pdf", "zip"];
     var head = '<p class="reader-back"><a href="' + esc(href("ongoing")) + '">← ' + esc(title("ongoing")) + "</a></p>" +
-      '<div class="page-head"><h1>' + esc(p.title) + "</h1>" + (p.note ? '<p class="intro">' + esc(p.note) + "</p>" : "") +
+      '<div class="page-head"><h1' + ed("content/projects/" + p.id + ".json#title", p, "title", "Collection name") + ">" + esc(p.title) + "</h1>" +
+      (p.note || EDIT ? '<p class="intro"' + ed("content/projects/" + p.id + ".json#note", p, "note", "A line about this collection (optional)", true) + ">" + esc(p.note || "") + "</p>" : "") +
       '<p class="series-meta">' + esc([es.length + (es.length === 1 ? " entry" : " entries"), SORT_LABEL[p.sort] || "", p.status === "finished" ? "Finished" : "Ongoing"].filter(Boolean).join(" · ")) + "</p>" +
       (can && es.length ? downloadBar("project:" + p.id, formats, "Download") : "") +
-      (OWNER && !PREVIEW ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="entry" data-project="' + esc(p.id) + '">+ New entry</button></p>' : "") + "</div>";
+      (EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="entry" data-project="' + esc(p.id) + '">+ New entry</button> ' +
+        '<button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(p.id) + '">Collection settings</button></p>' : "") + "</div>";
 
     if (entryId) {
       var idx = -1; es.forEach(function (e, i) { if (e.id === entryId) idx = i; });
@@ -1159,9 +1233,15 @@
         t.textContent = showing ? (LANG === "zh" ? "English" : "原文") : (LANG === "zh" ? "中文" : "English");
       }
     }
+    if (["sheet", "item", "item-move", "vimage-move", "rename-cat", "block"].indexOf(act) > -1) {
+      e.preventDefault();
+      openEditor({ mode: act, sheet: t.getAttribute("data-sheet"), file: t.getAttribute("data-file"), i: t.getAttribute("data-i"),
+                   dir: +t.getAttribute("data-dir") || 0, id: t.getAttribute("data-id"), val: t.getAttribute("data-val") });
+      return;
+    }
     if (act === "edit" || act === "new") {
       e.preventDefault();
-      openEditor({ mode: act, kind: t.getAttribute("data-kind"), id: t.getAttribute("data-id"), project: t.getAttribute("data-project"), shelf: t.getAttribute("data-shelf") });
+      openEditor({ mode: act, kind: t.getAttribute("data-kind"), id: t.getAttribute("data-id"), project: t.getAttribute("data-project"), shelf: t.getAttribute("data-shelf"), day: t.getAttribute("data-day") });
     }
   });
   app.addEventListener("keydown", function (e) {
@@ -1214,17 +1294,20 @@
     }
     draw(true);
   }
-  function openEditor(spec) {
-    var go = function () {
-      window.AlyxEditor.open(spec, {
-        root: ROOT, D: D, asset: asset, md: md, onSaved: onSaved,
-        project: D.project ? D.project.project : null,
-        posts: posts, fmtDay: fmtDay, player: player, mediaInfo: mediaInfo
-      });
+  function editorCtx() {
+    return {
+      root: ROOT, D: D, RAW: RAW, asset: asset, md: md, onSaved: onSaved, page: PAGE, lang: LANG,
+      project: D.project ? D.project.project : null, sections: sections, blockNames: BLOCK_NAMES, fonts: Object.keys(FONTS),
+      posts: posts, fmtDay: fmtDay, player: player, mediaInfo: mediaInfo, applyTheme: applyTheme,
+      redraw: function () { draw(true); },
+      setLang: function (l) { try { localStorage.setItem("alyx-lang", l); } catch (x) {} location.reload(); }
     };
-    if (window.AlyxEditor) return go();
-    loadScript(ROOT + "assets/js/editor.js?v=5").then(go);
   }
+  function withEditor(fn) {
+    if (window.AlyxEditor) return fn();
+    loadScript(ROOT + "assets/js/editor.js?v=6").then(function () { if (window.AlyxEditor) fn(); });
+  }
+  function openEditor(spec) { withEditor(function () { window.AlyxEditor.open(spec, editorCtx()); }); }
 
   /* ---------- drawing ---------- */
   function draw(keepScroll) {
@@ -1248,6 +1331,7 @@
       nav.classList.toggle("open", !open);
     });
     wireMedia(); markTracks();
+    if (EDIT) withEditor(function () { window.AlyxEditor.decorate(editorCtx()); });
     if (keepScroll) window.scrollTo(0, y);
     else {
       var h = hash(), target = h && document.getElementById(h);
@@ -1320,6 +1404,7 @@
       .concat([loadScript(ROOT + "assets/js/vendor/marked.min.js"), loadScript(ROOT + "assets/js/media.js?v=5")])
   ).then(function () {
     mergeDraftsInto("all");
+    if (EDIT) { try { RAW = JSON.parse(JSON.stringify(D)); } catch (e) { RAW = {}; } }
     localize(D);
     applyTheme(D.theme);
     draw();
