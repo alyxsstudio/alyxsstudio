@@ -1,4 +1,17 @@
 {
  "about": "Automatic English versions of Chinese text, made when the site is published. You can correct any \"en\" here; it will be kept.",
- "items": {}
+ "items": {
+  "8c817106980a405f": {
+   "zh": "测试：这是一条隐藏的帖子，用来检查自动翻译。",
+   "en": "Test: This is a hidden post to check for automatic translation.",
+   "auto": "Test: This is a hidden post to check for automatic translation.",
+   "by": "MyMemory (free, no key)"
+  },
+  "a4f98555d1afa52d": {
+   "zh": "今天的风很轻。我在窗边画了一只猫，**它一直看着我**。晚上想继续写小说。",
+   "en": "The wind is light today. I drew a cat by the window, * * and it kept looking at me * *. I want to continue writing novels in the evening.",
+   "auto": "The wind is light today. I drew a cat by the window, * * and it kept looking at me * *. I want to continue writing novels in the evening.",
+   "by": "MyMemory (free, no key)"
+  }
+ }
 }
