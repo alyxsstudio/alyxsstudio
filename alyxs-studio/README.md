@@ -36,13 +36,19 @@
 
 ## 中文写，英文显示
 - 写的时候用中文就行，后台保存的也是中文原文。
-- 每次发布时，GitHub 会自动生成英文版。用的是 GitHub Models，免费，不需要设置。
+- 每次发布时会自动生成英文版。用哪个翻译，取决于你在 GitHub 存了哪把钥匙（仓库 Settings → Secrets and variables → Actions → New repository secret）：
+  - 什么都不存：用免费的 MyMemory，不用设置，但英文比较直白，每天大约 5000 字，超出的第二天继续翻。
+  - `GEMINI_API_KEY`：Google Gemini，在 aistudio.google.com 免费申请，英文自然很多。
+  - `ANTHROPIC_API_KEY`：Claude，英文最有文学感，按量付费，每月几美分到几美元。
+  - `DEEPL_API_KEY`：DeepL 免费版。
+  - 存了钥匙以后，之前用免费翻译翻过、你没手动改过的段落，会在下次发布时自动用新的重翻一遍。
 - 访客默认看到英文。
 - 页面底部有 **English / 中文** 切换（只在"我"的模式下显示，想让访客也能切换，可以在 settings 里加 `language_switch: true`）。
 - 每条日常旁边有 **原文** 按钮，可以看中文原文。
 - 小说章节可以切换 **English / 中文 / 对照**，对照模式下中英文逐段并排。
 - 想改某段英文：直接修改 `data/translations.json` 里对应的 "en"，以后会一直保留你改的版本。
-- 免费额度每天有限。一次发布太多新内容时，剩下的会在下一次发布时继续翻译，在翻译完成之前暂时显示中文。
+- 一次发布太多新内容时，剩下的会在下一次发布时继续翻译，在翻译完成之前暂时显示中文。
+- 翻译情况可以看 `alyxsstudio.com/data/translate-status.json`（用的哪个翻译、还剩几段、有没有出错）。
 
 ## 引用卡片
 在任何文章或章节里选中一段文字，会出现 **Quote card** 按钮，点一下生成一张 Story 尺寸的引用图。手机上会直接调出分享面板。

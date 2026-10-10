@@ -169,7 +169,7 @@ const TRANSLATORS = {
         out.push(decode(t));
         await sleep(300);
       }
-      return [out.join("")];
+      return [fixMarks(out.join(""))];
     }
   }
 };
@@ -186,6 +186,18 @@ function splitForFree(text) {
   if (cur) pieces.push(cur);
   // keep a space between translated sentences
   return pieces.map((s, i) => (i < pieces.length - 1 && !/\n$/.test(s) ? s + " " : s));
+}
+// Machine translators often break Markdown bold into "* * words * *": put it back together.
+function fixMarks(s) {
+  s = String(s).replace(/\*\s+\*/g, "**");
+  const parts = s.split("**");
+  if (parts.length < 3 || parts.length % 2 === 0) return s;
+  let out = parts[0];
+  for (let i = 1; i < parts.length; i += 2) {
+    const before = out, inner = parts[i].trim(), after = parts[i + 1];
+    out = (before && !/[\s(“"'‘]$/.test(before) ? before + " " : before) + "**" + inner + "**" + (after && /^[\w(“"‘]/.test(after) ? " " + after : after);
+  }
+  return out;
 }
 const decode = (s) => String(s).replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 
