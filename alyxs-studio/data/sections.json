@@ -30,7 +30,7 @@
     },
     {
       "key": "books",
-      "title": "Books",
+      "title": "Book",
       "short": "Published on Amazon and Apple Books.",
       "intro": "",
       "in_menu": true
@@ -44,7 +44,7 @@
     },
     {
       "key": "design",
-      "title": "Concepts",
+      "title": "Concept",
       "short": "Sketches and ideas for things I make.",
       "intro": "",
       "in_menu": true
