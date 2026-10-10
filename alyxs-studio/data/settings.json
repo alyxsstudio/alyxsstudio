@@ -2,7 +2,7 @@
   "name": "Alyx's Studio",
   "tagline": "",
   "announcement": null,
-  "email": "contact@alyxsstudio.com",
+  "email": "📮：contact@alyxsstudio.com",
   "instagram_handle": "alyxsstudio",
   "instagram_url": "https://www.instagram.com/alyxsstudio/",
   "social_links": [],
@@ -66,9 +66,9 @@
       ]
     },
     {
-      "label": "Project",
+      "label": "News",
       "items": [
-        "picks",
+        "writing",
         "research"
       ]
     }
