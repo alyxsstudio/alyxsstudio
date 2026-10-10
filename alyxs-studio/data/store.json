@@ -1,10 +1,8 @@
 {
-  "title": "Store",
-  "short": "",
-  "intro": "",
   "items": [
     {
       "title": "Thank You Bag",
+      "category": "Bags & Charms",
       "price": "$68",
       "status": "soon",
       "note": "",
@@ -13,6 +11,7 @@
     },
     {
       "title": "Smiley Tee",
+      "category": "Clothing",
       "price": "$38",
       "status": "available",
       "note": "",
@@ -21,6 +20,7 @@
     },
     {
       "title": "Studio Notebook",
+      "category": "Paper",
       "price": "$18",
       "status": "available",
       "note": "",
@@ -29,6 +29,7 @@
     },
     {
       "title": "Untitled (Yellow), print",
+      "category": "Paper",
       "price": "$40",
       "status": "available",
       "note": "",
@@ -37,6 +38,7 @@
     },
     {
       "title": "Smiley Pin",
+      "category": "Bags & Charms",
       "price": "$12",
       "status": "sold out",
       "note": "",
@@ -45,9 +47,46 @@
     },
     {
       "title": "Small Things, White Rooms, signed",
+      "category": "Books",
       "price": "$24",
       "status": "soon",
       "note": "",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "0.38 mm gel pens",
+      "category": "Picks",
+      "price": "",
+      "status": "available",
+      "note": "Desk",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "A5 dot-grid notebook",
+      "category": "Picks",
+      "price": "",
+      "status": "available",
+      "note": "Desk",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Wooden book stand",
+      "category": "Picks",
+      "price": "",
+      "status": "available",
+      "note": "Reading",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Clip-on reading light",
+      "category": "Picks",
+      "price": "",
+      "status": "available",
+      "note": "Reading",
       "image": "",
       "url": ""
     }

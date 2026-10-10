@@ -10,13 +10,13 @@
   var h = React.createElement;
   var useEffect = React.useEffect, useRef = React.useRef, useState = React.useState;
 
-  // Which page of the site to show for each file in the editor
+  // Which page of the site to show while editing each file or collection
   var PAGES = {
-    design: "", settings: "",
-    writing: "writing/", research: "research/", cv: "cv/", books: "books/", serial: "serial/",
-    podcast: "podcast/", video: "video/", objects: "objects/", art: "art/", wardrobe: "wardrobe/",
-    picks: "picks/", shop: "shop/"
+    theme: "", settings: "", sections: "", follow: "follow/",
+    books: "books/", store: "store/", traces: "traces/",
+    daily: "daily/", projects: "ongoing/", entries: "ongoing/", visual: "visual/", design: "design/"
   };
+  var COLLECTIONS = { daily: 1, projects: 1, entries: 1, visual: 1, design: 1 };
   var DESKTOP = 1280, PHONE = 390;
   var ORIGIN = window.location.origin;
 
@@ -48,18 +48,27 @@
       var box = useRef(null);
       var pid = useRef("p" + Math.random().toString(36).slice(2, 10));
       var latest = useRef("{}");
+      var frameSrc = useRef("");
       var modeState = useState("desktop"), mode = modeState[0], setMode = modeState[1];
       var sizeState = useState({ w: 900, h: 760 }), size = sizeState[0], setSize = sizeState[1];
 
       var raw = props.entry && props.entry.getIn ? props.entry.getIn(["data"]) : null;
-      var json = JSON.stringify(swapAssets(plain(raw), props.getAsset));
+      var data = swapAssets(plain(raw), props.getAsset);
+      var entrySlug = (props.entry && props.entry.getIn && props.entry.getIn(["slug"])) || "draft";
+      var json = JSON.stringify(data);
       latest.current = json;
+      var isCollection = !!COLLECTIONS[file];
+      // which part of the page to open: the project for Ongoing entries, the post's day for Daily
+      var frag = file === "entries" ? (data.project || "") : file === "projects" ? entrySlug :
+                 file === "daily" ? String(data.date || "").slice(0, 10) : file === "visual" ? "s-" + entrySlug : "";
 
       function send() {
         var f = frame.current;
         if (!f || !f.contentWindow) return;
         try {
-          f.contentWindow.postMessage({ type: "alyx-preview", file: file, data: JSON.parse(latest.current) }, ORIGIN);
+          var msg = { type: "alyx-preview", data: JSON.parse(latest.current) };
+          if (isCollection) { msg.collection = file; msg.id = entrySlug; } else { msg.file = file; }
+          f.contentWindow.postMessage(msg, ORIGIN);
         } catch (e) {}
       }
 
@@ -91,7 +100,8 @@
         return function () { win.removeEventListener("resize", measure); };
       }, []);
 
-      var src = "/" + PAGES[file] + "?preview=1&pid=" + pid.current;
+      if (!frameSrc.current) frameSrc.current = "/" + PAGES[file] + "?preview=1&pid=" + pid.current + (frag ? "#" + frag : "");
+      var src = frameSrc.current;
       var desktop = mode === "desktop";
       var scale = desktop ? Math.min(1, size.w / DESKTOP) : 1;
       var frameW = desktop ? DESKTOP : PHONE;

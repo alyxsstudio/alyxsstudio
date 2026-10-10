@@ -1,0 +1,72 @@
+{
+  "groups": [
+    {
+      "name": "Social",
+      "links": [
+        {
+          "label": "Instagram",
+          "url": "https://www.instagram.com/alyxsstudio/"
+        },
+        {
+          "label": "Threads",
+          "url": ""
+        },
+        {
+          "label": "X",
+          "url": ""
+        },
+        {
+          "label": "RedNote 小红书",
+          "url": ""
+        },
+        {
+          "label": "Weibo 微博",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "name": "Watch",
+      "links": [
+        {
+          "label": "YouTube",
+          "url": ""
+        },
+        {
+          "label": "Bilibili",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "name": "Listen",
+      "links": [
+        {
+          "label": "Spotify",
+          "url": ""
+        },
+        {
+          "label": "Apple Podcasts",
+          "url": ""
+        },
+        {
+          "label": "Xiaoyuzhou 小宇宙",
+          "url": ""
+        }
+      ]
+    },
+    {
+      "name": "Read",
+      "links": [
+        {
+          "label": "Amazon",
+          "url": ""
+        },
+        {
+          "label": "Apple Books",
+          "url": ""
+        }
+      ]
+    }
+  ]
+}

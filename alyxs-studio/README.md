@@ -1,82 +1,43 @@
 # Alyx's Studio
 
-网站地址：https://alyxsstudio.com
-编辑后台：https://alyxsstudio.com/admin
+- 网站：https://alyxsstudio.com
+- 后台：https://alyxsstudio.com/admin
+- 托管：GitHub Pages。每次在后台点保存，GitHub 会自动发布，大约 1 分钟后生效。
 
-日常更新只需要打开后台：改文字、上传图片和 mp3、调字体和颜色，点保存后约 1 分钟网站自动更新。
+## 栏目
 
----
+| 栏目 | 放什么 | 在后台哪里改 |
+|---|---|---|
+| Daily | 碎碎念、感悟、图片、语音、转载、截图。网站上有日历，有更新的那天显示缩略图 | Daily 日常 |
+| Ongoing | 每天在长的合集：连载小说、图片词典、图片连载……会按设定自动排序，可以打包下载 | 先在「Ongoing 合集设置」建合集，再在「Ongoing 每日更新」里往合集加条目 |
+| Books | 出版在 Amazon / Apple Books 的书，分 Writing / Language / Art | Books · Store · Traces → Books |
+| Visual | 壁纸、头像、封面系列，可以设置成访客能下载 | Visual 图片系列 |
+| Design | 草图、构思图 | Design 草图·构思 |
+| Store | 衣服、帽子、包、挂件……附购买链接 | Books · Store · Traces → Store |
+| Traces | 作品去过的地方：发表、展出、对谈、合作、协会、报道 | Books · Store · Traces → Traces |
+| Follow | 所有平台的链接，同时显示在每页底部 | Site 网站设置 → Follow |
 
-## 第一次设置（只做一次）
+- **改栏目名字或菜单顺序**：只在「Site 网站设置 → 栏目名称和菜单」里改。菜单、首页和页面标题会一起变。
+- **首页显示什么、按什么顺序**：在「Site 网站设置 → 首页 · 联系方式 → 首页模块」里调整。
+- **字体、颜色、字号、每行几张图**：在「Site 网站设置 → Look」里改。
 
-### 1. 注册 GitHub，建一个仓库
-1. 打开 https://github.com/signup 注册账号，记住你的用户名。
-2. 登录后点右上角 **+** → **New repository**。
-3. Repository name 填 `alyxsstudio`。Public 或 Private 都可以，其他选项不用动。点 **Create repository**。
+## 打包下载
+- **合集**（Ongoing）可以导出 PDF、EPUB 或 ZIP：
+  - EPUB 可以直接用 Kindle 的 "Send to Kindle" 发送，也可以上传到 Apple Books。
+  - ZIP 里是原图和每一条的文字。
+- 每个合集和每个 Visual 系列都可以单独设置下载权限：**只有我**，或者**所有访客**。
+- **"只有我"是怎么判断的**：在自己的电脑或手机上打开一次 `alyxsstudio.com/?me`，那台设备就进入"我"的模式，能看到所有下载按钮。页面底部还有 **Download everything**，可以把整个网站（文字、图片、音频）打包成一个 ZIP 备份。
+  - 退出这个模式：打开 `alyxsstudio.com/?me=0`。
+  - 注意：这只是把按钮藏起来，不是加密。网站上的内容本身是公开的。
 
-### 2. 把网站文件传到仓库
-1. 在新仓库页面，点 **uploading an existing file** 这个链接。
-2. 打开解压后的 `alyxs-studio` 文件夹，全选**里面的所有东西**（admin、assets、data、index.html……），一起拖进网页。注意是拖文件夹里面的内容，不是拖外层的 `alyxs-studio` 文件夹本身。
-3. 等文件都列出来后，点页面下方的 **Commit changes**。
+## 小提示
+- 上传的图片会自动转成 webp，并缩小到长边 2880px 以内，网站不会越来越慢。
+- 语音和音频建议每个 30MB 以内。
+- 想先写好、暂时不公开，就勾选"先不公开"。
+- 旧的网址（/shop、/art、/serial……）会自动跳转到新栏目。
 
-### 3. 填写你的 GitHub 用户名
-1. 在仓库里依次点 `admin` → `config.yml`，再点右上角的铅笔图标 ✏️。
-2. 找到 `repo: GITHUB-USERNAME/alyxsstudio` 这一行，把 `GITHUB-USERNAME` 改成你的用户名。
-3. 点 **Commit changes** 保存。
-
-### 4. 让 Netlify 跟着 GitHub 自动更新
-1. 打开 Netlify，进入 alyxsstudio 网站。
-2. 依次进入 **Project configuration** → **Build & deploy** → **Continuous deployment**，点 **Link repository**（或 Link to Git）。
-3. 选 **GitHub**，授权后选择 `alyxsstudio` 仓库。
-4. Branch 选 `main`。Build command 留空，Publish directory 填 `.`。点 **Deploy**。
-
-域名和 HTTPS 都不会变。
-
-### 5. 第一次登录后台
-1. 打开 https://alyxsstudio.com/admin，点 **Sign In Using Access Token**。
-2. 弹出的窗口里有一个链接，点它会打开 GitHub 的 token 页面，需要的权限已经帮你选好了。
-3. Repository access 选 **Only select repositories**，再选 `alyxsstudio`。
-4. 生成 token，复制，粘贴回后台。浏览器会记住它，以后打开后台就直接进去了。
-
-> 不要把 token 发给任何人，它相当于这个仓库的钥匙。
-
----
-
-## 后台里有什么
-
-**Studio 网站设置**
-- **Design**：字体、颜色、字号、logo 大小、图片圆角、每行显示几个、图片比例。
-- **名称 · 联系 · 首页**：网站名、首页那句话、邮箱、Instagram、首页的方格图片、替换 logo。
-
-**Sections 栏目内容**
-
-每个栏目都可以改栏目名和简介，条目可以新增、删除、调整顺序。各栏目能做的事：
-
-| 栏目 | 可以做的事 |
-|---|---|
-| Writing | 正文直接写在后台，就能在网站上阅读；也可以只填外部链接 |
-| Research | 标题、期刊、链接，可以上传 PDF |
-| CV | 自己建分组（如 Education、Publications），可以上传简历 PDF |
-| Books | 封面，加 Kindle / Apple Books / Amazon 按钮 |
-| Serial | 每一章的正文写在后台，读者在网站上翻章阅读 |
-| Podcast | 上传 mp3 后网站上可以直接播放；也可以填 Spotify 等链接 |
-| Vlog | 填 YouTube 链接，封面会自动显示 |
-| Objects / Art / Wardrobe | 图片、名字、一句说明 |
-| Picks | 亚马逊推荐 |
-| Shop | 价格、状态（可购买 / 即将上架 / 售罄）、付款链接 |
-
-## 实时预览
-编辑任何一项时，右边会显示真实网站，你改什么它就跟着变。点"电脑 / 手机"可以切换两种屏幕的效果。预览里的改动只有你自己看得到，点保存后才会发布到网站。
-
-## 首页、菜单、页脚
-在 **Studio 首页 · 菜单 · 联系方式** 里：
-- **首页模块**：可以调整模块顺序，添加或删除模块。可选的模块有：Logo、栏目目录、最新商品、图片栏目、最新文章列表、Instagram、一段文字、一张大图、空白间隔。
-- **导航菜单**：可以改分组名称，把栏目在分组之间移动；不想显示的栏目从菜单里移除即可。
-- **顶部通知条**：填上文字就会显示，清空就会隐藏。
-- **页脚链接**：可以添加 YouTube、Spotify、Substack 等链接。
-
-## 一些建议
-- **图片**：jpg 格式，宽 1200–1600px，每张 300KB 左右最合适。
-- **mp3**：每个 30MB 以内。节目多了以后，建议把音频放到 Spotify for Creators 等平台，网站上填收听链接。
-- **商店付款**：网站本身不能收款。`付款链接` 填 Stripe Payment Link、Gumroad 或 Shopify 的链接。
-- **保存后没变化**：等一两分钟再刷新。也可以在 Netlify 的 **Deploys** 页面查看进度。
+## 技术说明
+- `content/`：Daily、Ongoing、Visual、Design 的内容，一条一个文件。
+- `data/`：其余设置和列表。
+- `scripts/build.mjs`：发布时把 `content/` 整理成网站用的数据。
+- `.github/workflows/pages.yml`：自动发布到 GitHub Pages。

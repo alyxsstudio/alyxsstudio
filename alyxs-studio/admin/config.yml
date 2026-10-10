@@ -1,13 +1,16 @@
 # Alyx's Studio — editor settings (Sveltia CMS)
-# The website lives in the alyxs-studio/ folder of the GitHub repository,
-# so every path below starts with alyxs-studio/.
+# The website lives in the alyxs-studio/ folder of the repository, so every path starts with alyxs-studio/.
+# Daily posts, Ongoing entries, Visual series and Design sketches are saved one file per entry in content/;
+# the publish step (scripts/build.mjs) puts them in order for the website.
 
 backend:
   name: github
   repo: alyxsstudio/alyxsstudio
   branch: main
   commit_messages:
+    create: Add {{collection}} “{{slug}}”
     update: Update {{collection}} “{{slug}}”
+    delete: Delete {{collection}} “{{slug}}”
     uploadMedia: Upload “{{path}}”
     deleteMedia: Delete “{{path}}”
 site_url: https://alyxsstudio.com
@@ -15,158 +18,956 @@ display_url: https://alyxsstudio.com
 logo_url: /assets/img/smiley.png
 media_folder: alyxs-studio/assets/uploads
 public_folder: /assets/uploads
+media_libraries:
+  default:
+    config:
+      max_file_size: 31457280
+      slugify_filename: true
+      transformations:
+        raster_image:
+          format: webp
+          quality: 86
+          width: 2880
+          height: 2880
 collections:
-- name: studio
-  label: Studio 网站设置
+- name: daily
+  label: Daily 日常
+  label_singular: 日常
+  icon: calendar_month
+  folder: alyxs-studio/content/daily
+  create: true
+  format: json
+  extension: json
+  slug: '{{year}}-{{month}}-{{day}}-{{hour}}{{minute}}{{second}}'
+  summary: '{{fields.date}}  {{fields.text}}'
+  sortable_fields:
+    fields:
+    - date
+    default:
+      field: date
+      direction: descending
+  view_groups:
+  - label: 月份
+    field: date
+    pattern: \d{4}-\d{2}
+  description: 碎碎念、感悟、图片、语音、转载、截图。按日期出现在网站的日历上。
+  fields:
+  - name: date
+    label: 时间
+    widget: datetime
+    default: '{{now}}'
+    format: YYYY-MM-DDTHH:mm
+    picker_utc: false
+  - name: text
+    label: 文字
+    widget: markdown
+    required: false
+  - name: images
+    label: 图片（可以一次选多张）
+    widget: image
+    required: false
+    multiple: true
+  - name: audio
+    label: 语音 / 音频（可选）
+    widget: file
+    required: false
+    accept: audio/*
+  - name: link
+    label: 转载 / 链接（可选）
+    widget: object
+    required: false
+    collapsed: true
+    fields:
+    - name: url
+      label: 链接
+      widget: string
+      required: false
+    - name: title
+      label: 来源名称（如 Threads）
+      widget: string
+      required: false
+    - name: quote
+      label: 摘一句话（可选）
+      widget: text
+      required: false
+  - name: tags
+    label: 标签（可选）
+    widget: list
+    required: false
+  - name: hidden
+    label: 先不公开（草稿）
+    widget: boolean
+    default: false
+- name: entries
+  label: Ongoing 每日更新
+  label_singular: 条目
+  icon: auto_stories
+  folder: alyxs-studio/content/entries
+  create: true
+  format: json
+  extension: json
+  slug: '{{fields.project}}-{{year}}{{month}}{{day}}-{{hour}}{{minute}}{{second}}'
+  summary: '{{fields.project}} · {{fields.title}}'
+  sortable_fields:
+    fields:
+    - date
+    - title
+    - project
+    default:
+      field: date
+      direction: descending
+  view_groups:
+  - label: 合集
+    field: project
+  description: 往某个合集里加一条：小说的一章、词典的一个词、一张连载图片。网站会按合集的排序方式自动排好。
+  fields:
+  - name: project
+    label: 属于哪个合集
+    widget: relation
+    collection: projects
+    value_field: '{{slug}}'
+    search_fields:
+    - title
+    display_fields:
+    - title
+  - name: date
+    label: 时间
+    widget: datetime
+    default: '{{now}}'
+    format: YYYY-MM-DDTHH:mm
+    picker_utc: false
+  - name: title
+    label: 标题（章节名、词语……）
+    widget: string
+    required: false
+  - name: number
+    label: 编号（按编号排序时用，可留空）
+    widget: number
+    value_type: int
+    required: false
+  - name: images
+    label: 图片（可多张）
+    widget: image
+    required: false
+    multiple: true
+  - name: text
+    label: 文字
+    widget: markdown
+    required: false
+  - name: audio
+    label: 音频（可选）
+    widget: file
+    required: false
+    accept: audio/*
+- name: projects
+  label: Ongoing 合集设置
+  label_singular: 合集
+  icon: collections_bookmark
+  folder: alyxs-studio/content/projects
+  create: true
+  format: json
+  extension: json
+  identifier_field: title
+  slug: '{{slug}}'
+  summary: '{{fields.title}}'
+  description: 每个合集是一个正在进行的项目：连载小说、图片词典、图片连载……
+  fields:
+  - name: title
+    label: 合集名称
+    widget: string
+  - name: note
+    label: 一句介绍
+    widget: text
+    required: false
+  - name: kind
+    label: 内容类型
+    widget: select
+    options:
+    - label: 文字为主（小说、文章）
+      value: text
+    - label: 图片为主（词典、图片连载）
+      value: image
+    - label: 图文混合
+      value: mixed
+    default: mixed
+  - name: sort
+    label: 自动排序
+    widget: select
+    options:
+    - label: 按日期，最早的在前
+      value: date-asc
+    - label: 按日期，最新的在前
+      value: date-desc
+    - label: 按标题 A–Z
+      value: title
+    - label: 按编号
+      value: number
+    default: date-asc
+  - name: cover
+    label: 封面（可选，不填就用第一张图）
+    widget: image
+    required: false
+  - name: status
+    label: 状态
+    widget: select
+    options:
+    - label: 进行中
+      value: ongoing
+    - label: 已完成
+      value: finished
+    default: ongoing
+  - name: download
+    label: 谁可以下载打包
+    widget: select
+    options:
+    - label: 只有我
+      value: private
+    - label: 所有访客
+      value: public
+    default: private
+  - name: date
+    label: 开始日期
+    widget: datetime
+    time_format: false
+    default: '{{now}}'
+    format: YYYY-MM-DD
+    picker_utc: false
+  - name: hidden
+    label: 先不公开
+    widget: boolean
+    default: false
+- name: visual
+  label: Visual 图片系列
+  label_singular: 系列
+  icon: photo_library
+  folder: alyxs-studio/content/visual
+  create: true
+  format: json
+  extension: json
+  identifier_field: title
+  slug: '{{slug}}'
+  summary: '{{fields.title}}'
+  description: 壁纸、头像、封面……每个系列一组图片。
+  fields:
+  - name: title
+    label: 系列名称
+    widget: string
+  - name: kind
+    label: 类型
+    widget: select
+    options:
+    - Wallpaper
+    - Avatar
+    - Cover
+    - Drawing
+    - Other
+    default: Wallpaper
+  - name: date
+    label: 日期
+    widget: datetime
+    time_format: false
+    default: '{{now}}'
+    format: YYYY-MM-DD
+    picker_utc: false
+  - name: note
+    label: 一句介绍
+    widget: text
+    required: false
+  - name: download
+    label: 谁可以下载
+    widget: select
+    options:
+    - label: 所有访客
+      value: public
+    - label: 只有我
+      value: private
+    default: public
+  - name: images
+    label: 图片
+    label_singular: 图片
+    widget: list
+    fields:
+    - name: image
+      label: 图片
+      widget: image
+      required: false
+    - name: title
+      label: 名字（可选）
+      widget: string
+      required: false
+    - name: phone
+      label: 手机版（可选）
+      widget: image
+      required: false
+    - name: desktop
+      label: 电脑版（可选）
+      widget: image
+      required: false
+    required: false
+    summary: '{{fields.title}}'
+  - name: hidden
+    label: 先不公开
+    widget: boolean
+    default: false
+- name: design
+  label: Design 草图·构思
+  label_singular: 草图
+  icon: draw
+  folder: alyxs-studio/content/design
+  create: true
+  format: json
+  extension: json
+  identifier_field: title
+  slug: '{{slug}}'
+  summary: '{{fields.title}}'
+  sortable_fields:
+    fields:
+    - date
+    - title
+    default:
+      field: date
+      direction: descending
+  fields:
+  - name: title
+    label: 名字
+    widget: string
+  - name: date
+    label: 日期
+    widget: datetime
+    time_format: false
+    default: '{{now}}'
+    format: YYYY-MM-DD
+    picker_utc: false
+  - name: images
+    label: 草图、构思图（可多张）
+    widget: image
+    required: false
+    multiple: true
+  - name: note
+    label: 一句说明
+    widget: text
+    required: false
+  - name: link
+    label: 相关链接（比如成品的购买页，可选）
+    widget: string
+    required: false
+  - name: hidden
+    label: 先不公开
+    widget: boolean
+    default: false
+- name: pages
+  label: Books · Store · Traces
+  icon: view_list
+  format: json
+  files:
+  - name: books
+    label: Books 出版的书
+    file: alyxs-studio/data/books.json
+    fields:
+    - name: items
+      label: 书
+      label_singular: 书
+      widget: list
+      fields:
+      - name: title
+        label: 书名
+        widget: string
+      - name: category
+        label: 分类
+        widget: select
+        options:
+        - Writing
+        - Language
+        - Art
+        - Other
+        default: Writing
+      - name: note
+        label: 一句说明
+        widget: string
+        required: false
+      - name: image
+        label: 封面
+        widget: image
+        required: false
+      - name: links
+        label: 购买 / 阅读链接
+        label_singular: 链接
+        widget: list
+        fields:
+        - name: label
+          label: 按钮文字（Amazon、Kindle、Apple Books…）
+          widget: string
+        - name: url
+          label: 链接
+          widget: string
+          required: false
+        required: false
+        summary: '{{fields.label}}'
+      summary: '{{fields.category}} · {{fields.title}}'
+  - name: store
+    label: Store 物件
+    file: alyxs-studio/data/store.json
+    fields:
+    - name: items
+      label: 物件
+      label_singular: 物件
+      widget: list
+      fields:
+      - name: title
+        label: 名字
+        widget: string
+      - name: category
+        label: 分类
+        widget: select
+        options:
+        - Clothing
+        - Hats
+        - Bags & Charms
+        - Paper
+        - Books
+        - Picks
+        - Other
+        default: Other
+      - name: price
+        label: 价格（可留空）
+        widget: string
+        required: false
+      - name: status
+        label: 状态
+        widget: select
+        options:
+        - label: 可购买
+          value: available
+        - label: 即将上架
+          value: soon
+        - label: 售罄
+          value: sold out
+        default: available
+      - name: note
+        label: 一句说明
+        widget: string
+        required: false
+      - name: image
+        label: 图片
+        widget: image
+        required: false
+      - name: url
+        label: 购买链接
+        widget: string
+        required: false
+      summary: '{{fields.category}} · {{fields.title}}'
+  - name: traces
+    label: Traces 作品足迹
+    file: alyxs-studio/data/traces.json
+    fields:
+    - name: note
+      label: 开头一段话（可选）
+      widget: markdown
+      required: false
+    - name: items
+      label: 足迹
+      label_singular: 条
+      widget: list
+      fields:
+      - name: kind
+        label: 类型
+        widget: select
+        options:
+        - label: Published 发表
+          value: Published
+        - label: Shown 展出
+          value: Shown
+        - label: Talks 对谈·讲座
+          value: Talks
+        - label: Collaborations 合作
+          value: Collaborations
+        - label: Memberships 协会
+          value: Memberships
+        - label: Mentions 提及·报道
+          value: Mentions
+        default: Published
+      - name: year
+        label: 年份
+        widget: string
+        required: false
+      - name: title
+        label: 作品 / 事件
+        widget: string
+      - name: where
+        label: 在哪里（刊物、展览、平台…）
+        widget: string
+        required: false
+      - name: url
+        label: 链接（可选）
+        widget: string
+        required: false
+      required: false
+      summary: '{{fields.year}} · {{fields.kind}} · {{fields.title}}'
+- name: site
+  label: Site 网站设置
   icon: tune
   format: json
   files:
-  - name: design
-    label: Design 字体 · 颜色 · 排版
-    file: alyxs-studio/data/design.json
+  - name: sections
+    label: 栏目名称和菜单
+    file: alyxs-studio/data/sections.json
     fields:
-    - name: font_body
-      label: 正文字体 Body font
-      widget: select
-      default: Geist
-      options:
-      - Geist
-      - Instrument Sans
-      - DM Sans
-      - Work Sans
-      - IBM Plex Sans
-      - Manrope
-      - Karla
-      - Libre Franklin
-      - Space Grotesk
-      - Figtree
-      - Outfit
-      - Albert Sans
-      - Newsreader
-      - EB Garamond
-      - Cormorant Garamond
-      - Fraunces
-      - Libre Caslon Text
-      - Instrument Serif
-      - Spectral
-      - Gaegu
-      - Patrick Hand
-      - Caveat
-      - Geist Mono
-      - IBM Plex Mono
-      - DM Mono
-      - Space Mono
-      - JetBrains Mono
-      - Courier Prime
-    - name: font_heading
-      label: 标题字体 Heading font
-      widget: select
-      default: Same as body
-      options:
-      - Same as body
-      - Geist
-      - Instrument Sans
-      - DM Sans
-      - Work Sans
-      - IBM Plex Sans
-      - Manrope
-      - Karla
-      - Libre Franklin
-      - Space Grotesk
-      - Figtree
-      - Outfit
-      - Albert Sans
-      - Newsreader
-      - EB Garamond
-      - Cormorant Garamond
-      - Fraunces
-      - Libre Caslon Text
-      - Instrument Serif
-      - Spectral
-      - Gaegu
-      - Patrick Hand
-      - Caveat
-      - Geist Mono
-      - IBM Plex Mono
-      - DM Mono
-      - Space Mono
-      - JetBrains Mono
-      - Courier Prime
-    - name: font_small
-      label: 小字字体（日期、价格、栏目名）Small text font
-      widget: select
-      default: Geist Mono
-      options:
-      - Same as body
-      - Geist Mono
-      - IBM Plex Mono
-      - DM Mono
-      - Space Mono
-      - JetBrains Mono
-      - Courier Prime
-      - Geist
-      - Instrument Sans
-      - DM Sans
-      - Newsreader
-      - EB Garamond
-    - name: font_custom
-      label: 自定义字体（可选）Custom Google Font
+    - name: sections
+      label: 栏目（拖动调整菜单顺序）
+      label_singular: 栏目
+      widget: list
+      fields:
+      - name: key
+        label: 哪个栏目
+        widget: select
+        options:
+        - label: Daily 日常
+          value: daily
+        - label: Ongoing 进行中的合集
+          value: ongoing
+        - label: Books 出版的书
+          value: books
+        - label: Visual 壁纸·头像·封面
+          value: visual
+        - label: Design 草图·构思
+          value: design
+        - label: Store 物件和链接
+          value: store
+        - label: Traces 作品足迹
+          value: traces
+        - label: Follow 所有平台
+          value: follow
+        default: daily
+      - name: title
+        label: 显示的名字（菜单、标题都用它）
+        widget: string
+      - name: short
+        label: 一句话（首页目录用）
+        widget: string
+        required: false
+      - name: intro
+        label: 页面顶部的介绍（可选）
+        widget: text
+        required: false
+      - name: in_menu
+        label: 显示在菜单里
+        widget: boolean
+        default: true
+      summary: '{{fields.title}}'
+      hint: 改名字只在这里改，菜单、首页和页面标题会一起变。
+  - name: settings
+    label: 首页 · 联系方式
+    file: alyxs-studio/data/settings.json
+    fields:
+    - name: name
+      label: 网站名
+      widget: string
+    - name: tagline
+      label: 首页一句话
       widget: string
       required: false
-      hint: 填 Google Fonts 上任意字体的名字（如 Noto Serif SC），会替换正文字体。不用就留空。
+    - name: email
+      label: 邮箱
+      widget: string
+      required: false
+    - name: announcement
+      label: 顶部通知条（不用就留空）
+      widget: object
+      required: false
+      fields:
+      - name: text
+        label: 文字
+        widget: string
+        required: false
+      - name: url
+        label: 链接
+        widget: string
+        required: false
+    - name: logo_large
+      label: 首页大 logo（留空用现在的）
+      widget: image
+      required: false
+    - name: logo
+      label: 左上角小 logo（留空用现在的）
+      widget: image
+      required: false
+    - name: home_blocks
+      label: 首页模块（从上到下的顺序）
+      label_singular: 模块
+      widget: list
+      hint: 拖动或用箭头调整顺序；点“添加”选择新模块。
+      types:
+      - name: hero
+        label: Logo + 一句话
+        widget: object
+        fields:
+        - name: show_tagline
+          label: 显示一句话
+          widget: boolean
+          default: true
+      - name: daily
+        label: 最新日常
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 6
+      - name: ongoing
+        label: 进行中的合集
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 3
+      - name: visual
+        label: Visual 图片
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 4
+      - name: design
+        label: Design 草图
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 3
+      - name: store
+        label: Store 物件
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 4
+      - name: books
+        label: Books 出版
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+        - name: count
+          label: 显示几个
+          widget: number
+          value_type: int
+          min: 1
+          max: 24
+          default: 4
+      - name: follow
+        label: 所有平台链接
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+      - name: index
+        label: 栏目目录
+        widget: object
+        fields:
+        - name: title
+          label: 小标题（留空就用栏目名）
+          widget: string
+          required: false
+      - name: text
+        label: 一段文字
+        widget: object
+        fields:
+        - name: title
+          label: 标题（可留空）
+          widget: string
+          required: false
+        - name: body
+          label: 内容
+          widget: markdown
+          required: false
+        - name: align
+          label: 对齐
+          widget: select
+          options:
+          - label: 靠左
+            value: left
+          - label: 居中
+            value: center
+          default: left
+      - name: image
+        label: 一张大图
+        widget: object
+        fields:
+        - name: image
+          label: 图片
+          widget: image
+          required: false
+        - name: caption
+          label: 说明（可留空）
+          widget: string
+          required: false
+        - name: url
+          label: 点击跳转（可留空）
+          widget: string
+          required: false
+        - name: size
+          label: 宽度
+          widget: select
+          options:
+          - label: 满宽
+            value: full
+          - label: 较宽
+            value: wide
+          - label: 窄
+            value: narrow
+          default: wide
+      - name: spacer
+        label: 空白间隔
+        widget: object
+        fields:
+        - name: size
+          label: 大小
+          widget: select
+          options:
+          - label: 小
+            value: small
+          - label: 中
+            value: medium
+          - label: 大
+            value: large
+          default: medium
+  - name: follow
+    label: Follow 所有平台
+    file: alyxs-studio/data/follow.json
+    fields:
+    - name: groups
+      label: 分组
+      label_singular: 分组
+      widget: list
+      fields:
+      - name: name
+        label: 分组名（Social、Watch、Listen、Read…）
+        widget: string
+      - name: links
+        label: 平台
+        label_singular: 平台
+        widget: list
+        fields:
+        - name: label
+          label: 平台名
+          widget: string
+        - name: url
+          label: 链接（留空就不显示）
+          widget: string
+          required: false
+        - name: handle
+          label: 账号名（可选）
+          widget: string
+          required: false
+        summary: '{{fields.label}}'
+      summary: '{{fields.name}}'
+      hint: 填了链接的平台才会显示，同时出现在每页底部。
+  - name: theme
+    label: Look 字体 · 颜色 · 排版
+    file: alyxs-studio/data/theme.json
+    fields:
+    - name: font_body
+      label: 正文字体
+      widget: select
+      options:
+      - Geist
+      - Instrument Sans
+      - DM Sans
+      - Work Sans
+      - IBM Plex Sans
+      - Manrope
+      - Karla
+      - Libre Franklin
+      - Space Grotesk
+      - Figtree
+      - Outfit
+      - Albert Sans
+      - Newsreader
+      - EB Garamond
+      - Cormorant Garamond
+      - Fraunces
+      - Libre Caslon Text
+      - Instrument Serif
+      - Spectral
+      - Gaegu
+      - Patrick Hand
+      - Caveat
+      - Geist Mono
+      - IBM Plex Mono
+      - DM Mono
+      - Space Mono
+      - JetBrains Mono
+      - Courier Prime
+      default: Geist
+    - name: font_heading
+      label: 标题字体
+      widget: select
+      options:
+      - Same as body
+      - Geist
+      - Instrument Sans
+      - DM Sans
+      - Work Sans
+      - IBM Plex Sans
+      - Manrope
+      - Karla
+      - Libre Franklin
+      - Space Grotesk
+      - Figtree
+      - Outfit
+      - Albert Sans
+      - Newsreader
+      - EB Garamond
+      - Cormorant Garamond
+      - Fraunces
+      - Libre Caslon Text
+      - Instrument Serif
+      - Spectral
+      - Gaegu
+      - Patrick Hand
+      - Caveat
+      - Geist Mono
+      - IBM Plex Mono
+      - DM Mono
+      - Space Mono
+      - JetBrains Mono
+      - Courier Prime
+      default: Same as body
+    - name: font_small
+      label: 小字字体（日期、价格、标签）
+      widget: select
+      options:
+      - Same as body
+      - Geist
+      - Instrument Sans
+      - DM Sans
+      - Work Sans
+      - IBM Plex Sans
+      - Manrope
+      - Karla
+      - Libre Franklin
+      - Space Grotesk
+      - Figtree
+      - Outfit
+      - Albert Sans
+      - Newsreader
+      - EB Garamond
+      - Cormorant Garamond
+      - Fraunces
+      - Libre Caslon Text
+      - Instrument Serif
+      - Spectral
+      - Gaegu
+      - Patrick Hand
+      - Caveat
+      - Geist Mono
+      - IBM Plex Mono
+      - DM Mono
+      - Space Mono
+      - JetBrains Mono
+      - Courier Prime
+      default: Same as body
+    - name: font_custom
+      label: 自定义 Google 字体（可选）
+      widget: string
+      required: false
+      hint: 填 Google Fonts 上的字体名，例如 Noto Serif SC。会替换正文字体，不用就留空。
     - name: color_text
-      label: 文字颜色 Text
+      label: 文字颜色
       widget: color
       allowInput: true
       default: '#111111'
     - name: color_background
-      label: 背景颜色 Background
+      label: 背景颜色
       widget: color
       allowInput: true
       default: '#ffffff'
     - name: color_muted
-      label: 灰色小字 Muted text
+      label: 灰色小字
       widget: color
       allowInput: true
       default: '#8a8984'
     - name: color_line
-      label: 分隔线 Lines
+      label: 分隔线
       widget: color
       allowInput: true
       default: '#e7e6e1'
     - name: color_tile
-      label: 空图片底色 Empty picture
+      label: 空图片和日历底色
       widget: color
       allowInput: true
       default: '#f4f3ef'
     - name: color_highlight
-      label: 选中高亮 Highlight
+      label: 高亮（今天、选中文字）
       widget: color
       allowInput: true
       default: '#f5e47c'
     - name: size_body
-      label: 正文字号 Body size (px)
+      label: 正文字号 (px)
       widget: number
       value_type: int
       min: 12
-      max: 22
+      max: 26
       default: 15
     - name: size_heading
-      label: 页面标题字号 Page title size (px)
+      label: 页面标题字号 (px)
       widget: number
       value_type: int
       min: 24
       max: 96
       default: 46
     - name: size_nav
-      label: 导航字号 Menu size (px)
+      label: 菜单字号 (px)
       widget: number
       value_type: int
       min: 11
-      max: 20
+      max: 24
       default: 13
     - name: uppercase_labels
-      label: 栏目小标签用大写 Uppercase labels
+      label: 小标签用大写字母
       widget: boolean
       default: true
     - name: logo_home_width
@@ -184,42 +985,35 @@ collections:
       max: 140
       default: 64
     - name: page_width
-      label: 页面最大宽度 Page width (px)
+      label: 页面最大宽度 (px)
       widget: number
       value_type: int
       min: 860
       max: 1800
       default: 1240
     - name: image_corners
-      label: 图片圆角 Picture corners (px)
+      label: 图片圆角 (px)
       widget: number
       value_type: int
       min: 0
       max: 32
       default: 0
-    - name: cols_shop
-      label: 每行几个：Shop
+    - name: cols_visual
+      label: 每行几个：Visual
+      widget: number
+      value_type: int
+      min: 1
+      max: 6
+      default: 4
+    - name: cols_design
+      label: 每行几个：Design
       widget: number
       value_type: int
       min: 1
       max: 6
       default: 3
-    - name: cols_objects
-      label: 每行几个：Objects
-      widget: number
-      value_type: int
-      min: 1
-      max: 6
-      default: 4
-    - name: cols_art
-      label: 每行几个：Art
-      widget: number
-      value_type: int
-      min: 1
-      max: 6
-      default: 4
-    - name: cols_wardrobe
-      label: 每行几个：Wardrobe
+    - name: cols_store
+      label: 每行几个：Store
       widget: number
       value_type: int
       min: 1
@@ -232,31 +1026,16 @@ collections:
       min: 1
       max: 6
       default: 4
-    - name: cols_picks
-      label: 每行几个：Picks
-      widget: number
-      value_type: int
-      min: 1
-      max: 6
-      default: 4
-    - name: cols_video
-      label: 每行几个：Vlog
-      widget: number
-      value_type: int
-      min: 1
-      max: 4
-      default: 3
     - name: cols_mobile
-      label: 手机上每行几个 On phones
+      label: 手机上每行几个
       widget: number
       value_type: int
       min: 1
       max: 3
       default: 2
-    - name: shape_shop
-      label: 图片比例：Shop
+    - name: shape_visual
+      label: 图片比例：Visual
       widget: select
-      default: 4 / 5
       options:
       - label: 方形 1:1
         value: 1 / 1
@@ -266,48 +1045,16 @@ collections:
         value: 3 / 4
       - label: 书封 2:3
         value: 2 / 3
+      - label: 手机壁纸 9:16
+        value: 9 / 16
       - label: 横 4:3
         value: 4 / 3
       - label: 宽 16:9
         value: 16 / 9
-    - name: shape_objects
-      label: 图片比例：Objects
-      widget: select
-      default: 4 / 5
-      options:
-      - label: 方形 1:1
-        value: 1 / 1
-      - label: 竖 4:5
-        value: 4 / 5
-      - label: 竖 3:4
-        value: 3 / 4
-      - label: 书封 2:3
-        value: 2 / 3
-      - label: 横 4:3
-        value: 4 / 3
-      - label: 宽 16:9
-        value: 16 / 9
-    - name: shape_art
-      label: 图片比例：Art
-      widget: select
-      default: 4 / 5
-      options:
-      - label: 方形 1:1
-        value: 1 / 1
-      - label: 竖 4:5
-        value: 4 / 5
-      - label: 竖 3:4
-        value: 3 / 4
-      - label: 书封 2:3
-        value: 2 / 3
-      - label: 横 4:3
-        value: 4 / 3
-      - label: 宽 16:9
-        value: 16 / 9
-    - name: shape_wardrobe
-      label: 图片比例：Wardrobe
-      widget: select
       default: 3 / 4
+    - name: shape_design
+      label: 图片比例：Design
+      widget: select
       options:
       - label: 方形 1:1
         value: 1 / 1
@@ -317,894 +1064,48 @@ collections:
         value: 3 / 4
       - label: 书封 2:3
         value: 2 / 3
+      - label: 手机壁纸 9:16
+        value: 9 / 16
       - label: 横 4:3
         value: 4 / 3
       - label: 宽 16:9
         value: 16 / 9
+      default: 4 / 5
+    - name: shape_store
+      label: 图片比例：Store
+      widget: select
+      options:
+      - label: 方形 1:1
+        value: 1 / 1
+      - label: 竖 4:5
+        value: 4 / 5
+      - label: 竖 3:4
+        value: 3 / 4
+      - label: 书封 2:3
+        value: 2 / 3
+      - label: 手机壁纸 9:16
+        value: 9 / 16
+      - label: 横 4:3
+        value: 4 / 3
+      - label: 宽 16:9
+        value: 16 / 9
+      default: 4 / 5
     - name: shape_books
       label: 图片比例：Books
       widget: select
+      options:
+      - label: 方形 1:1
+        value: 1 / 1
+      - label: 竖 4:5
+        value: 4 / 5
+      - label: 竖 3:4
+        value: 3 / 4
+      - label: 书封 2:3
+        value: 2 / 3
+      - label: 手机壁纸 9:16
+        value: 9 / 16
+      - label: 横 4:3
+        value: 4 / 3
+      - label: 宽 16:9
+        value: 16 / 9
       default: 2 / 3
-      options:
-      - label: 方形 1:1
-        value: 1 / 1
-      - label: 竖 4:5
-        value: 4 / 5
-      - label: 竖 3:4
-        value: 3 / 4
-      - label: 书封 2:3
-        value: 2 / 3
-      - label: 横 4:3
-        value: 4 / 3
-      - label: 宽 16:9
-        value: 16 / 9
-    - name: shape_picks
-      label: 图片比例：Picks
-      widget: select
-      default: 1 / 1
-      options:
-      - label: 方形 1:1
-        value: 1 / 1
-      - label: 竖 4:5
-        value: 4 / 5
-      - label: 竖 3:4
-        value: 3 / 4
-      - label: 书封 2:3
-        value: 2 / 3
-      - label: 横 4:3
-        value: 4 / 3
-      - label: 宽 16:9
-        value: 16 / 9
-  - name: settings
-    label: Studio 首页 · 菜单 · 联系方式
-    file: alyxs-studio/data/settings.json
-    fields:
-    - name: name
-      label: 网站名 Name
-      widget: string
-    - name: tagline
-      label: 首页一句话 Tagline
-      widget: string
-      required: false
-    - name: announcement
-      label: 顶部通知条（不用就留空）
-      widget: object
-      required: false
-      collapsed: false
-      fields:
-      - name: text
-        label: 文字（如 New chapter out now）
-        widget: string
-        required: false
-      - name: url
-        label: 链接（可留空）
-        widget: string
-        required: false
-    - name: email
-      label: 邮箱 Email
-      widget: string
-      required: false
-    - name: instagram_handle
-      label: Instagram 账号（不带 @）
-      widget: string
-      required: false
-    - name: instagram_url
-      label: Instagram 链接
-      widget: string
-      required: false
-    - name: social_links
-      label: 页脚链接（YouTube、Spotify、Substack…）
-      label_singular: 链接
-      widget: list
-      required: false
-      summary: '{{fields.label}}'
-      fields:
-      - name: label
-        label: 文字
-        widget: string
-      - name: url
-        label: 链接
-        widget: string
-    - name: logo_large
-      label: 首页大 logo（留空用现在的）
-      widget: image
-      required: false
-    - name: logo
-      label: 左上角小 logo（留空用现在的）
-      widget: image
-      required: false
-    - name: instagram_tiles
-      label: 首页 Instagram 方格
-      label_singular: 方格
-      widget: list
-      required: false
-      fields:
-      - name: image
-        label: 图片
-        widget: image
-        required: false
-      - name: url
-        label: 这条帖子的链接（可选）
-        widget: string
-        required: false
-    - name: home_blocks
-      label: 首页模块（拖动或用箭头调整顺序）
-      label_singular: 模块
-      widget: list
-      hint: 首页从上到下按这个顺序显示。点“添加”可以选择新模块类型。
-      types:
-      - name: hero
-        label: Logo + 一句话
-        widget: object
-        fields:
-        - name: show_tagline
-          label: 显示一句话
-          widget: boolean
-          default: true
-      - name: index
-        label: 栏目目录
-        widget: object
-        summary: 栏目目录
-        fields:
-        - name: title
-          label: 小标题（可留空）
-          widget: string
-          required: false
-          default: Index
-      - name: shop
-        label: 最新商品
-        widget: object
-        summary: 商品 · {{fields.title}}
-        fields:
-        - name: title
-          label: 小标题（可留空）
-          widget: string
-          required: false
-          default: New in the shop
-        - name: count
-          label: 显示几个
-          widget: number
-          value_type: int
-          min: 1
-          max: 12
-          default: 4
-      - name: section
-        label: 图片栏目（艺术、穿搭、物件、书、视频…）
-        widget: object
-        summary: '{{fields.section}} · {{fields.title}}'
-        fields:
-        - name: section
-          label: 哪个栏目
-          widget: select
-          options:
-          - label: Books 出版物
-            value: books
-          - label: Objects 设计商品
-            value: objects
-          - label: Art 艺术
-            value: art
-          - label: Wardrobe 穿搭
-            value: wardrobe
-          - label: Vlog 视频
-            value: video
-          - label: Shop 商店
-            value: shop
-          - label: Picks 亚马逊推荐
-            value: picks
-          default: art
-        - name: title
-          label: 小标题（可留空）
-          widget: string
-          required: false
-          default: ''
-        - name: count
-          label: 显示几个
-          widget: number
-          value_type: int
-          min: 1
-          max: 12
-          default: 4
-      - name: latest
-        label: 最新列表（文章、研究、连载、播客）
-        widget: object
-        summary: '{{fields.section}} · {{fields.title}}'
-        fields:
-        - name: section
-          label: 哪个栏目
-          widget: select
-          options:
-          - label: Writing 文章
-            value: writing
-          - label: Research 研究
-            value: research
-          - label: Serial 连载
-            value: serial
-          - label: Podcast 播客
-            value: podcast
-          default: writing
-        - name: title
-          label: 小标题（可留空）
-          widget: string
-          required: false
-          default: ''
-        - name: count
-          label: 显示几个
-          widget: number
-          value_type: int
-          min: 1
-          max: 12
-          default: 3
-      - name: instagram
-        label: Instagram 方格
-        widget: object
-        summary: Instagram
-        fields:
-        - name: title
-          label: 小标题（可留空）
-          widget: string
-          required: false
-          default: Instagram
-      - name: text
-        label: 一段文字
-        widget: object
-        summary: 文字 · {{fields.title}}
-        fields:
-        - name: title
-          label: 标题（可留空）
-          widget: string
-          required: false
-        - name: body
-          label: 内容
-          widget: markdown
-          required: false
-        - name: align
-          label: 对齐
-          widget: select
-          default: left
-          options:
-          - label: 靠左
-            value: left
-          - label: 居中
-            value: center
-      - name: image
-        label: 一张大图
-        widget: object
-        summary: 图片 · {{fields.caption}}
-        fields:
-        - name: image
-          label: 图片
-          widget: image
-          required: false
-        - name: caption
-          label: 图片说明（可留空）
-          widget: string
-          required: false
-        - name: url
-          label: 点击后跳转的链接（可留空）
-          widget: string
-          required: false
-        - name: size
-          label: 宽度
-          widget: select
-          default: wide
-          options:
-          - label: 满宽
-            value: full
-          - label: 较宽
-            value: wide
-          - label: 窄
-            value: narrow
-      - name: spacer
-        label: 空白间隔
-        widget: object
-        summary: 空白
-        fields:
-        - name: size
-          label: 大小
-          widget: select
-          default: medium
-          options:
-          - label: 小
-            value: small
-          - label: 中
-            value: medium
-          - label: 大
-            value: large
-    - name: menu
-      label: 导航菜单（分组和顺序）
-      label_singular: 分组
-      widget: list
-      required: false
-      hint: 每个分组是导航里的一列。栏目可以在分组之间移动；不放进任何分组的栏目就不会出现在导航里。
-      summary: '{{fields.label}}'
-      fields:
-      - name: label
-        label: 分组名（如 Read）
-        widget: string
-        required: false
-      - name: items
-        label: 这一组里的栏目
-        label_singular: 栏目
-        widget: list
-        field:
-          name: section
-          label: 栏目
-          widget: select
-          options:
-          - label: Writing 文章
-            value: writing
-          - label: Research 研究
-            value: research
-          - label: Books 出版物
-            value: books
-          - label: Serial 连载
-            value: serial
-          - label: CV 简历
-            value: cv
-          - label: Objects 设计商品
-            value: objects
-          - label: Art 艺术
-            value: art
-          - label: Wardrobe 穿搭
-            value: wardrobe
-          - label: Vlog 视频
-            value: video
-          - label: Podcast 播客
-            value: podcast
-          - label: Shop 商店
-            value: shop
-          - label: Picks 亚马逊推荐
-            value: picks
-          - label: Instagram（外链）
-            value: instagram
-- name: sections
-  label: Sections 栏目内容
-  icon: dashboard
-  format: json
-  files:
-  - name: writing
-    label: Writing 文章
-    file: alyxs-studio/data/writing.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: items
-      label: 文章
-      label_singular: 文章
-      widget: list
-      summary: '{{fields.date}} · {{fields.title}}'
-      fields:
-      - name: date
-        label: 日期
-        widget: string
-        required: false
-        hint: 例如 2026-10
-      - name: title
-        label: 标题
-        widget: string
-      - name: note
-        label: 一句简介
-        widget: string
-        required: false
-      - name: image
-        label: 配图（可选）
-        widget: image
-        required: false
-      - name: body
-        label: 正文（写在这里就在网站上直接阅读）
-        widget: markdown
-        required: false
-      - name: url
-        label: 外部链接（没有正文时，点标题跳到这里）
-        widget: string
-        required: false
-  - name: research
-    label: Research 学术研究
-    file: alyxs-studio/data/research.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: items
-      label: 研究
-      label_singular: 条目
-      widget: list
-      summary: '{{fields.date}} · {{fields.title}}'
-      fields:
-      - name: date
-        label: 日期
-        widget: string
-        required: false
-        hint: 例如 2026-10
-      - name: title
-        label: 标题
-        widget: string
-      - name: note
-        label: 期刊 / 说明
-        widget: string
-        required: false
-      - name: url
-        label: 链接
-        widget: string
-        required: false
-      - name: pdf
-        label: PDF（可选）
-        widget: file
-        required: false
-  - name: cv
-    label: CV 简历
-    file: alyxs-studio/data/cv.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: pdf
-      label: 简历 PDF（可选）
-      widget: file
-      required: false
-    - name: sections
-      label: 分组
-      label_singular: 分组
-      widget: list
-      summary: '{{fields.heading}}'
-      fields:
-      - name: heading
-        label: 分组名（如 Education）
-        widget: string
-      - name: rows
-        label: 条目
-        label_singular: 条目
-        widget: list
-        summary: '{{fields.date}} · {{fields.title}}'
-        fields:
-        - name: date
-          label: 日期
-          widget: string
-          required: false
-          hint: 例如 2026-10
-        - name: title
-          label: 内容
-          widget: string
-        - name: note
-          label: 补充（学校、会议等）
-          widget: string
-          required: false
-        - name: url
-          label: 链接
-          widget: string
-          required: false
-  - name: books
-    label: Books 出版物（Kindle / Apple Books）
-    file: alyxs-studio/data/books.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: items
-      label: 书
-      label_singular: 书
-      widget: list
-      summary: '{{fields.title}}'
-      fields:
-      - name: title
-        label: 书名
-        widget: string
-      - name: note
-        label: 一句说明（类型、年份）
-        widget: string
-        required: false
-      - name: image
-        label: 封面
-        widget: image
-        required: false
-      - name: links
-        label: 购买 / 阅读链接
-        label_singular: 链接
-        widget: list
-        required: false
-        summary: '{{fields.label}}'
-        fields:
-        - name: label
-          label: 按钮文字（如 Kindle、Apple Books、Amazon）
-          widget: string
-        - name: url
-          label: 链接
-          widget: string
-          required: false
-  - name: serial
-    label: Serial 连载小说
-    file: alyxs-studio/data/serial.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: novel
-      label: 小说名
-      widget: string
-    - name: intro
-      label: 故事简介
-      widget: text
-      required: false
-    - name: cover
-      label: 封面（可选）
-      widget: image
-      required: false
-    - name: read_on_label
-      label: 外部平台按钮文字（可选）
-      widget: string
-      required: false
-    - name: read_on_url
-      label: 外部平台链接（可选）
-      widget: string
-      required: false
-    - name: chapters
-      label: 章节
-      label_singular: 章节
-      widget: list
-      summary: Chapter {{fields.number}} · {{fields.title}}
-      fields:
-      - name: number
-        label: 第几章
-        widget: number
-        value_type: int
-        min: 0
-      - name: title
-        label: 章节名
-        widget: string
-      - name: date
-        label: 日期
-        widget: string
-        required: false
-        hint: 例如 2026-10
-      - name: body
-        label: 正文（写在这里就在网站上直接阅读）
-        widget: markdown
-        required: false
-      - name: url
-        label: 外部链接（没有正文时用）
-        widget: string
-        required: false
-  - name: podcast
-    label: Podcast 播客
-    file: alyxs-studio/data/podcast.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: show
-      label: 节目名
-      widget: string
-    - name: intro
-      label: 节目简介
-      widget: text
-      required: false
-    - name: cover
-      label: 节目封面（可选）
-      widget: image
-      required: false
-    - name: listen
-      label: 收听平台（Spotify、Apple Podcasts…）
-      label_singular: 链接
-      widget: list
-      required: false
-      summary: '{{fields.label}}'
-      fields:
-      - name: label
-        label: 按钮文字（如 Kindle、Apple Books、Amazon）
-        widget: string
-      - name: url
-        label: 链接
-        widget: string
-        required: false
-    - name: episodes
-      label: 单集
-      label_singular: 单集
-      widget: list
-      summary: No. {{fields.number}} · {{fields.title}}
-      fields:
-      - name: number
-        label: 第几期
-        widget: number
-        value_type: int
-        min: 0
-      - name: title
-        label: 标题
-        widget: string
-      - name: date
-        label: 日期
-        widget: string
-        required: false
-        hint: 例如 2026-10
-      - name: length
-        label: 时长（如 24 min）
-        widget: string
-        required: false
-      - name: note
-        label: 一句简介
-        widget: string
-        required: false
-      - name: audio
-        label: 音频 mp3（网站上直接播放，建议 30MB 以内）
-        widget: file
-        required: false
-      - name: url
-        label: 外部收听链接（可选）
-        widget: string
-        required: false
-  - name: video
-    label: Vlog 视频
-    file: alyxs-studio/data/video.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: channel_label
-      label: 频道按钮文字（如 YouTube）
-      widget: string
-      required: false
-    - name: channel_url
-      label: 频道链接
-      widget: string
-      required: false
-    - name: items
-      label: 视频
-      label_singular: 视频
-      widget: list
-      summary: '{{fields.title}}'
-      fields:
-      - name: title
-        label: 标题
-        widget: string
-      - name: note
-        label: 一句说明（时长等）
-        widget: string
-        required: false
-      - name: url
-        label: YouTube 链接
-        widget: string
-        required: false
-        hint: 填了 YouTube 链接，封面会自动显示
-      - name: image
-        label: 自定义封面（可选）
-        widget: image
-        required: false
-  - name: objects
-    label: Objects 设计商品
-    file: alyxs-studio/data/objects.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: items
-      label: 作品
-      label_singular: 作品
-      widget: list
-      summary: '{{fields.title}}'
-      fields:
-      - name: title
-        label: 名字
-        widget: string
-      - name: note
-        label: 一句说明
-        widget: string
-        required: false
-      - name: image
-        label: 图片
-        widget: image
-        required: false
-      - name: in_shop
-        label: 显示“In the shop”链接
-        widget: boolean
-        default: false
-  - name: art
-    label: Art 艺术作品
-    file: alyxs-studio/data/art.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: items
-      label: 作品
-      label_singular: 作品
-      widget: list
-      summary: '{{fields.title}}'
-      fields:
-      - name: title
-        label: 名字
-        widget: string
-      - name: note
-        label: 一句说明（材料、年份）
-        widget: string
-        required: false
-      - name: image
-        label: 图片
-        widget: image
-        required: false
-  - name: wardrobe
-    label: Wardrobe 个人穿搭
-    file: alyxs-studio/data/wardrobe.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: items
-      label: 穿搭
-      label_singular: 穿搭
-      widget: list
-      summary: '{{fields.title}}'
-      fields:
-      - name: title
-        label: 名字
-        widget: string
-      - name: note
-        label: 一句说明（材料、年份）
-        widget: string
-        required: false
-      - name: image
-        label: 图片
-        widget: image
-        required: false
-  - name: picks
-    label: Picks 亚马逊推荐
-    file: alyxs-studio/data/picks.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: disclosure
-      label: 联盟声明（没加入 Amazon Associates 就清空）
-      widget: string
-      required: false
-    - name: items
-      label: 推荐
-      label_singular: 推荐
-      widget: list
-      summary: '{{fields.title}}'
-      fields:
-      - name: title
-        label: 名字
-        widget: string
-      - name: note
-        label: 分类 / 一句话
-        widget: string
-        required: false
-      - name: image
-        label: 图片
-        widget: image
-        required: false
-      - name: url
-        label: 亚马逊链接
-        widget: string
-        required: false
-  - name: shop
-    label: Shop 商店
-    file: alyxs-studio/data/shop.json
-    fields:
-    - name: title
-      label: 栏目名称（导航和页面标题都用这个）
-      widget: string
-    - name: short
-      label: 首页目录里的一句话
-      widget: string
-      required: false
-    - name: intro
-      label: 栏目简介
-      widget: text
-      required: false
-    - name: items
-      label: 商品
-      label_singular: 商品
-      widget: list
-      summary: '{{fields.title}} · {{fields.price}}'
-      fields:
-      - name: title
-        label: 商品名
-        widget: string
-      - name: price
-        label: 价格（如 $38）
-        widget: string
-        required: false
-      - name: status
-        label: 状态
-        widget: select
-        default: available
-        options:
-        - label: 可购买 Available
-          value: available
-        - label: 即将上架 Coming soon
-          value: soon
-        - label: 售罄 Sold out
-          value: sold out
-      - name: note
-        label: 一句说明（可选）
-        widget: string
-        required: false
-      - name: image
-        label: 图片
-        widget: image
-        required: false
-      - name: url
-        label: 付款链接（Stripe / Gumroad / Shopify）
-        widget: string
-        required: false

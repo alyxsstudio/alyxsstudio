@@ -1,10 +1,8 @@
 {
-  "title": "Books",
-  "short": "",
-  "intro": "Read online on Kindle or Apple Books.",
   "items": [
     {
       "title": "Small Things, White Rooms",
+      "category": "Writing",
       "note": "Essays, 2026",
       "image": "",
       "links": [
@@ -24,6 +22,7 @@
     },
     {
       "title": "Letters from the Tropics",
+      "category": "Writing",
       "note": "Short nonfiction, 2025",
       "image": "",
       "links": [

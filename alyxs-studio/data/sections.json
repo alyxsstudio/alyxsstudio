@@ -1,0 +1,60 @@
+{
+  "sections": [
+    {
+      "key": "daily",
+      "title": "Daily",
+      "short": "Notes, photos and voice, day by day.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "ongoing",
+      "title": "Ongoing",
+      "short": "Things that grow a little every day.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "books",
+      "title": "Books",
+      "short": "Published on Amazon and Apple Books.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "visual",
+      "title": "Visual",
+      "short": "Wallpapers, avatars and covers.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "design",
+      "title": "Design",
+      "short": "Sketches and ideas for things I make.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "store",
+      "title": "Store",
+      "short": "Clothes, hats, bags and charms.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "traces",
+      "title": "Traces",
+      "short": "Where the work has been.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "follow",
+      "title": "Follow",
+      "short": "Everywhere else I post.",
+      "intro": "",
+      "in_menu": true
+    }
+  ]
+}

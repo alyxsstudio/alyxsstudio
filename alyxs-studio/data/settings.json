@@ -1,47 +1,41 @@
 {
   "name": "Alyx's Studio",
   "tagline": "",
-  "announcement": null,
   "email": "📮：contact@alyxsstudio.com",
-  "instagram_handle": "alyxsstudio",
-  "instagram_url": "https://www.instagram.com/alyxsstudio/",
-  "social_links": [],
   "logo_large": "",
   "logo": "",
-  "instagram_tiles": [
-    {
-      "image": "",
-      "url": ""
-    },
-    {
-      "image": "",
-      "url": ""
-    },
-    {
-      "image": "",
-      "url": ""
-    },
-    {
-      "image": "",
-      "url": ""
-    },
-    {
-      "image": "",
-      "url": ""
-    },
-    {
-      "image": "",
-      "url": ""
-    }
-  ],
+  "announcement": {
+    "text": "",
+    "url": ""
+  },
   "home_blocks": [
     {
-      "type": "image",
-      "image": "",
-      "caption": "",
-      "url": "",
-      "size": "wide"
+      "type": "hero",
+      "show_tagline": true
+    },
+    {
+      "type": "daily",
+      "title": "",
+      "count": 6
+    },
+    {
+      "type": "ongoing",
+      "title": "",
+      "count": 3
+    },
+    {
+      "type": "visual",
+      "title": "",
+      "count": 4
+    },
+    {
+      "type": "store",
+      "title": "",
+      "count": 4
+    },
+    {
+      "type": "follow",
+      "title": ""
     }
-  ],
-  "menu": []
+  ]
 }
