@@ -16,6 +16,8 @@ const ENDPOINT = process.env.TRANSLATE_ENDPOINT || "https://models.github.ai/inf
 const MODELS = ["openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4o-mini"];
 const MAX_REQUESTS = Number(process.env.MAX_TRANSLATE_REQUESTS || 40); // stay well inside the free daily limit
 const CHUNK_CHARS = 2400;
+const STATUS = path.join(SITE, "data", "translate-status.json");   // published, so problems are easy to see
+const status = { checked: new Date().toISOString(), paragraphs: 0, waiting: 0, translated: 0, requests: 0, problems: [] };
 
 const SYSTEM = [
   "You translate a writer's Chinese into natural, literary English for her personal website.",
@@ -70,10 +72,12 @@ async function ask(batch) {
           if (Array.isArray(arr) && arr.length === batch.length) return arr.map(String);
         } catch {}
         console.warn(`  ${model}: answer was not a matching JSON array, retrying`);
+        status.problems.push(model + ": answer was not a matching list");
         continue;
       }
       const body = await res.text();
       console.warn(`  ${model}: HTTP ${res.status} ${body.slice(0, 160)}`);
+      status.problems.push(model + ": HTTP " + res.status + " " + body.slice(0, 200));
       if (res.status === 429) { await sleep(8000); break; } // rate limited: try the next model
       if (res.status === 401 || res.status === 403) return null;
       await sleep(3000);
@@ -107,11 +111,16 @@ async function main() {
       const out = await ask(batch.map((b) => b[1]));
       if (!out) { console.warn("Translation unavailable right now; showing the Chinese until next time."); break; }
       batch.forEach(([h, zh], i) => { cache[h] = { zh, en: out[i] }; });
+      status.translated += batch.length;
       await writeCache(CACHE, cache);
       await sleep(process.env.TRANSLATE_ENDPOINT ? 0 : 4500); // free tier: keep under 15 requests a minute
     }
   }
   await writeCache(CACHE, cache);
+  status.paragraphs = needed.size; status.requests = requests;
+  status.waiting = [...needed.keys()].filter((h) => !cache[h]).length;
+  if (!TOKEN && todo.length) status.problems.push("No GITHUB_TOKEN");
+  await fs.writeFile(STATUS, JSON.stringify(status, null, 1) + "\n");
   console.log(`Done. ${requests} request(s).`);
 }
 
