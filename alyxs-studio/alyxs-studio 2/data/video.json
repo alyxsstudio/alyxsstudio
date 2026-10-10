@@ -1,0 +1,27 @@
+{
+  "title": "Vlog",
+  "short": "",
+  "intro": "Days at the desk, the archive and the studio.",
+  "channel_label": "YouTube",
+  "channel_url": "",
+  "items": [
+    {
+      "title": "A Week of Archive Days",
+      "note": "12 min",
+      "url": "",
+      "image": ""
+    },
+    {
+      "title": "Packing the White Bag",
+      "note": "6 min",
+      "url": "",
+      "image": ""
+    },
+    {
+      "title": "Studio Tour",
+      "note": "9 min",
+      "url": "",
+      "image": ""
+    }
+  ]
+}
