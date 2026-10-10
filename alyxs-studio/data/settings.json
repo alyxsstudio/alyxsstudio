@@ -43,34 +43,5 @@
       "size": "wide"
     }
   ],
-  "menu": [
-    {
-      "label": "Shop",
-      "items": [
-        "books",
-        "objects"
-      ]
-    },
-    {
-      "label": "Watch & Listen",
-      "items": [
-        "video",
-        "podcast"
-      ]
-    },
-    {
-      "label": "Look",
-      "items": [
-        "art",
-        "picks"
-      ]
-    },
-    {
-      "label": "News",
-      "items": [
-        "writing",
-        "research"
-      ]
-    }
-  ]
+  "menu": []
 }
