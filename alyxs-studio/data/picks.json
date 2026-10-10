@@ -1,0 +1,32 @@
+{
+  "title": "Picks",
+  "short": "",
+  "intro": "Things I use, on Amazon.",
+  "disclosure": "As an Amazon Associate I earn from qualifying purchases.",
+  "items": [
+    {
+      "title": "0.38 mm gel pens",
+      "note": "Desk",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "A5 dot-grid notebook",
+      "note": "Desk",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Wooden book stand",
+      "note": "Reading",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Clip-on reading light",
+      "note": "Reading",
+      "image": "",
+      "url": ""
+    }
+  ]
+}

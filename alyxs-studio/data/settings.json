@@ -1,0 +1,34 @@
+{
+  "name": "Alyx's Studio",
+  "tagline": "Writing, research, objects and images by Alyx.",
+  "email": "hello@yourdomain.com",
+  "instagram_handle": "alyxsstudio",
+  "instagram_url": "https://www.instagram.com/alyxsstudio/",
+  "home_shop_count": 4,
+  "instagram_tiles": [
+    {
+      "image": "",
+      "url": ""
+    },
+    {
+      "image": "",
+      "url": ""
+    },
+    {
+      "image": "",
+      "url": ""
+    },
+    {
+      "image": "",
+      "url": ""
+    },
+    {
+      "image": "",
+      "url": ""
+    },
+    {
+      "image": "",
+      "url": ""
+    }
+  ]
+}

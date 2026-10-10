@@ -1,0 +1,55 @@
+{
+  "title": "Shop",
+  "short": "",
+  "intro": "Made in small runs.",
+  "items": [
+    {
+      "title": "Thank You Bag",
+      "price": "$68",
+      "status": "soon",
+      "note": "",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Smiley Tee",
+      "price": "$38",
+      "status": "available",
+      "note": "",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Studio Notebook",
+      "price": "$18",
+      "status": "available",
+      "note": "",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Untitled (Yellow), print",
+      "price": "$40",
+      "status": "available",
+      "note": "",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Smiley Pin",
+      "price": "$12",
+      "status": "sold out",
+      "note": "",
+      "image": "",
+      "url": ""
+    },
+    {
+      "title": "Small Things, White Rooms, signed",
+      "price": "$24",
+      "status": "soon",
+      "note": "",
+      "image": "",
+      "url": ""
+    }
+  ]
+}

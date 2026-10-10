@@ -1,0 +1,31 @@
+{
+  "title": "Objects",
+  "short": "",
+  "intro": "Things designed in the studio.",
+  "items": [
+    {
+      "title": "Thank You Bag",
+      "note": "Translucent ripstop crossbody, hand-drawn smiley",
+      "image": "",
+      "in_shop": true
+    },
+    {
+      "title": "Smiley Tee",
+      "note": "Heavy cotton, white",
+      "image": "",
+      "in_shop": true
+    },
+    {
+      "title": "Studio Notebook",
+      "note": "A5, dot grid",
+      "image": "",
+      "in_shop": true
+    },
+    {
+      "title": "Smiley Pin",
+      "note": "Enamel, 20 mm",
+      "image": "",
+      "in_shop": false
+    }
+  ]
+}

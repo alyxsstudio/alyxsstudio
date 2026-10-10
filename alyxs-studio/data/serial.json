@@ -1,0 +1,32 @@
+{
+  "title": "Serial",
+  "short": "A biotech thriller, one chapter at a time.",
+  "intro": "A biologist is found dead. She leaves three unfinished studies: parthenogenesis, lab-grown gametes, an artificial womb. Everyone wants her data.",
+  "novel": "Working Title",
+  "cover": "",
+  "read_on_label": "Read on [platform]",
+  "read_on_url": "",
+  "chapters": [
+    {
+      "number": 1,
+      "title": "The Lab at Night",
+      "date": "2026-10",
+      "url": "",
+      "body": "The lights in the lab were still on at two in the morning.\n\nNobody noticed until the cleaner came in and found the door unlocked.\n\n*Sample text. Replace it with your chapter.*"
+    },
+    {
+      "number": 2,
+      "title": "Three Folders",
+      "date": "2026-10",
+      "url": "",
+      "body": "Three folders sat on the desk, each labelled in the same careful hand.\n\n*Sample text. Replace it with your chapter.*"
+    },
+    {
+      "number": 3,
+      "title": "Coming soon",
+      "date": "",
+      "url": "",
+      "body": ""
+    }
+  ]
+}
