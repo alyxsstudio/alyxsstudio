@@ -3,21 +3,21 @@
     {
       "key": "daily",
       "title": "Feed",
-      "short": "Notes, photos and voice, day by day.",
+      "short": "day by day",
       "intro": "",
       "in_menu": true
     },
     {
       "key": "ongoing",
       "title": "Draft",
-      "short": "Things that grow a little every day.",
+      "short": "",
       "intro": "",
       "in_menu": true
     },
     {
       "key": "watch",
       "title": "Video",
-      "short": "Videos from everywhere I post.",
+      "short": "",
       "intro": "",
       "in_menu": true
     },
@@ -38,7 +38,7 @@
     {
       "key": "visual",
       "title": "Gallery",
-      "short": "Wallpapers, avatars and covers.",
+      "short": "",
       "intro": "",
       "in_menu": true
     },
@@ -59,7 +59,7 @@
     {
       "key": "traces",
       "title": "Press",
-      "short": "Where the work has been.",
+      "short": "",
       "intro": "",
       "in_menu": true
     },
