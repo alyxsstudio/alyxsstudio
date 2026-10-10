@@ -92,7 +92,24 @@ async function resolve(url) {
   const r = await get(url);
   return r.url || url;
 }
+// Apple Music / Podcasts: the public iTunes lookup gives the name and artwork
+async function apple(u) {
+  const id = u.searchParams.get("i") && !/podcast/.test(u.pathname) ? u.searchParams.get("i") : (u.pathname.match(/\/(?:id)?(\d{6,})(?:\/|$)/) || [])[1];
+  if (!id) throw new Error("no id");
+  const country = (u.pathname.match(/^\/([a-z]{2})\//) || [])[1] || "us";
+  const j = await json(`https://itunes.apple.com/lookup?id=${id}&country=${country}`);
+  const r = (j.results || [])[0];
+  if (!r) throw new Error("not found in iTunes");
+  return { title: r.trackName || r.collectionName, author: r.artistName, cover: (r.artworkUrl600 || r.artworkUrl100 || "").replace(/\/\d+x\d+bb\./, "/600x600bb.") };
+}
 async function lookup(original) {
+  try { return await lookupOnce(original); } catch (e) {
+    // the platform's own service said no: try reading the page itself
+    try { const url = await resolve(original).catch(() => original); const m = await fromPage(url); if (m.title || m.cover) return m; } catch {}
+    throw e;
+  }
+}
+async function lookupOnce(original) {
   const url = await resolve(original);
   const u = new URL(url), h = u.hostname.replace(/^(www|m)\./, "");
   const enc = encodeURIComponent(url);
@@ -117,6 +134,8 @@ async function lookup(original) {
     const j = await json("https://api.bilibili.com/x/web-interface/view?bvid=" + bv, { headers: { Referer: "https://www.bilibili.com/" } });
     if (j.code !== 0) throw new Error("Bilibili " + j.code + " " + (j.message || ""));
     m = { title: j.data.title, author: j.data.owner && j.data.owner.name, cover: j.data.pic };
+  } else if (/apple\.com$/.test(h)) {
+    m = await apple(u).catch(() => fromPage(url));
   } else {
     m = await fromPage(url);
   }
