@@ -121,6 +121,12 @@ async function main() {
   status.waiting = [...needed.keys()].filter((h) => !cache[h]).length;
   if (!TOKEN && todo.length) status.problems.push("No GITHUB_TOKEN");
   await fs.writeFile(STATUS, JSON.stringify(status, null, 1) + "\n");
+  if (process.env.GITHUB_ACTIONS) {
+    // shows up as a note on the run, readable from the GitHub API
+    const clean = (s) => String(s).replace(/[\r\n%]/g, " ").slice(0, 900);
+    console.log(`::notice title=Translation::${status.paragraphs} Chinese paragraphs, ${status.translated} translated now, ${status.waiting} waiting, ${requests} request(s)`);
+    for (const p of status.problems.slice(0, 5)) console.log(`::warning title=Translation problem::${clean(p)}`);
+  }
   console.log(`Done. ${requests} request(s).`);
 }
 
