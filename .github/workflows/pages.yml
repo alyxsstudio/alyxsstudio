@@ -1,5 +1,5 @@
 # Publishes alyxsstudio.com with GitHub Pages.
-# Runs every time something is saved in the editor (each save is a commit to main).
+# Runs every time something is saved (in /admin or on the site itself — each save is a commit to main).
 name: Publish site
 
 on:
@@ -8,9 +8,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # to keep data/translations.json up to date
   pages: write
   id-token: write
+  models: read      # free GitHub Models, used to make English versions of Chinese text
 
 # If you save several times in a row, only the newest version is published.
 concurrency:
@@ -25,12 +26,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: English versions of Chinese text
+        run: node alyxs-studio/scripts/translate.mjs alyxs-studio
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
       - name: Build
         run: node alyxs-studio/scripts/build.mjs alyxs-studio _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      - name: Keep the translations
+        continue-on-error: true
+        run: |
+          if [ -n "$(git status --porcelain -- alyxs-studio/data/translations.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add alyxs-studio/data/translations.json
+            git commit -m "Update English translations [skip ci]"
+            git pull --rebase origin main && git push origin HEAD:main
+          fi
 
   deploy:
     needs: build

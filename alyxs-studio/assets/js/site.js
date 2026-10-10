@@ -29,6 +29,20 @@
   } catch (e) {}
   if (PREVIEW) OWNER = true;
 
+  /* ---------- language: Chinese is written, English is shown (the build makes the English) ---------- */
+  var LANG = "en";
+  try { LANG = localStorage.getItem("alyx-lang") === "zh" ? "zh" : "en"; } catch (e) {}
+  function localize(o) {
+    if (LANG !== "zh" || !o || typeof o !== "object") return o;
+    if (Array.isArray(o)) { o.forEach(localize); return o; }
+    Object.keys(o).forEach(function (k) {
+      if (k === "text_zh") o.__en = o.text;
+      if (/_zh$/.test(k)) o[k.slice(0, -3)] = o[k];
+      else localize(o[k]);
+    });
+    return o;
+  }
+
   /* ---------- helpers ---------- */
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -169,6 +183,9 @@
           "<p>© " + new Date().getFullYear() + " " + esc(s.name) + "</p>" +
           (s.email ? '<p class="mail">' + esc(s.email) + "</p>" : "") +
         "</div>" + owner +
+        (OWNER || s.language_switch ? '<p class="lang-switch">' +
+          '<button type="button" class="linkish' + (LANG === "en" ? " on" : "") + '" data-act="lang" data-val="en">English</button>' +
+          '<button type="button" class="linkish' + (LANG === "zh" ? " on" : "") + '" data-act="lang" data-val="zh">中文</button></p>' : "") +
       "</footer>"
     );
   }
@@ -212,6 +229,23 @@
     if (!links.length) return "";
     return '<p class="links">' + links.map(function (l) { return a(l.url, esc(l.label) + arrow(l.url), "pill"); }).join("") + "</p>";
   }
+  function ownerEdit(kind) {
+    if (!OWNER || PREVIEW) return null;
+    return function (it) { return it.id ? '<p class="tile-more"><button type="button" class="mini-btn" data-act="edit" data-kind="' + kind + '" data-id="' + esc(it.id) + '">Edit</button></p>' : ""; };
+  }
+  /* the round + button: what it makes depends on the page */
+  function fab() {
+    if (!OWNER || PREVIEW) return "";
+    var spec = null;
+    if (PAGE === "home" || PAGE === "daily") spec = 'data-kind="daily"';
+    if (PAGE === "design") spec = 'data-kind="design"';
+    if (PAGE === "visual") spec = 'data-kind="visual"';
+    if (PAGE === "ongoing") {
+      var pid = hash().split("/")[0];
+      spec = pid && D.project && D.project.project.id === pid ? 'data-kind="entry" data-project="' + esc(pid) + '"' : 'data-kind="project"';
+    }
+    return spec ? '<button type="button" class="fab" data-act="new" ' + spec + ' aria-label="New">+</button>' : "";
+  }
   function emptyNote(text) { return '<p class="empty">' + esc(text || "More soon.") + "</p>"; }
 
   /* ---------- download buttons (formats depend on the collection) ---------- */
@@ -248,7 +282,9 @@
     var audio = p.audio ? '<audio class="player" controls preload="none" src="' + esc(asset(p.audio)) + '"></audio>' : "";
     var tags = list(p.tags).length ? '<p class="post-tags">' + list(p.tags).map(function (t) { return "#" + esc(t); }).join(" ") + "</p>" : "";
     var meta = '<p class="post-meta"><a href="' + esc(href("daily", "p-" + p.id)) + '">' +
-      (opts.showDay ? esc(fmtDay(p.day)) + " · " : "") + esc(timeOf(p.date)) + "</a></p>";
+      (opts.showDay ? esc(fmtDay(p.day)) + " · " : "") + esc(timeOf(p.date)) + "</a>" +
+      (p.text_zh && p.text_zh !== p.text ? ' <button type="button" class="mini-btn" data-act="orig" data-id="' + esc(p.id) + '">' + (LANG === "zh" ? "English" : "原文") + "</button>" : "") +
+      (OWNER && !PREVIEW ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '">Edit</button>' : "") + "</p>";
     return '<article class="post" id="p-' + esc(p.id) + '">' + meta +
       (p.text ? '<div class="prose post-text">' + md(p.text) + "</div>" : "") +
       gallery + audio + link + tags + shareRow(p) + "</article>";
@@ -531,7 +567,8 @@
         return '<section class="series" id="s-' + esc(s.id) + '">' +
           '<div class="series-head"><h2 class="series-title">' + esc(s.title) + "</h2>" +
           '<p class="series-meta">' + esc([s.kind, imgs.length + (imgs.length === 1 ? " image" : " images")].filter(Boolean).join(" · ")) + "</p>" +
-          (s.note ? '<p class="intro">' + esc(s.note) + "</p>" : "") + dl + "</div>" +
+          (s.note ? '<p class="intro">' + esc(s.note) + "</p>" : "") + dl +
+          (OWNER && !PREVIEW ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="visual" data-id="' + esc(s.id) + '">+ Add images</button></p>' : "") + "</div>" +
           (imgs.length ? tiles(imgs.map(function (im, i) {
             return { title: im.title, image: im.image, act: 'data-act="lightbox" data-src="visual:' + esc(s.id) + '" data-i="' + i + '"' };
           }), shape("visual", "3 / 4"), cols("visual", 4)) : emptyNote()) + "</section>";
@@ -544,9 +581,9 @@
       var dl = OWNER && its.length ? downloadBar("design", ["zip", "pdf"], "Download all") : "";
       return pageHead("design") + dl + (its.length ? tiles(its.map(function (x) {
         var n = list(x.images).length;
-        return { title: x.title, note: [fmtDay(x.date), n > 1 ? n + " images" : ""].filter(Boolean).join(" · "), image: list(x.images)[0],
+        return { id: x.id, title: x.title, note: [fmtDay(x.date), n > 1 ? n + " images" : ""].filter(Boolean).join(" · "), image: list(x.images)[0],
                  act: 'data-act="lightbox" data-src="design:' + esc(x.id) + '" data-i="0"' };
-      }), shape("design", "4 / 5"), cols("design", 3)) : emptyNote());
+      }), shape("design", "4 / 5"), cols("design", 3), ownerEdit("design")) : emptyNote());
     },
 
     store: function () {
@@ -599,12 +636,42 @@
   var SORT_LABEL = { "date-asc": "Oldest first", "date-desc": "Newest first", title: "A–Z", number: "By number" };
   function loadProject(id) {
     return getJSON("data/gen/ongoing-" + id + ".json").then(function (j) {
-      D.project = j || { project: { id: id }, entries: [] };
+      D.project = localize(j || { project: { id: id }, entries: [] });
       mergeDraftsInto("project");
     });
   }
   function entryLabel(e, i) {
     return e.number !== "" && e.number != null ? "No. " + e.number : "No. " + (i + 1);
+  }
+  /* English / 中文 / side by side, for text written in Chinese */
+  function readerTools(e) {
+    var tools = "";
+    if (e.text_zh && e.text_zh !== e.text) {
+      var m = STATE.readMode || "main";
+      tools += '<div class="read-modes" role="tablist">' +
+        [["main", LANG === "zh" ? "中文" : "English"], ["other", LANG === "zh" ? "English" : "中文"], ["both", "对照 · Side by side"]].map(function (x) {
+          return '<button type="button" role="tab" aria-selected="' + (m === x[0]) + '" class="chip' + (m === x[0] ? " on" : "") + '" data-act="readmode" data-val="' + x[0] + '">' + x[1] + "</button>";
+        }).join("") + "</div>";
+    }
+    if (OWNER && !PREVIEW) tools += '<p class="owner-tools"><button type="button" class="pill" data-act="edit" data-kind="entry" data-id="' + esc(e.id) + '">Edit</button></p>';
+    return tools;
+  }
+  function readerBody(e) {
+    var m = STATE.readMode || "main";
+    var other = LANG === "zh" ? (e.text_en || null) : e.text_zh;
+    // when the page shows Chinese, the English is the field the build wrote before localize() swapped it
+    if (LANG === "zh" && e.text_zh) other = e.__en || null;
+    if (m === "other" && other) return '<div class="prose">' + md(other) + "</div>";
+    if (m === "both" && other) {
+      var a = String(e.text || "").split(/\n{2,}/), b = String(other).split(/\n{2,}/);
+      if (a.length === b.length) {
+        return '<div class="bilingual">' + a.map(function (pa, i) {
+          return '<div class="bi-row"><div class="prose">' + md(pa) + '</div><div class="prose alt">' + md(b[i]) + "</div></div>";
+        }).join("") + "</div>";
+      }
+      return '<div class="bilingual cols"><div class="prose">' + md(e.text) + '</div><div class="prose alt">' + md(other) + "</div></div>";
+    }
+    return '<div class="prose">' + md(e.text) + "</div>";
   }
   function projectView(data, entryId) {
     var p = data.project, es = data.entries || [];
@@ -614,7 +681,8 @@
     var head = '<p class="reader-back"><a href="' + esc(href("ongoing")) + '">← ' + esc(title("ongoing")) + "</a></p>" +
       '<div class="page-head"><h1>' + esc(p.title) + "</h1>" + (p.note ? '<p class="intro">' + esc(p.note) + "</p>" : "") +
       '<p class="series-meta">' + esc([es.length + (es.length === 1 ? " entry" : " entries"), SORT_LABEL[p.sort] || "", p.status === "finished" ? "Finished" : "Ongoing"].filter(Boolean).join(" · ")) + "</p>" +
-      (can && es.length ? downloadBar("project:" + p.id, formats, "Download") : "") + "</div>";
+      (can && es.length ? downloadBar("project:" + p.id, formats, "Download") : "") +
+      (OWNER && !PREVIEW ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="entry" data-project="' + esc(p.id) + '">+ New entry</button></p>' : "") + "</div>";
 
     if (entryId) {
       var idx = -1; es.forEach(function (e, i) { if (e.id === entryId) idx = i; });
@@ -624,10 +692,11 @@
         var next = es[idx + 1] ? '<a href="#' + esc(p.id + "/" + es[idx + 1].id) + '">' + esc(es[idx + 1].title || entryLabel(es[idx + 1], idx + 1)) + " →</a>" : "<span></span>";
         return '<article class="reader"><p class="reader-back"><a href="#' + esc(p.id) + '">← ' + esc(p.title) + "</a></p>" +
           '<header class="reader-head"><p class="reader-kicker">' + esc(entryLabel(e, idx)) + "</p><h1>" + esc(e.title || "") + "</h1>" +
-          '<p class="reader-meta">' + esc(fmtDay(e.date)) + "</p></header>" +
+          (STATE.readMode === "both" && e.title_zh && e.title_zh !== e.title ? '<p class="reader-alt">' + esc(LANG === "zh" ? e.title_en || "" : e.title_zh) + "</p>" : "") +
+          '<p class="reader-meta">' + esc(fmtDay(e.date)) + "</p>" + readerTools(e) + "</header>" +
           list(e.images).map(function (src) { return '<figure class="reader-fig">' + pic(src, e.title) + "</figure>"; }).join("") +
           (e.audio ? '<audio class="player" controls preload="none" src="' + esc(asset(e.audio)) + '"></audio>' : "") +
-          '<div class="prose">' + md(e.text) + "</div>" +
+          readerBody(e) +
           '<nav class="pager" aria-label="Entries">' + prev + next + "</nav></article>";
       }
     }
@@ -636,16 +705,18 @@
       return head + '<ol class="rows">' + es.map(function (e, i) {
         return '<li class="row"><span class="row-date">' + esc(fmtDay(e.date)) + '</span><span class="row-main">' +
           '<a class="row-title" href="#' + esc(p.id + "/" + e.id) + '">' + esc(e.title || entryLabel(e, i)) + "</a></span>" +
-          '<span class="row-end">' + esc(entryLabel(e, i)) + "</span></li>";
+          '<span class="row-end">' + esc(entryLabel(e, i)) +
+          (OWNER && !PREVIEW ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="entry" data-id="' + esc(e.id) + '">Edit</button>' : "") + "</span></li>";
       }).join("") + "</ol>";
     }
     if (kind === "image") {
       return head + tiles(es.map(function (e, i) {
-        return { title: e.title, note: cut(plain(e.text), 80), image: list(e.images)[0], act: 'data-act="lightbox" data-src="project:' + esc(p.id) + '" data-i="' + i + '"' };
-      }), "1 / 1", cols("visual", 4));
+        return { id: e.id, title: e.title, note: cut(plain(e.text), 80), image: list(e.images)[0], act: 'data-act="lightbox" data-src="project:' + esc(p.id) + '" data-i="' + i + '"' };
+      }), "1 / 1", cols("visual", 4), ownerEdit("entry"));
     }
     return head + '<div class="entry-list">' + es.map(function (e, i) {
-      return '<article class="post"><p class="post-meta"><a href="#' + esc(p.id + "/" + e.id) + '">' + esc(entryLabel(e, i)) + " · " + esc(fmtDay(e.date)) + "</a></p>" +
+      return '<article class="post"><p class="post-meta"><a href="#' + esc(p.id + "/" + e.id) + '">' + esc(entryLabel(e, i)) + " · " + esc(fmtDay(e.date)) + "</a>" +
+        (OWNER && !PREVIEW ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="entry" data-id="' + esc(e.id) + '">Edit</button>' : "") + "</p>" +
         (e.title ? '<h2 class="text-title">' + esc(e.title) + "</h2>" : "") +
         (list(e.images).length ? '<div class="post-images n' + Math.min(list(e.images).length, 4) + '">' + list(e.images).map(function (src, k) {
           return '<button type="button" class="post-img" data-act="lightbox" data-src="entry:' + esc(e.id) + '" data-i="' + k + '">' + pic(src, "") + "</button>";
@@ -686,7 +757,7 @@
   function runExport(fn, arg) {
     var go = function () { window.AlyxExport[fn](arg, { root: ROOT, getJSON: getJSON, absUrl: absUrl, settings: D.settings || {} }); };
     if (window.AlyxExport) return go();
-    loadScript(ROOT + "assets/js/export.js?v=3").then(go);
+    loadScript(ROOT + "assets/js/export.js?v=4").then(go);
   }
 
   /* ---------- sharing ---------- */
@@ -724,33 +795,53 @@
     return out;
   }
   function storyImage(p, url, btn) {
-    var label = btn.textContent; btn.textContent = "Making…";
+    storyCard({ image: list(p.images)[0], text: plain(p.text) || (p.link && p.link.title) || "", meta: fmtDay(p.day), name: "story-" + p.id, url: url }, btn);
+  }
+  /* A 1080×1920 card for Instagram Story / Threads: a post, or a quote picked from any text */
+  function storyCard(o, btn) {
+    var label = btn ? btn.textContent : "";
+    if (btn) btn.textContent = "Making…";
     var css = getComputedStyle(document.documentElement);
-    var ink = css.getPropertyValue("--ink").trim() || "#111", paper = css.getPropertyValue("--paper").trim() || "#fff", mute = css.getPropertyValue("--mute").trim() || "#888";
+    var ink = css.getPropertyValue("--ink").trim() || "#111", paper = css.getPropertyValue("--paper").trim() || "#fff",
+        mute = css.getPropertyValue("--mute").trim() || "#888", sun = css.getPropertyValue("--sun").trim() || "#f5e47c";
     var font = '"' + (STATE.fontBody || "Geist") + '", ' + FALLBACK[FONTS[STATE.fontBody] || "sans"];
-    Promise.all([loadImg(list(p.images)[0]), loadImg((D.settings || {}).logo || "assets/img/logo-sm.png"), document.fonts ? document.fonts.ready : null]).then(function (r) {
+    Promise.all([loadImg(o.image), loadImg((D.settings || {}).logo || "assets/img/logo-sm.png"), document.fonts ? document.fonts.ready : null]).then(function (r) {
       var photo = r[0], logo = r[1];
       var c = document.createElement("canvas"); c.width = 1080; c.height = 1920;
       var x = c.getContext("2d");
       x.fillStyle = paper; x.fillRect(0, 0, 1080, 1920);
-      var y = 200;
-      if (photo) {
-        var maxW = 900, maxH = 980, s = Math.min(maxW / photo.width, maxH / photo.height);
-        var w = photo.width * s, h = photo.height * s;
-        x.drawImage(photo, (1080 - w) / 2, y, w, h); y += h + 80;
-      } else { y = 420; }
-      x.fillStyle = ink; x.font = (photo ? 46 : 64) + "px " + font; x.textBaseline = "top";
-      wrapLines(x, plain(p.text) || (p.link && p.link.title) || "", 880, photo ? 6 : 12).forEach(function (l) { x.fillText(l, 100, y); y += photo ? 66 : 92; });
+      x.textBaseline = "top";
+      if (o.quote) {
+        // big quotation mark, the selected words, and where they come from
+        var size = o.text.length > 160 ? 52 : o.text.length > 70 ? 64 : 78;
+        x.font = size + "px " + font;
+        var lines = wrapLines(x, o.text, 860, 14);
+        var lh = Math.round(size * 1.42), block = lines.length * lh;
+        var y0 = Math.max(330, (1920 - block) / 2 - 80);
+        x.fillStyle = sun; x.font = "260px Georgia, serif"; x.fillText("\u201C", 92, y0 - 210);
+        x.fillStyle = ink; x.font = size + "px " + font;
+        lines.forEach(function (l, i) { x.fillText(l, 110, y0 + i * lh); });
+        x.fillStyle = mute; x.font = "36px " + font;
+        if (o.source) wrapLines(x, "— " + o.source, 860, 2).forEach(function (l, i) { x.fillText(l, 110, y0 + block + 60 + i * 50); });
+      } else {
+        var y = 200;
+        if (photo) {
+          var s2 = Math.min(900 / photo.width, 980 / photo.height), w = photo.width * s2, h = photo.height * s2;
+          x.drawImage(photo, (1080 - w) / 2, y, w, h); y += h + 80;
+        } else { y = 420; }
+        x.fillStyle = ink; x.font = (photo ? 46 : 64) + "px " + font;
+        wrapLines(x, o.text || "", 880, photo ? 6 : 12).forEach(function (l) { x.fillText(l, 100, y); y += photo ? 66 : 92; });
+      }
       x.fillStyle = mute; x.font = "34px " + font;
-      x.fillText(fmtDay(p.day), 100, 1700);
+      if (o.meta) x.fillText(o.meta, 100, 1700);
       x.fillText(location.host || "alyxsstudio.com", 100, 1750);
-      if (logo) { var lw = 150, lh = logo.height * (lw / logo.width); x.drawImage(logo, 1080 - 100 - lw, 1790 - lh, lw, lh); }
+      if (logo) { var lw = 150, lhh = logo.height * (lw / logo.width); x.drawImage(logo, 1080 - 100 - lw, 1790 - lhh, lw, lhh); }
       c.toBlob(function (blob) {
-        btn.textContent = label;
+        if (btn) btn.textContent = label;
         if (!blob) return;
-        var file = new File([blob], "story-" + p.id + ".png", { type: "image/png" });
+        var file = new File([blob], (o.name || "story") + ".png", { type: "image/png" });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          navigator.share({ files: [file], title: (D.settings || {}).name || "", url: url }).catch(function () {});
+          navigator.share({ files: [file], title: (D.settings || {}).name || "", url: o.url }).catch(function () {});
         } else {
           var aEl = document.createElement("a"); aEl.href = URL.createObjectURL(blob); aEl.download = file.name;
           document.body.appendChild(aEl); aEl.click(); setTimeout(function () { URL.revokeObjectURL(aEl.href); aEl.remove(); }, 1000);
@@ -758,6 +849,39 @@
       }, "image/png");
     });
   }
+
+  /* ---------- select any words in a post or chapter → quote card ---------- */
+  var quoteBtn = null;
+  function hideQuoteBtn() { if (quoteBtn) quoteBtn.hidden = true; }
+  function onSelect() {
+    var sel = window.getSelection && window.getSelection();
+    var text = sel && !sel.isCollapsed ? String(sel).replace(/\s+/g, " ").trim() : "";
+    if (!text || text.length < 4) return hideQuoteBtn();
+    var node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    var prose = node && node.closest && node.closest("main .prose, main .lb-text");
+    if (!prose) return hideQuoteBtn();
+    var rect = sel.getRangeAt(0).getBoundingClientRect();
+    if (!quoteBtn) {
+      quoteBtn = document.createElement("button");
+      quoteBtn.type = "button"; quoteBtn.className = "quote-btn"; quoteBtn.textContent = "Quote card";
+      quoteBtn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      quoteBtn.addEventListener("click", function () {
+        var src = quoteBtn.getAttribute("data-source") || "";
+        storyCard({ quote: true, text: cut(quoteBtn.getAttribute("data-text"), 420), source: src, meta: "", name: "quote" }, quoteBtn);
+      });
+      document.body.appendChild(quoteBtn);
+    }
+    var article = prose.closest("article, .reader, .post");
+    var h = article && article.querySelector("h1, h2");
+    var src = (h ? h.textContent + " · " : "") + ((D.settings || {}).name || "");
+    quoteBtn.setAttribute("data-text", text);
+    quoteBtn.setAttribute("data-source", src);
+    quoteBtn.style.left = Math.max(8, Math.min(window.innerWidth - 130, rect.left + rect.width / 2 - 60)) + "px";
+    quoteBtn.style.top = Math.max(8, rect.top - 44) + "px";
+    quoteBtn.hidden = false;
+  }
+  document.addEventListener("selectionchange", function () { clearTimeout(onSelect.t); onSelect.t = setTimeout(onSelect, 250); });
+  window.addEventListener("scroll", hideQuoteBtn, { passive: true });
 
   /* ---------- clicks ---------- */
   function lightboxItems(src) {
@@ -804,7 +928,75 @@
       if (col) runExport(t.getAttribute("data-fmt"), col);
     }
     if (act === "export-all") { e.preventDefault(); runExport("all", null); }
+    if (act === "lang") { try { localStorage.setItem("alyx-lang", t.getAttribute("data-val")); } catch (x) {} location.reload(); }
+    if (act === "readmode") { STATE.readMode = t.getAttribute("data-val"); draw(true); }
+    if (act === "orig") {
+      var post = postById(t.getAttribute("data-id")), box = t.closest(".post").querySelector(".post-text");
+      if (post && box) {
+        var showing = t.getAttribute("data-on") === "1";
+        var alt = LANG === "zh" ? post.__en : post.text_zh;
+        box.innerHTML = md(showing ? post.text : alt);
+        t.setAttribute("data-on", showing ? "0" : "1");
+        t.textContent = showing ? (LANG === "zh" ? "English" : "原文") : (LANG === "zh" ? "中文" : "English");
+      }
+    }
+    if (act === "edit" || act === "new") {
+      e.preventDefault();
+      openEditor({ mode: act, kind: t.getAttribute("data-kind"), id: t.getAttribute("data-id"), project: t.getAttribute("data-project") });
+    }
   });
+
+  /* ---------- editing on the page (owner) ---------- */
+  function sortEntries(arr, how) {
+    arr.sort(function (a, b) {
+      if (how === "date-desc") return String(b.date).localeCompare(String(a.date));
+      if (how === "title") return String(a.title || "").localeCompare(String(b.title || ""), undefined, { numeric: true, sensitivity: "base" });
+      if (how === "number") return (+a.number || 0) - (+b.number || 0);
+      return String(a.date).localeCompare(String(b.date));
+    });
+  }
+  function onSaved(kind, item, removed) {
+    var drop = function (arr) { return (arr || []).filter(function (x) { return x.id !== item.id; }); };
+    item.images = list(item.images);
+    if (kind === "daily") {
+      D.daily = D.daily || { posts: [] };
+      D.daily.posts = drop(D.daily.posts);
+      if (!removed) { item.day = String(item.date || "").slice(0, 10); D.daily.posts.push(item); STATE.selDay = item.day; STATE.month = item.day.slice(0, 7); }
+      D.daily.posts.sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); });
+    }
+    if (kind === "entry" && D.project && D.project.project.id === item.project) {
+      D.project.entries = drop(D.project.entries);
+      if (!removed) D.project.entries.push(item);
+      sortEntries(D.project.entries, D.project.project.sort || "date-asc");
+    }
+    if (kind === "project") {
+      D.ongoing = D.ongoing || { projects: [] };
+      D.ongoing.projects = drop(D.ongoing.projects);
+      if (!removed) D.ongoing.projects.unshift(Object.assign({ count: 0, updated: item.date }, item));
+    }
+    if (kind === "design") {
+      D.design = D.design || { items: [] };
+      D.design.items = drop(D.design.items);
+      if (!removed) D.design.items.unshift(item);
+    }
+    if (kind === "visual") {
+      D.visual = D.visual || { series: [] };
+      var i = -1; D.visual.series.forEach(function (x, k) { if (x.id === item.id) i = k; });
+      if (removed) D.visual.series = drop(D.visual.series); else if (i > -1) D.visual.series[i] = item; else D.visual.series.unshift(item);
+    }
+    draw(true);
+  }
+  function openEditor(spec) {
+    var go = function () {
+      window.AlyxEditor.open(spec, {
+        root: ROOT, D: D, asset: asset, md: md, onSaved: onSaved,
+        project: D.project ? D.project.project : null,
+        posts: posts, fmtDay: fmtDay
+      });
+    };
+    if (window.AlyxEditor) return go();
+    loadScript(ROOT + "assets/js/editor.js?v=4").then(go);
+  }
 
   /* ---------- drawing ---------- */
   function draw(keepScroll) {
@@ -815,7 +1007,7 @@
       bar = '<div class="notice">' + (s.announcement.url ? a(s.announcement.url, esc(s.announcement.text) + arrow(s.announcement.url), "") : esc(s.announcement.text)) + "</div>";
     }
     app.innerHTML = bar + header(page) + '<main id="main" class="page page-' + page + '">' + render[page]() + "</main>" + footer() +
-      (PREVIEW ? '<p class="preview-badge">Preview · not saved yet</p>' : "");
+      (PREVIEW ? '<p class="preview-badge">Preview · not saved yet</p>' : "") + fab();
     var name = s.name || "Alyx's Studio";
     var h1 = app.querySelector("main h1");
     document.title = page === "home" ? name : (h1 ? h1.textContent : title(page)) + " — " + name;
@@ -895,6 +1087,7 @@
       .concat([loadScript(ROOT + "assets/js/vendor/marked.min.js")])
   ).then(function () {
     mergeDraftsInto("all");
+    localize(D);
     applyTheme(D.theme);
     draw();
     window.addEventListener("hashchange", function () {

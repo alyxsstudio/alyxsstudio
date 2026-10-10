@@ -7,15 +7,18 @@
 // No dependencies; runs on GitHub Actions and on any computer with Node 18+.
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { readCache, applyTranslations } from "./i18n.mjs";
 
 const SITE = path.resolve(process.argv[2] || ".");
 const OUT = path.resolve(process.argv[3] || "_site");
 const SKIP = new Set(["scripts", "content", "netlify.toml", "README.md", "node_modules", ".DS_Store"]);
+const SKIP_DATA = new Set(["translations.json"]);
 
 async function copyDir(src, dst) {
   await fs.mkdir(dst, { recursive: true });
   for (const entry of await fs.readdir(src, { withFileTypes: true })) {
     if (src === SITE && SKIP.has(entry.name)) continue;
+    if (src === path.join(SITE, "data") && SKIP_DATA.has(entry.name)) continue;
     if (entry.name === ".DS_Store") continue;
     const s = path.join(src, entry.name), d = path.join(dst, entry.name);
     if (entry.isDirectory()) await copyDir(s, d);
@@ -62,18 +65,28 @@ async function main() {
   await copyDir(SITE, OUT);
   const gen = path.join(OUT, "data", "gen");
   await fs.mkdir(gen, { recursive: true });
+  // English versions of Chinese text (made by translate.mjs); the original stays in <field>_zh
+  const cache = await readCache(path.join(SITE, "data", "translations.json"));
+  let untranslated = 0;
+  const tr = (data) => { untranslated += applyTranslations(data, cache); return data; };
   const write = (name, data) => fs.writeFile(path.join(gen, name), JSON.stringify(data));
+  // translate as content is read, so sorting by title uses the English the site shows
+  const read = async (name) => tr(await readFolder(name));
+  for (const f of ["books", "store", "traces", "sections", "settings", "follow"]) {
+    const file = path.join(OUT, "data", f + ".json");
+    try { await fs.writeFile(file, JSON.stringify(tr(JSON.parse(await fs.readFile(file, "utf8"))))); } catch {}
+  }
 
   // Daily
-  const daily = (await readFolder("daily"))
+  const daily = (await read("daily"))
     .filter((p) => p.date && !p.hidden)
     .map((p) => ({ ...p, day: dayOf(p.date), images: asList(p.images) }))
     .sort(byDateDesc);
   await write("daily.json", { posts: daily });
 
   // Ongoing: projects + entries
-  const projects = (await readFolder("projects")).filter((p) => !p.hidden);
-  const entries = (await readFolder("entries")).map((e) => ({ ...e, images: asList(e.images) }));
+  const projects = (await read("projects")).filter((p) => !p.hidden);
+  const entries = (await read("entries")).map((e) => ({ ...e, images: asList(e.images) }));
   const summary = [];
   for (const p of projects) {
     const mine = sortEntries(entries.filter((e) => e.project === p.id), p.sort || "date-asc");
@@ -89,16 +102,17 @@ async function main() {
   await write("ongoing.json", { projects: summary, recent });
 
   // Visual series
-  const visual = (await readFolder("visual")).filter((s) => !s.hidden)
+  const visual = (await read("visual")).filter((s) => !s.hidden)
     .map((s) => ({ ...s, images: asList(s.images) })).sort(byDateDesc);
   await write("visual.json", { series: visual });
 
   // Design sketches
-  const design = (await readFolder("design")).filter((s) => !s.hidden)
+  const design = (await read("design")).filter((s) => !s.hidden)
     .map((s) => ({ ...s, images: asList(s.images) })).sort(byDateDesc);
   await write("design.json", { items: design });
 
   await write("build.json", { built: new Date().toISOString() });
+  if (untranslated) console.log(`${untranslated} paragraph(s) still waiting for English; they show in Chinese for now.`);
   console.log(`Built ${OUT}: ${daily.length} posts, ${projects.length} projects, ${entries.length} entries, ${visual.length} series, ${design.length} sketches.`);
 }
 
