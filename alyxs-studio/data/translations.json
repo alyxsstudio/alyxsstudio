@@ -13,6 +13,12 @@
    "auto": "The roommate was obviously not interested in asking. Kirin stood where she was, until the sound of the door on the second floor closing again slowly released her clenched fingers.",
    "by": "MyMemory (free, no key)"
   },
+  "03b502d277bd1aea": {
+   "zh": "在故乡萨巴拉，他本是天才。六岁学音乐，十三岁写诗。在总督府的沙龙聚会上，只要有人给出一个主题句——比如 Hei de amar-te até morrer（我将爱你至死）——曼陀林拨响的同时，七音节的即兴诗句已从他嘴里流出，作词、谱曲、演唱同时完成。十九世纪的巴西批评家后来盛赞他是“我国最优秀的即兴诗人之一”，并专门为这种才能造了一个词：repentista（即兴诗人）。",
+   "en": "In his hometown of Sabara, he was a genius. He studied music at the age of six and wrote poetry at the age of thirteen. At the salon party of the Governor's Palace, as long as someone gave a theme sentence - such as Hei de amar-te até morrer (I will love you to death) - while the mandolin was ringing, the seven-syllable improvised verse had flowed out of his mouth, and the lyrics, composition, and singing were completed at the same time. Nineteenth-century Brazilian critics later praised him as \"one of the finest improvisational poets in our country\" and coined a term specifically for this talent: repentista (improvisational poet).",
+   "auto": "In his hometown of Sabara, he was a genius. He studied music at the age of six and wrote poetry at the age of thirteen. At the salon party of the Governor's Palace, as long as someone gave a theme sentence - such as Hei de amar-te até morrer (I will love you to death) - while the mandolin was ringing, the seven-syllable improvised verse had flowed out of his mouth, and the lyrics, composition, and singing were completed at the same time. Nineteenth-century Brazilian critics later praised him as \"one of the finest improvisational poets in our country\" and coined a term specifically for this talent: repentista (improvisational poet).",
+   "by": "MyMemory (free, no key)"
+  },
   "03fc19408416dd0c": {
    "zh": "午夜十二点四十分，Kirin深一脚浅一脚地踩过没膝的脏雪，靴底早已渗水，脚趾冻得失去了知觉。门廊灯泡坏了一半，剩下那半盏昏黄地悬着，积雪没人扫，台阶薄冰踩上去发出干脆的碎裂声。",
    "en": "At 12:40 at midnight, Kirin stepped on the dirty snow without knees, the soles of her boots had already seeped, and her toes were frozen and unconscious. The porch bulb was half broken, and the other half was dangling duskily. No one swept the snow, and the thin ice of the steps stepped on it and made a crisp crackling sound.",
@@ -67,12 +73,6 @@
    "auto": "She froze.",
    "by": "MyMemory (free, no key)"
   },
-  "0a389a0b44b49282": {
-   "zh": "莱奥诺尔·德·阿尔梅达·葡萄牙·洛雷纳·埃·伦卡斯特雷（D. Leonor de Almeida Portugal Lorena e Lencastre），阿洛尔纳侯爵夫人，阿苏马尔伯爵夫人，奥因豪森伯爵夫人。诗人们叫她阿尔西佩（Alcipe）——战神玛尔斯之女。",
-   "en": "Leonor de Almeida Portugal Lorena e Rencastre (D. Leonor de Almeida Portugal Lorena e Lencastre), Duchess of Alorna, Duchess of Azumar, Duchess of Eauinhausen. The poets called her Alcipe, the daughter of Mars, the god of war.",
-   "auto": "Leonor de Almeida Portugal Lorena e Rencastre (D. Leonor de Almeida Portugal Lorena e Lencastre), Duchess of Alorna, Duchess of Azumar, Duchess of Eauinhausen. The poets called her Alcipe, the daughter of Mars, the god of war.",
-   "by": "MyMemory (free, no key)"
-  },
   "0a5e9b2e30562255": {
    "zh": "一具尚未完全成型的胚胎蜷缩在浅红色液体中，脊背弓起，眼睑紧闭，皮肤呈半透明的暗粉色。",
    "en": "An embryo that is not yet fully formed is curled up in a pale red liquid with an arched spine, closed eyelids and translucent dark pink skin.",
@@ -113,6 +113,12 @@
    "zh": "合租排屋门前常年胡乱堆着各个室友的网购包裹，她下意识以为这是自己上周趁prime day订阅的处方到了。",
    "en": "Shared row houses are piled with online shopping packages of various roommates all year round, and she subconsciously thinks that this is the prescription she subscribed to last week on prime day.",
    "auto": "Shared row houses are piled with online shopping packages of various roommates all year round, and she subconsciously thinks that this is the prescription she subscribed to last week on prime day.",
+   "by": "MyMemory (free, no key)"
+  },
+  "11bec5a443fabfba": {
+   "zh": "她叫莱奥诺尔·德·阿尔梅达·葡萄牙·洛雷纳·埃·伦卡斯特雷（D. Leonor de Almeida Portugal Lorena e Lencastre），阿洛尔纳侯爵夫人，阿苏马尔伯爵夫人，奥因豪森伯爵夫人。诗人们叫她阿尔西佩（Alcipe）——战神玛尔斯之女。",
+   "en": "Her name is Leonor de Almeida Portugal Lorena e Rencastre (D. Leonor de Almeida Portugal Lorena e Lencastre), Duchess of Alorna, Duchess of Azumar, Duchess of Eauinhausen. The poets called her Alcipe, the daughter of Mars, the god of war.",
+   "auto": "Her name is Leonor de Almeida Portugal Lorena e Rencastre (D. Leonor de Almeida Portugal Lorena e Lencastre), Duchess of Alorna, Duchess of Azumar, Duchess of Eauinhausen. The poets called her Alcipe, the daughter of Mars, the god of war.",
    "by": "MyMemory (free, no key)"
   },
   "1380e619ac62391c": {
@@ -227,6 +233,12 @@
    "zh": "窗外，一辆除雪车拖着黄色警示灯缓缓驶过，轮胎碾碎积冰，发出长而迟钝的摩擦声。",
    "en": "Outside the window, a snowplow pulled a yellow warning light, and the tires crushed ice and made a long, slow friction sound.",
    "auto": "Outside the window, a snowplow pulled a yellow warning light, and the tires crushed ice and made a long, slow friction sound.",
+   "by": "MyMemory (free, no key)"
+  },
+  "206d2ed680ddc2dd": {
+   "zh": "她完成了常人难以企及的自我启蒙：精通八种语言（葡萄牙语、希腊语、拉丁语、西班牙语、法语、意大利语、德语、英语）；独自完成了《圣经·诗篇》全部一百五十篇的葡语意译；写下了一千多首诗。她翻译、模仿与意译的作品总数超过两百一十四首，涵盖至少二十七位世界顶级文学大师，从古希腊的萨福一直到与她同时代的拉马丁，横贯两千五百年的西方文学史。她甚至是葡萄牙历史上最早把德国文学系统性带入本国视野的先驱。",
+   "en": "She completed a self-enlightenment that was beyond the reach of ordinary people: she was proficient in eight languages (Portuguese, Greek, Latin, Spanish, French, Italian, German, English); she completed all 150 Portuguese translations of the Bible and Psalms alone; and she wrote more than 1,000 poems. She translated, imitated and translated more than 214 works, covering at least 27 of the world's top literary masters, from Sappho in ancient Greece to her contemporary Lamartine, spanning 2,500 years of Western literary history. She was even the first pioneer in Portuguese history to systematically bring German literature into her own country.",
+   "auto": "She completed a self-enlightenment that was beyond the reach of ordinary people: she was proficient in eight languages (Portuguese, Greek, Latin, Spanish, French, Italian, German, English); she completed all 150 Portuguese translations of the Bible and Psalms alone; and she wrote more than 1,000 poems. She translated, imitated and translated more than 214 works, covering at least 27 of the world's top literary masters, from Sappho in ancient Greece to her contemporary Lamartine, spanning 2,500 years of Western literary history. She was even the first pioneer in Portuguese history to systematically bring German literature into her own country.",
    "by": "MyMemory (free, no key)"
   },
   "23013e41f1ab054e": {
@@ -361,12 +373,6 @@
    "auto": "It was completely crushed in the Inconfidência Mineira of 1789. After the revelation of the incident triggered by the rebellion against the royal quota assessment (derrama), Lucas, 21, was shocked to see the salon transformed into an interrogation room: José Caetano César Manitti, a royal magistrate who used to clap his hands and clap with him, turned into a cold-blooded investigative clerk, personally led the army and raided the house, and took the 800 volumes of the deliberative priest Vieira as the serial number of the crime. The poet Claudio died in prison, Gonzaga (pseudonym \"Dirceu\") was exiled to Mozambique, and Tiradentes was unloaded for public display. The bloodbath taught Lucas the cruellest lesson of all: In that era of whistleblowers and pickpockets, words on paper were enough to kill. A short overlay of voyeuristic erotic songs that he wrote when he was thirteen - \"Things are wonderful, I want to talk about them; but, shh… don't talk\" (Chitôm) - really internalized at this moment for the sake of his life's survival: push the most dangerous truths to his lips, and shut up immediately.",
    "by": "MyMemory (free, no key)"
   },
-  "425186ab334ce613": {
-   "zh": "在故乡萨巴拉，他本是天才。六岁学音乐，十三岁写诗。在总督府的沙龙聚会上，只要有人给出一个主题句——比如 Hei de amar-te até morrer（我将爱你至死）——曼陀林拨响的同时，七音节的即兴诗句已从他嘴里流出，作词、谱曲、演唱同时完成。十九世纪的巴西批评家后来盛赞他是“我国最优秀的即兴诗人之一”，并专门为这种才能造了一个词：repentista（即兴诗人）。但在这间客厅里，在阿尔西佩面前，他什么都不算。",
-   "en": "In his hometown of Sabara, he was a genius. He studied music at the age of six and wrote poetry at the age of thirteen. At the salon party of the Governor's Palace, as long as someone gave a theme sentence - such as Hei de amar-te até morrer (I will love you to death) - while the mandolin was ringing, the seven-syllable improvised verse had flowed out of his mouth, and the lyrics, composition, and singing were completed at the same time. Nineteenth-century Brazilian critics later praised him as \"one of the finest improvisational poets in our country\" and coined a term specifically for this talent: repentista (improvisational poet). But in this living room, in front of Alcipe, he counted nothing.",
-   "auto": "In his hometown of Sabara, he was a genius. He studied music at the age of six and wrote poetry at the age of thirteen. At the salon party of the Governor's Palace, as long as someone gave a theme sentence - such as Hei de amar-te até morrer (I will love you to death) - while the mandolin was ringing, the seven-syllable improvised verse had flowed out of his mouth, and the lyrics, composition, and singing were completed at the same time. Nineteenth-century Brazilian critics later praised him as \"one of the finest improvisational poets in our country\" and coined a term specifically for this talent: repentista (improvisational poet). But in this living room, in front of Alcipe, he counted nothing.",
-   "by": "MyMemory (free, no key)"
-  },
   "42bad0b245ae175b": {
    "zh": "走廊尽头那间全透明的独立办公室大门虚掩着，警报的暗红频闪中，办公椅侧翻在地。",
    "en": "At the end of the hallway, the door of the fully transparent independent office was hiding, and the office chair rolled over in the dark red flashes of the alarm.",
@@ -379,16 +385,16 @@
    "auto": "The sound of slippers rubbing the floor is coming from upstairs. Someone got up at night.",
    "by": "MyMemory (free, no key)"
   },
-  "471a4e0bbd68dbd9": {
-   "zh": "首先袭来的是气味——蜂蜡在银烛台上的蜜甜，从中国漆器瓶中溢出的晚香玉的浓郁，巴西沉香木家具散发的温暖树脂，法国香粉里的鸢尾花根，英国红茶的苦涩蒸汽——所有这些在一间铺着东方地毯的长厅中混合成一种令人微微晕眩的空气。厅中摆满了从印度运来的紫檀木椅子。花梨木书架沿墙排列，壁炉上方是一幅巨大的油画，椭圆画框中，一位年轻女子身体微微转向右侧，珍珠缀在栗色发间，目光却转过来，直视画外。那是她年轻时的肖像。",
-   "en": "First came the smell - the sweetness of beeswax on a silver candlestick, the richness of latex jade spilling from a Chinese lacquer jar, the warmth of resin emanating from Brazilian agarwood furniture, the iris roots of French perfume, the bitter vapour of English black tea - all mixed into a slightly dizzying air in a long hall covered with oriental carpets. The hall was filled with rosewood chairs from India. Rosewood bookshelves are arranged along the wall. Above the fireplace is a huge oil painting. In the elliptical frame, a young woman's body turns slightly to the right. Pearls are dotted in the chestnut hair, but her eyes turn around and look straight out. It was a portrait of her when she was young.",
-   "auto": "First came the smell - the sweetness of beeswax on a silver candlestick, the richness of latex jade spilling from a Chinese lacquer jar, the warmth of resin emanating from Brazilian agarwood furniture, the iris roots of French perfume, the bitter vapour of English black tea - all mixed into a slightly dizzying air in a long hall covered with oriental carpets. The hall was filled with rosewood chairs from India. Rosewood bookshelves are arranged along the wall. Above the fireplace is a huge oil painting. In the elliptical frame, a young woman's body turns slightly to the right. Pearls are dotted in the chestnut hair, but her eyes turn around and look straight out. It was a portrait of her when she was young.",
-   "by": "MyMemory (free, no key)"
-  },
   "472e8fec298c1222": {
    "zh": "在门廊角落堆放的空披萨盒与黑色垃圾袋旁边，赫然挡着一个四四方方的黄褐色重型纸箱。",
    "en": "Next to the empty pizza boxes and black garbage bags stacked in the corner of the porch, a square yellow-brown heavy-duty carton is blocked.",
    "auto": "Next to the empty pizza boxes and black garbage bags stacked in the corner of the porch, a square yellow-brown heavy-duty carton is blocked.",
+   "by": "MyMemory (free, no key)"
+  },
+  "47a6dba7fa1f70fe": {
+   "zh": "厅中摆满了从印度运来的紫檀木椅子。花梨木书架沿墙排列，壁炉上方是一幅巨大的油画，椭圆画框中，一位年轻女子身体微微转向右侧，珍珠缀在栗色发间，目光却转过来，直视画外。那是她年轻时的肖像。",
+   "en": "The hall was filled with rosewood chairs from India. Rosewood bookshelves are arranged along the wall. Above the fireplace is a huge oil painting. In the elliptical frame, a young woman's body turns slightly to the right. Pearls are dotted in the chestnut hair, but her eyes turn around and look straight out. It was a portrait of her when she was young.",
+   "auto": "The hall was filled with rosewood chairs from India. Rosewood bookshelves are arranged along the wall. Above the fireplace is a huge oil painting. In the elliptical frame, a young woman's body turns slightly to the right. Pearls are dotted in the chestnut hair, but her eyes turn around and look straight out. It was a portrait of her when she was young.",
    "by": "MyMemory (free, no key)"
   },
   "480b9be8aaeec98d": {
@@ -451,10 +457,10 @@
    "auto": "She was placed in the deepest part of the shadowy second basement, washing the tubes, providing sterile water, and recording the weight of the waste tank.",
    "by": "MyMemory (free, no key)"
   },
-  "51d4b16b6f632f2e": {
-   "zh": "Lucas睁开眼睛。那个八岁的小女孩，此刻坐在客厅正中央，四十四岁。整个帝国的精英、最有才华的男人围成半圆，等她给出今晚即兴赋诗的主题句。",
-   "en": "Lucas opened his eyes. The eight-year-old girl, now sitting in the middle of the living room, was forty-four years old. The elite and most talented men of the entire empire circled in a semicircle, waiting for her to give the theme sentence of the impromptu poem tonight.",
-   "auto": "Lucas opened his eyes. The eight-year-old girl, now sitting in the middle of the living room, was forty-four years old. The elite and most talented men of the entire empire circled in a semicircle, waiting for her to give the theme sentence of the impromptu poem tonight.",
+  "501ab6f4e54c1925": {
+   "zh": "首先袭来的是气味——蜂蜡在银烛台上的蜜甜，从中国漆器瓶中溢出的晚香玉的浓郁，巴西沉香木家具散发的温暖树脂，法国香粉里的鸢尾花根，英国红茶的苦涩蒸汽——所有这些在一间铺着东方地毯的长厅中混合成一种令人微微晕眩的空气。",
+   "en": "First came the smell - the sweetness of beeswax on a silver candlestick, the richness of latex jade spilling from a Chinese lacquer jar, the warmth of resin emanating from Brazilian agarwood furniture, the iris roots of French perfume, the bitter vapour of English black tea - all mixed into a slightly dizzying air in a long hall covered with oriental carpets.",
+   "auto": "First came the smell - the sweetness of beeswax on a silver candlestick, the richness of latex jade spilling from a Chinese lacquer jar, the warmth of resin emanating from Brazilian agarwood furniture, the iris roots of French perfume, the bitter vapour of English black tea - all mixed into a slightly dizzying air in a long hall covered with oriental carpets.",
    "by": "MyMemory (free, no key)"
   },
   "526724b04db753f4": {
@@ -655,12 +661,6 @@
    "auto": "She raised her head and looked into Iris's eyes, which were filled with the words “We are friends.”",
    "by": "MyMemory (free, no key)"
   },
-  "786584d790bfa258": {
-   "zh": "首相庞巴尔（Pombal）本来判决下令处死全部家族成员，包括所有女人和孩子。八岁的孙女小莱奥诺尔·德·阿尔梅达本应和外祖母一起死在那个黎明。拯救她的是两个女人：王后玛丽安娜和二十四岁的王位继承人玛丽亚公主——她们亲自干预，阻止了对全部女性和儿童的处决。",
-   "en": "Prime Minister Pombal had ordered the execution of all members of the family, including all women and children. The eight-year-old granddaughter, Leonor de Almeida Jr., was supposed to die at dawn with her grandmother. She was rescued by two women: Queen Marianne and twenty-four-year-old heir to the throne, Princess Maria, who personally intervened to prevent the execution of all women and children.",
-   "auto": "Prime Minister Pombal had ordered the execution of all members of the family, including all women and children. The eight-year-old granddaughter, Leonor de Almeida Jr., was supposed to die at dawn with her grandmother. She was rescued by two women: Queen Marianne and twenty-four-year-old heir to the throne, Princess Maria, who personally intervened to prevent the execution of all women and children.",
-   "by": "MyMemory (free, no key)"
-  },
   "795455e1cfeb5677": {
    "zh": "在透射光下，夹层中出现了一道折叠的轮廓。",
    "en": "Under the transmitted light, a folded profile appears in the interlayer.",
@@ -805,6 +805,12 @@
    "auto": "Kirin closed the computer and looked at the box on the desk.",
    "by": "MyMemory (free, no key)"
   },
+  "98e295ab829e9811": {
+   "zh": "一七九四年深秋的某个夜晚，里斯本的灯火在特茹河上碎成一条条金线。一个二十六岁的巴西人站在门口，手里攥着一张皱巴巴的请帖。他推开了那扇雕刻着阿洛尔纳家族纹章的橡木门。",
+   "en": "One night in the late autumn of 1794, Lisbon's lights shattered into a golden line on the Tejo River. A twenty-six-year-old Brazilian stands in the doorway holding a crumpled invitation. He pushed open the oak door with the Alorna family crest engraved on it.",
+   "auto": "One night in the late autumn of 1794, Lisbon's lights shattered into a golden line on the Tejo River. A twenty-six-year-old Brazilian stands in the doorway holding a crumpled invitation. He pushed open the oak door with the Alorna family crest engraved on it.",
+   "by": "MyMemory (free, no key)"
+  },
   "9b34ea798313a9ad": {
    "zh": "Kirin找到一把薄刃裁纸刀，沿着已经松动的胶缝轻轻探入，用镊子夹住露出来的浅灰色纸角，一点一点将它抽出。",
    "en": "Kirin found a thin-bladed paper-cutting knife, gently penetrated along the already loose glue seam, clamped the exposed light gray paper corner with tweezers, and pulled it out bit by bit.",
@@ -815,6 +821,12 @@
    "zh": "到了第三年，她已经不再试图理解当年那场面试。",
    "en": "By the third year, she was no longer trying to understand the interview.",
    "auto": "By the third year, she was no longer trying to understand the interview.",
+   "by": "MyMemory (free, no key)"
+  },
+  "9c7670beaa99251e": {
+   "zh": "首相庞巴尔（Pombal）本判决下令处死全部家族成员，包括所有女人和孩子。八岁的孙女小莱奥诺尔·德·阿尔梅达本应和外祖母一起死在那个黎明。拯救她的是两个女人：王后玛丽安娜和二十四岁的王位继承人玛丽亚公主——她们亲自干预，阻止了对全部女性和儿童的处决。",
+   "en": "Prime Minister Pombal ordered the execution of all members of the family, including all women and children. The eight-year-old granddaughter, Leonor de Almeida Jr., was supposed to die at dawn with her grandmother. She was rescued by two women: Queen Marianne and twenty-four-year-old heir to the throne, Princess Maria, who personally intervened to prevent the execution of all women and children.",
+   "auto": "Prime Minister Pombal ordered the execution of all members of the family, including all women and children. The eight-year-old granddaughter, Leonor de Almeida Jr., was supposed to die at dawn with her grandmother. She was rescued by two women: Queen Marianne and twenty-four-year-old heir to the throne, Princess Maria, who personally intervened to prevent the execution of all women and children.",
    "by": "MyMemory (free, no key)"
   },
   "9cdff8ba27309045": {
@@ -967,12 +979,6 @@
    "auto": "“The Warren Building involves fully enclosed control of floors; no one is allowed unauthorized access to the laboratory or remote access to the servers involved; and any person in possession of, access to, or knowledge of the whereabouts of the relevant experimental samples and data must immediately contact the designated investigator. Unauthorized removal, alteration, destruction, or concealment of materials is strictly prohibited and may result in serious federal criminal liability.”",
    "by": "MyMemory (free, no key)"
   },
-  "b60c31e8d69e18c7": {
-   "zh": "一七九四年深秋的某个夜晚，里斯本的灯火在特茹河上碎成一条条金线。一个二十六岁的巴西人站在门口，手里攥着一张皱巴巴的请帖。他整理了一下从里约热内卢带来的丝绒外套——尽管在巴西这已是极尽奢华，但在里斯本圣多明戈斯教堂附近的冷风里，这身行头显得单薄而拘谨。他推开了那扇雕刻着阿洛尔纳家族纹章的橡木门。",
-   "en": "One night in the late autumn of 1794, Lisbon's lights shattered into a golden line on the Tejo River. A twenty-six-year-old Brazilian stands in the doorway holding a crumpled invitation. He sorted out the velvet jacket he had brought from Rio de Janeiro - which, though extremely luxurious in Brazil, seemed thin and cautious in the cold breeze near the church of São Domingos in Lisbon. He pushed open the oak door with the Alorna family crest engraved on it.",
-   "auto": "One night in the late autumn of 1794, Lisbon's lights shattered into a golden line on the Tejo River. A twenty-six-year-old Brazilian stands in the doorway holding a crumpled invitation. He sorted out the velvet jacket he had brought from Rio de Janeiro - which, though extremely luxurious in Brazil, seemed thin and cautious in the cold breeze near the church of São Domingos in Lisbon. He pushed open the oak door with the Alorna family crest engraved on it.",
-   "by": "MyMemory (free, no key)"
-  },
   "b6d99adff114d088": {
    "zh": "她指尖颤抖地在浏览器地址栏敲入UPS官方跟踪网址，逐位输进单号。",
    "en": "She trembled at her fingertips and typed the UPS official tracking URL into the browser address bar, digit by digit entering the order number.",
@@ -989,6 +995,12 @@
    "zh": "“古人在文字里幻想了几千年的孤雌生殖、人造子宫，你觉得那真的只是神话吗？”",
    "en": "\"The ancients fantasized about thousands of years of parthenogenesis and artificial wombs in the text. Do you think that's really just a myth?\"",
    "auto": "\"The ancients fantasized about thousands of years of parthenogenesis and artificial wombs in the text. Do you think that's really just a myth?\"",
+   "by": "MyMemory (free, no key)"
+  },
+  "b8d7f3cdfc2cd04f": {
+   "zh": "眼前的这一幕堪称奇迹：她的家族塔沃拉在1759年的血腥黎明中被铲平，然而在幽闭高墙之内度过的约十八年（一说近十九年）青春里，她凭借才华与智识，竟在废墟上重新成为了帝国的文化中心。",
+   "en": "This scene in front of her was a miracle: her family, Tavola, was bulldozed in the bloody dawn of 1759, but during her youth of about eighteen (almost nineteen) years inside the claustrophobic walls, she was able to re-emerge as the cultural center of the empire on the ruins with her talent and intelligence.",
+   "auto": "This scene in front of her was a miracle: her family, Tavola, was bulldozed in the bloody dawn of 1759, but during her youth of about eighteen (almost nineteen) years inside the claustrophobic walls, she was able to re-emerge as the cultural center of the empire on the ruins with her talent and intelligence.",
    "by": "MyMemory (free, no key)"
   },
   "b8ffa2be4d418b58": {
@@ -1027,22 +1039,16 @@
    "auto": "After unfolding, it is a black and white copy of the building floor plan.She recognized the outline of the Warren Building at a glance.\nThe paper seemed to be from an old construction drawing file, the room was still numbered with numbers and English letters, and some of the walls were located in a completely different location from the floor she was familiar with.",
    "by": "MyMemory (free, no key)"
   },
-  "c1a26640d97b666f": {
-   "zh": "在幽闭高墙之内度过的约十八年（一说近十九年）青春里，她完成了常人难以企及的自我启蒙：精通八种语言（葡萄牙语、希腊语、拉丁语、西班牙语、法语、意大利语、德语、英语）；独自完成了《圣经·诗篇》全部一百五十篇的葡语意译；写下了一千多首诗。她翻译、模仿与意译的作品总数超过两百一十四首，涵盖至少二十七位世界顶级文学大师，从古希腊的萨福一直到与她同时代的拉马丁，横贯两千五百年的西方文学史。她甚至是葡萄牙历史上最早把德国文学系统性带入本国视野的先驱。",
-   "en": "In her youth of about eighteen (or nearly nineteen) years within the claustrophobic walls, she accomplished a self-enlightenment unattainable to ordinary people: proficient in eight languages (Portuguese, Greek, Latin, Spanish, French, Italian, German, English); completed the Portuguese translation of all one hundred and fifty Bibles and Psalms alone; and wrote more than a thousand poems. She translated, imitated and translated more than 214 works, covering at least 27 of the world's top literary masters, from Sappho in ancient Greece to her contemporary Lamartine, spanning 2,500 years of Western literary history. She was even the first pioneer in Portuguese history to systematically bring German literature into her own country.",
-   "auto": "In her youth of about eighteen (or nearly nineteen) years within the claustrophobic walls, she accomplished a self-enlightenment unattainable to ordinary people: proficient in eight languages (Portuguese, Greek, Latin, Spanish, French, Italian, German, English); completed the Portuguese translation of all one hundred and fifty Bibles and Psalms alone; and wrote more than a thousand poems. She translated, imitated and translated more than 214 works, covering at least 27 of the world's top literary masters, from Sappho in ancient Greece to her contemporary Lamartine, spanning 2,500 years of Western literary history. She was even the first pioneer in Portuguese history to systematically bring German literature into her own country.",
+  "bee0d100851811ea": {
+   "zh": "整个帝国的精英、最有才华的男人围成半圆，等她给出今晚即兴赋诗的主题句。",
+   "en": "The elite and most talented men of the entire empire circled in a semicircle, waiting for her to give the theme sentence of the impromptu poem tonight.",
+   "auto": "The elite and most talented men of the entire empire circled in a semicircle, waiting for her to give the theme sentence of the impromptu poem tonight.",
    "by": "MyMemory (free, no key)"
   },
   "c1a87dc32c59d1db": {
    "zh": "这意味着，调查人员至少已经怀疑有东西不见了。",
    "en": "This means investigators have at least suspected something is missing.",
    "auto": "This means investigators have at least suspected something is missing.",
-   "by": "MyMemory (free, no key)"
-  },
-  "c2047368a084e794": {
-   "zh": "眼前的这一幕堪称奇迹：她的家族塔沃拉在1759年的血腥黎明中被铲平，然而此刻，她凭借才华与智识，竟在废墟上重新成为了帝国的文化中心。",
-   "en": "The scene in front of her was a miracle: her family Tavola was bulldozed in the bloody dawn of 1759, but now, with her talent and intelligence, she has become the cultural center of the empire again on the ruins.",
-   "auto": "The scene in front of her was a miracle: her family Tavola was bulldozed in the bloody dawn of 1759, but now, with her talent and intelligence, she has become the cultural center of the empire again on the ruins.",
    "by": "MyMemory (free, no key)"
   },
   "c5c766c3bc0ee51d": {
@@ -1103,6 +1109,12 @@
    "zh": "带他去东方的总督贝尔纳多（Bernardo José Maria da Silveira e Lorena）的姐姐，其家族正是通过与庞巴尔家族联姻，接管了原本属于塔沃拉家族的东方利益链。",
    "en": "The sister of Bernardo José Maria da Silveira e Lorena, the governor who took him to the east, it was by marrying the Pombal family that the family took over the eastern interest chain that belonged to the Tavola family.",
    "auto": "The sister of Bernardo José Maria da Silveira e Lorena, the governor who took him to the east, it was by marrying the Pombal family that the family took over the eastern interest chain that belonged to the Tavola family.",
+   "by": "MyMemory (free, no key)"
+  },
+  "cacd7a5d2cdd85c2": {
+   "zh": "但在这间客厅里，在阿尔西佩面前，他什么都不算。",
+   "en": "But in this living room, in front of Alcipe, he counted nothing.",
+   "auto": "But in this living room, in front of Alcipe, he counted nothing.",
    "by": "MyMemory (free, no key)"
   },
   "cb3d6ab671649572": {
@@ -1253,6 +1265,12 @@
    "zh": "翻开扉页，一幅精细的古典雕版插图占据了整个版面。",
    "en": "Opening the title page, a delicate illustration of a classical engraving occupies the entire layout.",
    "auto": "Opening the title page, a delicate illustration of a classical engraving occupies the entire layout.",
+   "by": "MyMemory (free, no key)"
+  },
+  "e5f835d6c3201d79": {
+   "zh": "Lucas睁开眼睛。那个八岁的小女孩，此刻坐在客厅正中央，四十四岁。",
+   "en": "Lucas opened his eyes. The eight-year-old girl, now sitting in the middle of the living room, was forty-four years old.",
+   "auto": "Lucas opened his eyes. The eight-year-old girl, now sitting in the middle of the living room, was forty-four years old.",
    "by": "MyMemory (free, no key)"
   },
   "e98e66f3cd65bb06": {
