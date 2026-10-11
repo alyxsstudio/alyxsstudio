@@ -1045,6 +1045,19 @@ mark.fl { background: none; color: inherit; text-decoration: line-through; text-
 .wr-ptres .wr-olist .mini-btn { margin: 0 2px; }
 @media (max-width: 640px) { .wr-step { padding: 6px 11px; font-size: calc(var(--u) * 13); } .wr-tools .pill { padding: 6px 11px; font-size: calc(var(--u) * 12); } .wr-key { margin-left: 0; width: 100%; } .wr-docwrap { padding-left: 18px; } .wr-arrow { display: none; } }
 
+.wr-file { cursor: pointer; font-size: calc(var(--u) * 13); }
+.wr-drop { outline: 2px dashed var(--ink); outline-offset: 6px; border-radius: 12px; }
+.wr-plan, .wr-left { max-width: 860px; margin: 0 0 18px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; font-size: calc(var(--u) * 13); }
+.wr-left { margin-top: 28px; }
+.wr-plan summary, .wr-left summary { cursor: pointer; color: var(--mute); }
+.wr-plan ol { margin: 10px 0 2px; padding-left: 20px; display: grid; gap: 6px; line-height: 1.6; }
+.wr-lo { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+.wr-lo p { margin: 0; line-height: 1.7; color: var(--mute); }
+.wr-why { font-family: var(--mono); font-size: calc(var(--u) * 10); text-transform: uppercase; letter-spacing: .05em; color: var(--mute); padding-top: 3px; }
+.wr-doc p.head { margin-top: 1.6em; font-family: var(--head); font-size: calc(var(--size-body) * 1.15); }
+.wr-doc p.head:first-child { margin-top: 0; }
+@media (max-width: 640px) { .wr-lo { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
 /* inspiration board (only for the owner) */
 .in-tabs { margin: 0 0 18px; }
 .in-tabs a.chip:hover { text-decoration: none; }

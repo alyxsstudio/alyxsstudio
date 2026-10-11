@@ -68,6 +68,36 @@
     for (k in b) nb += b[k] * b[k];
     return na && nb ? dot / Math.sqrt(na * nb) : 0;
   }
+  function norm(v) { var n = 0; for (var k in v) n += v[k] * v[k]; return Math.sqrt(n); }
+  /* pairs of paragraphs with cosine ≥ min, without comparing every pair:
+     only paragraphs that share some of their most telling words are compared */
+  function near(vecs, min, skip) {
+    var n = vecs.length, norms = vecs.map(norm), tops = [], index = {}, out = [];
+    vecs.forEach(function (v, i) {
+      if (skip && skip(i)) { tops.push([]); return; }
+      var t = Object.keys(v).sort(function (a, b) { return v[b] - v[a]; }).slice(0, 16);
+      tops.push(t);
+      t.forEach(function (k) { (index[k] = index[k] || []).push(i); });
+    });
+    var cap = Math.max(400, n * 0.08);
+    for (var i = 0; i < n; i++) {
+      if (!tops[i].length) continue;
+      var shared = {};
+      tops[i].forEach(function (k) {
+        var post = index[k]; if (post.length > cap) return;
+        for (var x = 0; x < post.length; x++) { var j = post[x]; if (j > i) shared[j] = (shared[j] || 0) + 1; }
+      });
+      for (var js in shared) {
+        if (shared[js] < 2) continue;
+        var j = +js, a = vecs[i], b = vecs[j], dot = 0;
+        if (Object.keys(a).length > Object.keys(b).length) { var tmp = a; a = b; b = tmp; }
+        for (var k in a) if (b[k]) dot += a[k] * b[k];
+        var sim = norms[i] && norms[j] ? dot / (norms[i] * norms[j]) : 0;
+        if (sim >= min) out.push([i, j, sim]);
+      }
+    }
+    return out;
+  }
   function weigh(vecs) {
     var df = {}, n = vecs.length;
     vecs.forEach(function (v) { for (var k in v) df[k] = (df[k] || 0) + 1; });
@@ -124,7 +154,12 @@
     var allS = [];
     info.forEach(function (p) { p.sentences.forEach(function (s) { allS.push(s); }); });
     var sorted = allS.map(function (s) { return s.density; }).sort(function (a, b) { return a - b; });
-    var pct = function (v) { if (sorted.length < 2) return 60; var lo = 0; while (lo < sorted.length && sorted[lo] < v) lo++; return Math.round(lo / (sorted.length - 1) * 100); };
+    var pct = function (v) {
+      if (sorted.length < 2) return 60;
+      var lo = 0, hi = sorted.length;   // first index with sorted[i] >= v
+      while (lo < hi) { var mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; }
+      return Math.round(lo / (sorted.length - 1) * 100);
+    };
     allS.forEach(function (s) { s.score = pct(s.density); s.top = s.score >= 80 && s.len > 6; s.weak = s.score <= 15 || s.filler.length >= 2; });
     info.forEach(function (p) {
       var tot = 0, w = 0;
@@ -135,25 +170,20 @@
     });
     // versions: paragraphs that say the same thing
     var DUP = 0.5, TOPIC = 0.2, dupGroups = [], gOf = {};
-    for (var a = 0; a < info.length; a++) {
-      if (info[a].heading || info[a].len < 12) continue;
-      for (var b = a + 1; b < info.length; b++) {
-        if (info[b].heading || info[b].len < 12) continue;
-        var sim = cosine(info[a].vec, info[b].vec);
-        if (sim < DUP) continue;
-        var ga = gOf[a], gb = gOf[b];
-        if (ga == null && gb == null) { gOf[a] = gOf[b] = dupGroups.length; dupGroups.push([a, b]); }
-        else if (ga != null && gb == null) { gOf[b] = ga; dupGroups[ga].push(b); }
-        else if (ga == null && gb != null) { gOf[a] = gb; dupGroups[gb].push(a); }
-        else if (ga !== gb) { dupGroups[gb].forEach(function (x) { gOf[x] = ga; dupGroups[ga].push(x); }); dupGroups[gb] = []; }
-      }
-    }
+    near(info.map(function (p) { return p.vec; }), DUP, function (i) { return info[i].heading || info[i].len < 12; }).forEach(function (pr) {
+      var a = pr[0], b = pr[1], ga = gOf[a], gb = gOf[b];
+      if (ga == null && gb == null) { gOf[a] = gOf[b] = dupGroups.length; dupGroups.push([a, b]); }
+      else if (ga != null && gb == null) { gOf[b] = ga; dupGroups[ga].push(b); }
+      else if (ga == null && gb != null) { gOf[a] = gb; dupGroups[gb].push(a); }
+      else if (ga !== gb) { dupGroups[gb].forEach(function (x) { gOf[x] = ga; dupGroups[ga].push(x); }); dupGroups[gb] = []; }
+    });
     dupGroups = dupGroups.filter(function (g) { return g.length > 1; }).map(function (g) {
       g.sort(function (x, y) { return x - y; });
       var best = g.slice().sort(function (x, y) { return info[y].score - info[x].score || info[y].len - info[x].len; })[0];
       return { members: g, best: best };
     });
     dupGroups.forEach(function (g, gi) { g.members.forEach(function (m) { info[m].dup = gi; info[m].isBest = m === g.best; }); });
+    if (opts.light) return { paragraphs: info, dupGroups: dupGroups, topics: [], alternatives: [], count: count(text) };
     // topics: paragraphs about the same thing, in the order they first appear
     var topics = [];
     info.forEach(function (p) {
@@ -179,12 +209,17 @@
     else info.forEach(function (p) { for (var k in p.vec) anchor[k] = (anchor[k] || 0) + p.vec[k]; });
     var whole = {};
     info.forEach(function (p) { if (!p.heading) for (var k in p.vec) whole[k] = (whole[k] || 0) + p.vec[k]; });
-    var thesisCJK = CJK.test(thesisText);
+    var thesisCJK = CJK.test(thesisText), wholeSq = 0;
+    for (var wk in whole) wholeSq += whole[wk] * whole[wk];
     info.forEach(function (p) {
       // a paragraph in another language than the thesis is compared with the rest of the draft instead
       var sameScript = !thesisText.trim() || p.cjk === thesisCJK;
-      var rest = {}; for (var k in whole) rest[k] = whole[k] - (p.vec[k] || 0);
-      p.relDraft = cosine(p.vec, rest);
+      // closeness to the rest of the draft (the whole minus this paragraph), without copying the whole
+      var dot = 0, pp = 0;
+      for (var k in p.vec) { dot += p.vec[k] * (whole[k] || 0); pp += p.vec[k] * p.vec[k]; }
+      var restSq = wholeSq - 2 * (p.heading ? 0 : dot) + (p.heading ? 0 : pp);
+      var restDot = p.heading ? dot : dot - pp;
+      p.relDraft = pp && restSq > 0 ? restDot / Math.sqrt(pp * restSq) : 0;
       p.relevance = sameScript ? cosine(p.vec, anchor) : p.relDraft;
       p.relBasis = sameScript ? "thesis" : "draft";
     });
@@ -249,7 +284,7 @@
     return Object.keys(found);
   }
 
-  var api = { analyze: analyze, paragraphs: paragraphs, sentences: sentences, count: count, terms: terms, cosine: cosine, place: place, mlaIssues: mlaIssues, portuguese: portuguese, fillerIn: fillerIn, years: years };
+  var api = { analyze: analyze, near: near, weigh: weigh, norm: norm, paragraphs: paragraphs, sentences: sentences, count: count, terms: terms, cosine: cosine, place: place, mlaIssues: mlaIssues, portuguese: portuguese, fillerIn: fillerIn, years: years };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.AlyxAnalyze = api;
 })(typeof window !== "undefined" ? window : globalThis);
