@@ -5,12 +5,12 @@
 (function () {
   "use strict";
   function x(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-  // runs: *italic* and **bold**
+  // runs: *italic* and **bold**; a line break inside a paragraph (a poem) stays a line break
   function runs(text, base) {
     var out = "", re = /(\*\*[^*]+\*\*|\*[^*]+\*)/g, last = 0, m;
     var run = function (t, i, b) {
       if (!t) return "";
-      return "<w:r><w:rPr>" + (base || "") + (b ? "<w:b/>" : "") + (i ? "<w:i/>" : "") + '</w:rPr><w:t xml:space="preserve">' + x(t) + "</w:t></w:r>";
+      return "<w:r><w:rPr>" + (base || "") + (b ? "<w:b/>" : "") + (i ? "<w:i/>" : "") + '</w:rPr><w:t xml:space="preserve">' + x(t).split("\n").join('</w:t><w:br/><w:t xml:space="preserve">') + "</w:t></w:r>";
     };
     text = String(text || "");
     while ((m = re.exec(text))) {
