@@ -106,6 +106,36 @@
 - 哪些软件、网站算工作或休息：改 `~/Library/Application Support/AlyxActivity/apps.json`。
 - 卸载：`curl -fsSL https://raw.githubusercontent.com/alyxsstudio/alyxsstudio/main/tools/mac-activity/uninstall.sh | bash`
 
+## 写作间 Writing room（只有你能看）
+✎ Owner → **Writing room ✎**（网址 `/write/`）。写论文、长文章用。全部自动存进私密仓库 `studio-drafts/papers/`，不会出现在网站上。
+- **Write**：直接写或粘贴。顶部显示字数（汉字 + 英文单词）。每段右边有标签：
+  - ★ 数字：这一段的信息密度（名字、年代、引文、出处、具体术语越多、废话越少，分数越高）。
+  - 同一种颜色的竖条 = 讲同一件事的重复段落；"best version" 是其中最好的一段。
+  - "off topic?"：和论点、和全文都没什么关联的段落（只是提示）。
+  - "cite?"：有引文或"某某认为"，但没有出处。
+  - 年份：这一段讲的是哪一年。
+  - 点标签：**解释给读者听**、**写得更密**、**扣回论点**、**找出处**、**合并重复**、**放到一边**、**看其他版本**（点其他版本里的某一句，就能把这句加进当前段落）。
+- **Paste & sort（粘贴整理）**：从 Gemini 拿到新的版本，或者一次贴进三十页草稿，都贴这里：
+  - 一模一样的段落自动跳过。
+  - 同一段的新写法放在原段旁边当"版本"；如果新写法明显更密，就替换原段，旧的留作版本。
+  - 相关内容放到相关段落后面，新内容放在 Works Cited 前面。
+  - 什么都不会丢，顶部有 **Undo**。在 Write 里一次粘贴三段以上，也会问要不要这样自动整理。
+- **Review**：逐句标注：绿底 = 信息密集的好句子，灰字 = 空洞的句子，删除线 = 套话或 AI 腔，红色虚线 = 需要出处。
+- **Organize**：
+  - **By topic**：按主题把段落归在一起。
+  - **By time**：按年代排。
+  - **Repeats**：一键保留每组最好的一段，其他放到一边。
+  - **Off topic?**、**Set aside**：被放到一边的内容都在这里，可以放回去。
+  - 都可以一键"Put the draft in this order"，或者请 Gemini 给出最佳顺序。
+- **Check**：缺出处的句子（Gemini 联网帮你找是谁说的，给出 MLA 9 引用；找不到会直说）；MLA 9 的常见错误（一键修正）；葡萄牙语拼写（LanguageTool 免费检查，葡萄牙 / 巴西两种拼法可选；1820 年代的旧拼法可能被标出来，如果是引文请保留）。
+- **English**：需要时才用。每段旁边写英文，有 DeepL 和 Gemini 按钮；段落移动后英文跟着走。
+- **Thesis & style**：
+  - 写下论点、关键词、读者是谁。
+  - 把你喜欢的文笔段落（哪怕内容已经不用了）贴进"Style you like"，Gemini 改写时会模仿这种文风。
+  - Gemini 钥匙也在这里填（和私人日历共用）：在 aistudio.google.com 免费申请。
+  - 没有钥匙也能用：每个按钮会复制一段写好的提示词并打开 Gemini，你把 Gemini 的回答贴回 "Paste & sort" 就行。
+- MLA 用的是第 9 版（目前最新版）。
+
 ## 引用卡片
 在任何文章或章节里选中一段文字，会出现 **Quote card** 按钮，点一下生成一张 Story 尺寸的引用图。手机上会直接调出分享面板。
 

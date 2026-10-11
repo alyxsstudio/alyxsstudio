@@ -1007,6 +1007,11 @@
       return pageHead("follow") + (groups || emptyNote()) + addButton("+ New group", 'data-act="item" data-file="follow"') + (s.email ? '<p class="follow-mail">' + esc(s.email) + "</p>" : "");
     },
 
+    write: function () {
+      if (!EDIT) return '<div class="page-head"><h1>Private</h1><p class="intro">This page is only for the studio\'s owner.</p></div>';
+      return '<div id="writer" class="writer"></div>';
+    },
+
     locked: function () {
       var s = D.settings || {};
       return '<section class="curtain"><img class="curtain-logo" src="' + esc(asset(s.logo_large || "assets/img/logo.png")) + '" alt="' + esc(s.name) + '">' +
@@ -1414,12 +1419,18 @@
   }
   function withEditor(fn) {
     if (window.AlyxEditor) return fn();
-    loadScript(ROOT + "assets/js/editor.js?v=8").then(function () { if (window.AlyxEditor) fn(); });
+    loadScript(ROOT + "assets/js/editor.js?v=9").then(function () { if (window.AlyxEditor) fn(); });
   }
   function withJournal(fn) {
     withEditor(function () {
       if (window.AlyxJournal) return fn();
       loadScript(ROOT + "assets/js/journal.js?v=1").then(function () { if (window.AlyxJournal) fn(); });
+    });
+  }
+  function withWriter(fn) {
+    withEditor(function () {
+      if (window.AlyxWriter && window.AlyxAnalyze) return fn();
+      Promise.all([loadScript(ROOT + "assets/js/analyze.js?v=1"), loadScript(ROOT + "assets/js/writer.js?v=1")]).then(function () { if (window.AlyxWriter) fn(); });
     });
   }
   function openEditor(spec) { withEditor(function () { window.AlyxEditor.open(spec, editorCtx()); }); }
@@ -1455,6 +1466,9 @@
     });
     wireMedia(); markTracks();
     if (EDIT) withEditor(function () { window.AlyxEditor.decorate(editorCtx()); });
+    if (EDIT && page === "write") withWriter(function () {
+      window.AlyxWriter.mount({ el: app.querySelector("#writer"), hash: hash(), setHash: function (h) { location.hash = h; } });
+    });
     if (EDIT && page === "daily" && app.querySelector("#journal-day")) withJournal(function () {
       window.AlyxJournal.mount({ app: app, day: STATE.selDay, month: STATE.month, redraw: function () { draw(true); } });
     });

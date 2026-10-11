@@ -169,7 +169,13 @@
     read: function (p) {
       return priv.ready().then(function (ok) {
         if (!ok) throw new Error("private storage unavailable");
-        return gh(privPath(p), { allow404: true }).then(function (j) { return j ? { data: JSON.parse(textFromB64(j.content)), sha: j.sha } : null; });
+        return gh(privPath(p), { allow404: true }).then(function (j) {
+          if (!j) return null;
+          if (j.content) return { data: JSON.parse(textFromB64(j.content)), sha: j.sha };
+          // over 1 MB: ask for the raw file
+          return fetch(API + privPath(p), { headers: { Authorization: "Bearer " + token(), Accept: "application/vnd.github.raw+json" }, cache: "no-store" })
+            .then(function (r) { return r.json(); }).then(function (d) { return { data: d, sha: j.sha }; });
+        });
       });
     },
     write: function (p, data, sha) {
@@ -1108,6 +1114,7 @@
       '<p class="ed-text">Only you can change things: editing needs your GitHub sign-in. Here you see what you wrote (Chinese stays Chinese); visitors see the English version.</p>' +
       '<div class="ed-menu">' +
         '<button type="button" class="pill solid" data-go="visitor">See it as a visitor ↗</button>' +
+        '<a class="pill solid" href="' + esc(CTX.root) + 'write/">Writing room ✎</a>' +
         '<button type="button" class="pill" data-go="translations">English versions</button>' +
         '<button type="button" class="pill" data-go="menu">Menu & page names</button>' +
         '<button type="button" class="pill" data-go="site">Name, logo, email</button>' +
