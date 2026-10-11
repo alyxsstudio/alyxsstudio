@@ -1469,7 +1469,7 @@
   function withWriter(fn) {
     withEditor(function () {
       if (window.AlyxWriter && window.AlyxAnalyze) return fn();
-      Promise.all([loadScript(ROOT + "assets/js/analyze.js?v=6"), loadScript(ROOT + "assets/js/writer.js?v=6")]).then(function () { if (window.AlyxWriter) fn(); });
+      Promise.all([loadScript(ROOT + "assets/js/analyze.js?v=6"), loadScript(ROOT + "assets/js/writer.js?v=7")]).then(function () { if (window.AlyxWriter) fn(); });
     });
   }
   function withInspo(fn) {

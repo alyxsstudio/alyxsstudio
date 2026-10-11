@@ -326,7 +326,7 @@
   function mount(ctx) {
     W.ctx = ctx;
     var id = (ctx.hash.match(/^p=(.+)$/) || [])[1];
-    if (W.list == null) { ctx.el.innerHTML = '<p class="empty">Opening…</p>'; loadList().then(loadAI).then(moveFromNovel).then(function () { mount(ctx); }); return; }
+    if (W.list == null) { ctx.el.innerHTML = '<p class="empty">Opening…</p>'; loadList().then(loadAI).then(function () { return moveFromNovel(); }).then(function () { mount(ctx); }); return; }
     if (id && (!W.paper || W.paper.id !== id)) return openPaper(id);
     if (!id) { closeWriter(true); W.paper = null; }
     render();
@@ -370,6 +370,7 @@
     el.innerHTML = '<div class="page-head"><h1>' + esc(W.ctx.title || "Thesis") + '</h1><p class="intro">Your articles. Only you can see this page; everything is saved privately as you work.</p></div>' +
       (W.failed ? '<p class="j-hint">Private storage couldn\'t open. Open /admin once in this browser to sign in, then reload.</p>' : "") +
       (W.movedNote ? '<p class="wr-moved">' + esc(W.movedNote) + "</p>" : "") +
+      missingMoved().map(function (m) { return '<p class="wr-moved">“' + esc(m.title) + '” from Novel isn\'t here yet' + (W.moveErr ? " (" + esc(W.moveErr) + ")" : "") + '. <button type="button" class="pill solid" data-l="move">Bring “' + esc(m.title) + '” here</button></p>'; }).join("") +
       '<p class="owner-tools"><button type="button" class="pill solid" data-l="new">+ New article</button></p>' +
       (list.length ? '<ul class="wr-list">' + list.map(function (x) {
         return '<li><a href="#p=' + esc(x.id) + '"><span class="wr-l-title">' + esc(x.title || "Untitled") + '</span><span class="wr-l-meta">' + (x.chapters ? x.chapters + (x.chapters === 1 ? " chapter · " : " chapters · ") : "") + fmtN(x.words || 0) + " 字 / words · " +
@@ -377,6 +378,7 @@
       }).join("") + "</ul>" : "");
     el.onclick = function (e) {
       var b = e.target.closest("[data-l]"); if (!b) return;
+      if (b.getAttribute("data-l") === "move") { b.disabled = true; b.textContent = "Bringing it…"; moveFromNovel(true).then(function () { renderList(el); }); return; }
       if (b.getAttribute("data-l") === "new") {
         var id = "paper-" + stamp();
         W.paper = upgrade({ id: id, title: "Untitled", blocks: [], created: Date.now() });
@@ -875,52 +877,61 @@
     }).then(function () { if (W.writer === w) suggPanel(w); });
   }
 
-  /* ---------- a serial moved here from Novel (once): its chapters become this article's chapters ---------- */
-  var MOVED = [{ project: "brazil-oriental", id: "lucas" }];
-  function moveFromNovel() {
-    if (W.failed || W.moving) return Promise.resolve();
-    var todo = MOVED.filter(function (m) { return !(W.list || []).some(function (x) { return x.id === m.id; }) && (W.removed || []).indexOf(m.id) < 0; });
+  /* ---------- a serial moved here from Novel: its chapters become this article's chapters ---------- */
+  // where the chapters were when they left the public site (so no GitHub search is needed)
+  var MOVED = [{ project: "brazil-oriental", id: "lucas", title: "Lucas", commit: "8de0f37f354103fc86d0b467d5f046d63d0ce0b7",
+    files: ["015041", "015128", "015952", "020036", "020057", "020141", "020223", "020348", "020604", "020657", "021247", "023811"].map(function (t) { return "brazil-oriental-20261011-" + t; }) }];
+  function missingMoved() { return MOVED.filter(function (m) { return !(W.list || []).some(function (x) { return x.id === m.id; }); }); }
+  function moveFromNovel(force) {
+    if (W.moving) return W.moving;
+    var todo = missingMoved().filter(function (m) { return force || (W.removed || []).indexOf(m.id) < 0; });
     if (!todo.length) return Promise.resolve();
-    W.moving = true;
-    return todo.reduce(function (pr, m) {
+    W.moveErr = "";
+    W.moving = todo.reduce(function (pr, m) {
       return pr.then(function () {
-        return lget("moved:" + m.id).then(function (done) {
-          if (done) return;
-          return priv().read("papers/" + m.id + ".json").then(function (r) {
-            if (r && r.data) { (W.list = W.list || []).unshift({ id: m.id, title: r.data.title, words: A().count(text(r.data.blocks || [])).total, updated: r.data.updated || Date.now() }); saveList(); return; }
-            return fetchSerial(m.project).then(function (got) {
-              if (!got || !got.entries.length) return;
-              var p = upgrade({ id: m.id, title: got.title || "Untitled", blocks: [], created: Date.now(), from: "Novel · " + m.project });
+        return lget("paper:" + m.id).then(function (have) {
+          // already on this device (or in your private repository): just list it again
+          var known = have && have.blocks ? Promise.resolve(have) : W.failed ? Promise.resolve(null) : priv().read("papers/" + m.id + ".json").then(function (r) { return r && r.data; }).catch(function () { return null; });
+          return known.then(function (paper) {
+            if (paper && paper.blocks && paper.blocks.length) return paper;
+            return fetchSerial(m).then(function (got) {
+              if (!got || !got.entries.length) throw new Error("the chapters couldn't be found on GitHub");
+              var p = upgrade({ id: m.id, title: got.title || m.title, blocks: [], created: Date.now(), from: "Novel · " + m.project });
               var keep = W.paper; W.paper = p;
               got.entries.forEach(function (e) { addChapter(e.title || "", splitMarkdown(e.text), { date: e.date }); });
               W.paper = keep;
-              p.updated = Date.now();
-              W.shas = W.shas || {};
-              return lput("paper:" + m.id, p).then(function () { return priv().write("papers/" + m.id + ".json", p); }).then(function (sha) {
-                W.shas[m.id] = sha;
-                (W.list = W.list || []).unshift({ id: m.id, title: p.title, words: A().count(text(p.blocks)).total, chapters: got.entries.length, updated: p.updated });
-                saveList(); lput("moved:" + m.id, Date.now());
-                W.movedNote = "“" + p.title + "” moved here from Novel: " + got.entries.length + " chapters" + (got.drafts ? " (with your unpublished " + (got.drafts === 1 ? "draft" : got.drafts + " drafts") + ")" : "") + ". It is no longer on the public site.";
+              p.updated = 1;   // a copy already in your private repository (written elsewhere) always wins over this one
+              W.movedNote = "“" + p.title + "” is here: " + got.entries.length + " chapters" + (got.drafts ? " (with your unpublished " + (got.drafts === 1 ? "draft" : got.drafts + " drafts") + ")" : "") + ". Click it to keep writing.";
+              return lput("paper:" + m.id, p).then(function () {
+                if (!W.failed) priv().write("papers/" + m.id + ".json", p).then(function (sha) { W.shas = W.shas || {}; W.shas[m.id] = sha; }).catch(cloudFail);
+                return p;
               });
             });
+          }).then(function (paper) {
+            W.removed = (W.removed || []).filter(function (x) { return x !== m.id; });
+            if (!(W.list || []).some(function (x) { return x.id === m.id; })) (W.list = W.list || []).unshift({ id: m.id, title: paper.title, words: A().count(text((paper.blocks || []).filter(function (b) { return !isRef(b); }))).total, chapters: chapters(paper).length, updated: Date.now() });
+            saveList();
           });
         });
       });
-    }, Promise.resolve()).catch(function (e) { console.error(e); }).then(function () { W.moving = false; });
+    }, Promise.resolve()).catch(function (e) { console.error(e); W.moveErr = e.message || String(e); }).then(function () { W.moving = null; });
+    return W.moving;
   }
   // the chapters as they were last published, with any newer unpublished drafts from the writing page
-  function fetchSerial(project) {
+  function fetchSerial(m) {
+    var project = m.project;
     var REPO = "alyxsstudio/alyxsstudio", API = "https://api.github.com/repos/" + REPO, BASE = "alyxs-studio/content/";
     var getJ = function (u) { return fetch(u, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("GitHub " + r.status); return r.json(); }); };
     var list = function (ref) { return getJ(API + "/contents/" + BASE + "entries?ref=" + ref).then(function (a) { return (a || []).filter(function (f) { return f.name.indexOf(project + "-") === 0; }); }); };
-    return list("main").then(function (files) {
+    var known = m.commit ? Promise.resolve({ ref: m.commit, files: m.files.map(function (n) { return { name: n + ".json", path: BASE + "entries/" + n + ".json" }; }) }) : null;
+    return (known || list("main").then(function (files) {
       if (files.length) return { ref: "main", files: files };
       // already removed from the site: read them from the commit before
       return getJ(API + "/commits?path=" + BASE + "projects/" + project + ".json&per_page=1").then(function (cs) {
         var parent = cs && cs[0] && cs[0].parents && cs[0].parents[0] && cs[0].parents[0].sha; if (!parent) return { files: [] };
         return list(parent).then(function (f2) { return { ref: parent, files: f2 }; });
       });
-    }).then(function (o) {
+    })).then(function (o) {
       if (!o.files.length) return null;
       var raw = "https://raw.githubusercontent.com/" + REPO + "/" + o.ref + "/";
       return Promise.all([getJ(raw + BASE + "projects/" + project + ".json").catch(function () { return {}; })].concat(o.files.map(function (f) {
