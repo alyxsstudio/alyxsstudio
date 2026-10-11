@@ -1,26 +1,6 @@
 {
   "items": [
     {
-      "title": "Brazil Oriental",
-      "category": "Research",
-      "note": "",
-      "image": "/assets/uploads/books-1-ud25.webp",
-      "links": [
-        {
-          "label": "Kindle",
-          "url": ""
-        },
-        {
-          "label": "Apple Books",
-          "url": ""
-        },
-        {
-          "label": "Amazon",
-          "url": ""
-        }
-      ]
-    },
-    {
       "links": [
         {
           "label": "Kindle",
@@ -39,6 +19,26 @@
       "category": "Language",
       "note": "",
       "image": "/assets/uploads/books-1-9a6d.webp"
+    },
+    {
+      "title": "Brazil Oriental",
+      "category": "Research",
+      "note": "",
+      "image": "/assets/uploads/books-1-ud25.webp",
+      "links": [
+        {
+          "label": "Kindle",
+          "url": ""
+        },
+        {
+          "label": "Apple Books",
+          "url": ""
+        },
+        {
+          "label": "Amazon",
+          "url": ""
+        }
+      ]
     }
   ]
 }
