@@ -4,5 +4,6 @@
   "kind": "Other",
   "note": "",
   "download": "public",
-  "images": []
+  "images": [],
+  "hidden": true
 }
