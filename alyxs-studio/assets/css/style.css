@@ -1246,3 +1246,12 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
 .wc-prev { max-height: 40vh; overflow: auto; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px; font-size: calc(var(--u) * 13); color: var(--mute); }
 .wc-prev p { margin: 0 0 .7em; }
 .wc-notes { margin: 0 0 12px; padding-left: 18px; font-size: calc(var(--u) * 13); }
+/* insert a chapter here: a quiet line between chapters that shows its button on hover (always on touch screens) */
+.wc-ins { position: relative; height: 22px; margin: -11px 0; z-index: 1; display: flex; align-items: center; justify-content: center; }
+.wc-ins::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed transparent; }
+.wc-ins button { font: inherit; font-size: calc(var(--u) * 12); color: var(--mute); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; cursor: pointer; opacity: .45; transition: opacity .15s; position: relative; }
+.wc-ins button span { font-weight: 600; }
+.wc-ins:hover button, .wc-ins button:focus-visible { opacity: 1; }
+.wc-ins:hover::before { border-top-color: var(--line); }
+.wc-ins button:hover { color: var(--ink); border-color: var(--ink); }
+@media (hover: none) { .wc-ins button { opacity: 1; } .wc-ins { height: 34px; margin: 0; } }

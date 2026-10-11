@@ -208,6 +208,7 @@
     var p = W.paper, h = newHead(title, opts.date);
     var bs = (texts || []).map(function (t) { var b = { id: uid(), text: t, by: "paste", src: [] }; if (opts.isNew) b.added = Date.now(); return b; });
     var at = p.blocks.findIndex(isRef); if (at < 0) at = p.blocks.length;
+    if (opts.first) { var c0 = chapters()[0]; if (c0) at = p.blocks.indexOf(c0.head); }
     if (opts.after) { var c = chapterById(opts.after); if (c) at = p.blocks.indexOf(c.blocks.length ? c.blocks[c.blocks.length - 1] : c.head) + 1; }
     p.blocks.splice.apply(p.blocks, [at, 0, h].concat(bs));
     return h;
@@ -479,8 +480,22 @@
 
   /* ================= 1 · WRITE: the chapters, each with its full text ================= */
   function paraHTML(b) {
-    if (isHead(b.text)) return '<h3 class="wc-sub">' + richHTML(b.text.replace(/^#+\s*/, "")) + "</h3>";
-    return "<p" + (b.added ? ' class="new" title="New — not yet fitted in"' : "") + ">" + richHTML(b.text) + "</p>";
+    if (isHead(b.text)) return '<h3 class="wc-sub" data-b="' + b.id + '">' + richHTML(b.text.replace(/^#+\s*/, "")) + "</h3>";
+    return '<p data-b="' + b.id + '"' + (b.added ? ' class="new" title="New — not yet fitted in"' : "") + ">" + richHTML(b.text) + "</p>";
+  }
+  function insertHere(after, label) {
+    return '<div class="wc-ins"><button type="button" data-c="insert" data-after="' + esc(after) + '" title="' + esc(label) + '"><span>+</span> ' + esc(label) + "</button></div>";
+  }
+  // the paragraph and the place in it under the mouse, so the chapter opens right there
+  function spotAt(e) {
+    var r = null;
+    if (document.caretRangeFromPoint) r = document.caretRangeFromPoint(e.clientX, e.clientY);
+    else if (document.caretPositionFromPoint) { var cp = document.caretPositionFromPoint(e.clientX, e.clientY); if (cp) { r = document.createRange(); r.setStart(cp.offsetNode, cp.offset); } }
+    var el = e.target.closest("[data-b]");
+    if (!el) return null;
+    var off = 0;
+    if (r && el.contains(r.startContainer)) { var pre = document.createRange(); pre.selectNodeContents(el); pre.setEnd(r.startContainer, r.startOffset); off = pre.toString().length; }
+    return { b: el.getAttribute("data-b"), off: off, y: el.getBoundingClientRect().top };
   }
   function chapCount(c) { return A().count(c.blocks.map(function (b) { return b.text; }).join("\n")).total; }
   function stepWrite(body) {
@@ -493,7 +508,7 @@
       (cs.length > 1 ? '<nav class="wc-toc" aria-label="Chapters">' + cs.map(function (c, i) {
         return '<a href="#ch-' + esc(c.id) + '" data-c="goto" data-id="' + esc(c.id) + '"><b>' + (i + 1) + "</b> " + esc(chapName(c, i)) + "</a>";
       }).join("") + "</nav>" : "") +
-      (cs.length ? '<div class="wc-list">' + cs.map(function (c, i) {
+      (cs.length ? '<div class="wc-list">' + insertHere("", "Insert a chapter at the beginning") + cs.map(function (c, i) {
         var nw = c.blocks.filter(function (b) { return b.added; }).length, t = chapTitle(c.head);
         return '<article class="wc-ch" id="ch-' + esc(c.id) + '" data-id="' + esc(c.id) + '">' +
           '<header class="wc-head"><span class="wc-no">No. ' + (i + 1) + "</span>" +
@@ -503,7 +518,8 @@
             '<span class="wc-btns"><button type="button" class="mini-btn" data-c="up" data-id="' + esc(c.id) + '" title="Move up"' + (i ? "" : " disabled") + ">↑</button>" +
               '<button type="button" class="mini-btn" data-c="down" data-id="' + esc(c.id) + '" title="Move down"' + (i < cs.length - 1 ? "" : " disabled") + ">↓</button>" +
               '<button type="button" class="pill" data-c="edit" data-id="' + esc(c.id) + '">Write</button></span></header>' +
-          '<div class="wc-text" data-c="edit" data-id="' + esc(c.id) + '">' + (c.blocks.length ? c.blocks.map(paraHTML).join("") : '<p class="empty">Empty — click to write.</p>') + "</div></article>";
+          '<div class="wc-text" data-c="edit" data-id="' + esc(c.id) + '">' + (c.blocks.length ? c.blocks.map(paraHTML).join("") : '<p class="empty">Empty — click to write.</p>') + "</div></article>" +
+          insertHere(c.id, i < cs.length - 1 ? "Insert a chapter between No. " + (i + 1) + " and No. " + (i + 2) : "Add a chapter at the end");
       }).join("") + "</div>" :
       '<div class="wr-empty"><p>Write the article one chapter at a time — one topic each, in any order; you can move them later.</p><p class="j-hint">You can also drop .docx, .pdf, .md or .txt files here: each becomes a chapter.</p></div>');
     wireDrop(body, function (files) { addFiles(files); });
@@ -513,8 +529,9 @@
       var k = b.getAttribute("data-c"), id = b.getAttribute("data-id");
       if (k === "goto") { e.preventDefault(); var el = document.getElementById("ch-" + id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
       if (k === "new") { remember(); var h = addChapter("", []); save(); writeChapter(h.id); }
+      if (k === "insert") { remember(); var after = b.getAttribute("data-after"), h2 = addChapter("", [], after ? { after: after } : { first: true }); save(); writeChapter(h2.id); }
       if (k === "up" || k === "down") { remember(); moveChapter(id, k === "up" ? -1 : 1); save(); render(); var el2 = document.getElementById("ch-" + id); if (el2) el2.scrollIntoView({ block: "center" }); }
-      if (k === "edit") { if (String(window.getSelection() || "").length > 1) return; writeChapter(id); }   // selecting text to copy doesn't open it
+      if (k === "edit") { if (String(window.getSelection() || "").length > 1) return; writeChapter(id, b.classList.contains("wc-text") ? spotAt(e) : null); }   // selecting text to copy doesn't open it
     };
   }
   // each file becomes a chapter named after it
@@ -539,7 +556,7 @@
       return '<p data-id="' + b.id + '"' + (b.added ? ' class="new"' : "") + ">" + richHTML(b.text) + "</p>";
     }).join("");
   }
-  function writeChapter(id) {
+  function writeChapter(id, spot) {
     var c = chapterById(id); if (!c) return;
     closeWriter(true);
     var p = W.paper, cs = chapters(), idx = cs.findIndex(function (x) { return x.id === id; });
@@ -621,8 +638,8 @@
       if ((k.metaKey || k.ctrlKey) && k.key === "s") { k.preventDefault(); readChapter(w); saveNow(); }
       if (k.key === "Escape" && !$(".wr-pop")) closeWriter();
     });
-    (chapTitle(c.head) || c.blocks.length ? body : $(".ew-title", w)).focus();
-    if (c.blocks.length) { var r = document.createRange(); r.selectNodeContents(body); r.collapse(false); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+    (chapTitle(c.head) || c.blocks.length ? body : $(".ew-title", w)).focus({ preventScroll: true });
+    if (c.blocks.length) placeCaret(w, spot);
   }
   // where the cursor is in its paragraph: "start", "middle", "end" or "" (outside / empty paragraph)
   function caretPlace(body) {
@@ -652,6 +669,19 @@
       } else if (!cur.textContent.trim()) cur.remove();
     }
     var last = nodes[nodes.length - 1], rr = document.createRange(); rr.selectNodeContents(last); rr.collapse(false); sel.removeAllRanges(); sel.addRange(rr);
+  }
+  // the cursor goes where you clicked in the chapter (or at its end), and that place is shown
+  function placeCaret(w, spot) {
+    var body = $(".ew-body", w), sel = window.getSelection(), r = document.createRange();
+    var el = spot && spot.b ? body.querySelector('[data-id="' + spot.b + '"]') : null;
+    if (!el) { r.selectNodeContents(body); r.collapse(false); sel.removeAllRanges(); sel.addRange(r); return; }
+    var left = spot.off || 0, walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n, done = false;
+    while ((n = walker.nextNode())) { if (left <= n.nodeValue.length) { r.setStart(n, left); done = true; break; } left -= n.nodeValue.length; }
+    if (!done) { r.selectNodeContents(el); r.collapse(false); } else r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    // the paragraph stays at the same height on the screen as where you clicked it
+    var page = $(".ew-page", w), y = spot.y != null ? spot.y : page.getBoundingClientRect().top + 120;
+    page.scrollTop += el.getBoundingClientRect().top - y;
   }
   function closeWriter(quiet) {
     var w = W.writer; if (!w) return;
