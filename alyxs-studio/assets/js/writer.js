@@ -147,7 +147,9 @@
       });
     };
     W.pending[id] = run;
-    W.timers[key] = setTimeout(run, now ? 0 : 2500);
+    // a very long article is sent up less often while you type (it is always kept in this browser at once)
+    var big = (p.units || []).length > 400 || (p.blocks || []).length > 400;
+    W.timers[key] = setTimeout(run, now ? 0 : big ? 9000 : 2500);
   }
   function saveNow() {
     if (W.paper) lput("paper:" + W.paper.id, W.paper);
@@ -301,6 +303,7 @@
   function aiKey() { return (W.ai || {}).gemini_key; }
   function context() {
     var p = W.paper, c = "You are helping a scholar of literature and film (her field: how knowledge of the East is produced and how East and West are written, in the Lusophone world — Brazil, Portugal, Portuguese Asia) finish an academic article. Treat it as literary and film analysis, not as history.\n";
+    if (p.brief) c += "\nAbout this article (from the author):\n" + p.brief.slice(0, 8000) + "\n";
     if (p.thesis) c += "\nThesis of the article: " + p.thesis;
     if (p.keywords) c += "\nKey names and terms: " + p.keywords;
     if (p.readers) c += "\nReaders: " + p.readers;
@@ -365,213 +368,515 @@
     if (navigator.clipboard) navigator.clipboard.writeText(prompt).then(go, manual); else manual();
   }
 
-  /* ===== turning the whole draft into one article: a plan, then each section written ===== */
-  var PLAN = "You are the editor turning a messy draft into ONE finished, readable article. Below are numbered fragments of it: notes, several versions of the same passage, passages written earlier with AI. Many repeat each other and they are in no useful order.\n\n" +
-    "Design the article:\n" +
-    "1. Find the threads. A thread is one chain of cause and effect in the life and work of the person (or people) at the centre: an experience, a place, an encounter, a relationship, a reading, a historical event → how it shaped their character, beliefs, taste or way of seeing → the choices it led to (the works they made, the films, the decisions). Group fragments by these hidden connections — causes, influences, consequences, butterfly effects — NOT by shared keywords and NOT by date. Keep each chain whole and in one place; never break a chain into pieces scattered through the article.\n" +
-    "2. Inside a thread, follow the chain in the order a reader needs it (usually the order in time).\n" +
-    "3. Order the threads for the reader: open with a concrete, vivid scene or image from the material that raises a question; reveal things gradually — do not give away the conclusion or every answer in the first section; let each section raise something the next one answers; build toward the thesis; close by drawing the threads together.\n" +
-    "4. KEEP EVERYTHING. The finished article must contain all the content: every argument, example, detail, name, date, quotation and nuance. Do not summarize, shorten or drop material. List a fragment as a repeat ONLY if everything in it is already said in the fragment named as \"of\" (an exact or near-exact duplicate); if it adds even one detail, use it in a section instead. List a fragment as unrelated ONLY if it is plainly outside the article (a personal note, a shopping list, a message to someone); when in doubt, use it.\n" +
-    "5. Usually 4–9 sections. Headings short, in the language of the draft.\n" +
-    "Every fragment number must appear exactly once: in one section's \"use\", in \"repeats\", or in \"unrelated\".\n\n" +
-    "Answer JSON only:\n{\"title\":\"…\",\"sections\":[{\"title\":\"…\",\"logic\":\"one sentence: what this section does and why it comes here\",\"use\":[3,17,5]}],\"repeats\":[{\"n\":9,\"of\":3}],\"unrelated\":[12]}";
-  var WRITE = "Write this section as finished prose of the article, in the language of the material:\n" +
-    "- Clear paragraphs; each paragraph is one complete step of the argument (the point, its evidence, what it means), joined to the next by a real transition.\n" +
-    "- KEEP ALL THE CONTENT. Every argument, example, detail, name, date, quotation and nuance in the material must be in your text; this is editing, not summarizing. The text should be about as long as the material once exact repetitions are removed — longer is fine, shorter is not.\n" +
-    "- Where versions say the same thing, merge them into one passage using the best-written sentences and the most vivid details of each; say each point once.\n" +
-    "- Repair gaps in logic and odd jumps or gaps in time: make the order of events and the cause and effect explicit. If fragments contradict each other, keep the better-supported one.\n" +
-    "- No short, choppy sentences: dense, well-built longer sentences in which every clause carries information. No padding, no clichés.\n" +
-    "- Briefly explain names, terms, works and events a reader without background needs.\n" +
-    "- Keep every fact, name, date, quotation (exact wording, original language) and citation. Never add facts, quotations or sources.\n" +
-    "- Don't reveal what later sections will show; end so that the next section follows naturally.\n" +
-    "- Fragments marked [YOURS] were written by the author herself: keep each word for word as its own paragraph, as {\"keep\": n}, where it fits.\n" +
-    "Answer JSON only: {\"paragraphs\":[{\"text\":\"…\",\"from\":[3,5]},{\"keep\":7}]}  (\"from\" = the fragment numbers the paragraph uses)";
-  function buildable() { return W.paper.blocks.filter(function (b) { return !isRef(b) && !(b.head && b.by === "ai"); }); }
-  function fragList(frs, limit) {
-    return frs.map(function (b, i) {
-      var t = b.text.replace(/\s*\n+\s*/g, " "), more = (b.src || []).filter(function (v) { return v !== b.text; }).length;
-      if (limit && t.length > limit) t = t.slice(0, limit) + "…";
-      return "[" + (i + 1) + "]" + (b.by === "me" ? " [YOURS]" : "") + (more ? " (+" + more + " other versions)" : "") + " " + t;
-    }).join("\n\n");
+  /* =====================================================================================
+     ORGANIZE — how a human editor would do it, step by step:
+     1 Break every text into idea units (one point with its evidence), and tell apart finished
+       prose, rough versions, sketches, notes-to-self and scraps.
+     2 Put together the units that say the same thing (versions of one idea), choose the most
+       mature one, and list contradictions between versions (dates, numbers, names).
+     3 Find the hidden chains — experience → effect on his character and choices → the novel —
+       and arrange them for a reader: a vivid way in, a gradual reveal, the thesis at the end.
+     4 Fuse the versions of each idea into one passage that keeps every detail.
+     5 Assemble a rough draft from that map. Rewriting with Gemini comes after, on request.
+     Every stage is saved, so a long run can be continued after a refresh or a Gemini limit.
+     ===================================================================================== */
+  var NOTE_RE = /^(我希望|我觉得|我们现在|我们其实|我突然意识到|我需要|我是希望|你(之前|这里|上一|需要|要|不能|从|说|抓到|对|们的|的这个|这个)|请你|这个版本|这一版|解决方案|根据我们|如果你需要|这里要强调|可以这样写|下面是|以下是推测)/;
+  function joinSents(ss) { return ss.reduce(function (t, s) { return t + (t && /[A-Za-zÀ-ÿ0-9.,;:!?”"’)]$/.test(t) && /^[A-Za-zÀ-ÿ“"(]/.test(s) ? " " : "") + s; }, ""); }
+  function localKind(t) {
+    var s = t.trim(), core = s.replace(/[\s\d\p{P}\p{S}_]/gu, "");
+    if (core.length < 5) return "fragment";
+    if (/^(#{1,6}\s|第[一二三四五六七八九十\d]+(部分|章|节))/.test(s) && s.length < 60) return "heading";
+    if (NOTE_RE.test(s)) return "note";
+    if (!/[。！？.!?”"」』)）:：]$/.test(s) && A().count(s).total < 30) return "fragment";
+    return "text";
   }
-  function build() {
-    var p = W.paper, frs = buildable();
-    if (!frs.length) return;
-    if (!aiKey()) return copyBuildPrompt();
-    readDoc();
-    remember();
-    var total = frs.reduce(function (n, b) { return n + b.text.length; }, 0), limit = total > 160000 ? Math.max(80, Math.floor(160000 / frs.length)) : 0;
-    var job = W.job = { total: 1, done: 0, stop: false, label: "Organizing: reading everything and planning one article…", stats: {}, before: A().count(text()).total, run: Date.now() };
-    W.note = null; progress();
-    var waitNote = function (s) { job.label = "Gemini asked to wait " + s + " s (free plan limit)…"; progress(); };
-    gemini(context() + "\n" + PLAN + "\n\nFragments:\n\n" + fragList(frs, limit), { json: true, max: 32768, temp: 0.4, job: job, onWait: waitNote }).then(function (r) {
-      var plan = parseJSON(r.text);
-      if (!plan || !Array.isArray(plan.sections) || !plan.sections.length) throw new Error("Gemini's plan couldn't be read" + (r.cut ? " (it was cut off — try Flash, or fewer pages at a time)" : "") + ".");
-      applyPlan(plan, frs);
-      job.total = plan.sections.length + 1; job.done = 1; progress();
-      return plan.sections.reduce(function (pr, sec, k) {
-        return pr.then(function () {
-          if (job.stop) return;
-          job.label = "Writing section " + (k + 1) + " of " + plan.sections.length + ": " + sec.title; progress();
-          return writeSection(k, job, waitNote).catch(function (e) { job.error = e.message; }).then(function () { job.done++; progress(); });
-        });
-      }, Promise.resolve());
-    }).catch(function (e) { job.error = e.message; console.error(e); }).then(function () {
-      W.job = null;
-      var st = job.stats || {}, after = A().count(text()).total, secs = (W.paper.plan && W.paper.plan.sections || []).length;
-      W.fresh = {}; W.paper.blocks.forEach(function (b) { if (b.by === "ai" && !b.head && b.ai === b.text && b.made >= job.run) W.fresh[b.id] = 1; });
-      W.note = job.error ? { warn: true, html: "Gemini stopped part way: " + esc(job.error) + ". What was finished is kept; press <b>Organize again</b> to finish." } :
-        job.stop ? { html: "Stopped. What was written so far is kept." } :
-        { html: "<b>Done — one article in " + secs + " sections.</b> " + fmtN(job.before) + " → " + fmtN(after) + " 字. Nothing was thrown away: " +
-          (st.folded ? st.folded + " repeated passages were folded into the paragraphs that say the same (click a purple dot to see them)" : "all your passages were used") +
-          (st.unrelated ? "; " + st.unrelated + " notes that don't belong are under “Left out” at the bottom" : "") + ". New paragraphs are lightly highlighted." };
-      progress(); save();
-      if (document.activeElement && document.activeElement.classList.contains("wr-write")) showDoc(); else if (W.step === 1) render();
-    });
+  function localMat(t) {
+    var c = A().count(t).total, spec = (t.match(/1[5-9]\d\d|20\d\d|[一二三四五六七八九〇]{4}年|[“"「《][^”"」》]{2,}[”"」》]|[A-ZÀ-Ý][a-zà-ÿ]{2,}/g) || []).length;
+    var ends = /[。！？.!?”"」』)）]$/.test(t.trim());
+    if (c < 40 || !ends) return 1;
+    return c > 140 && spec >= 2 ? 3 : 2;
   }
-  function applyPlan(plan, frs) {
-    readDoc();   // what you typed while Gemini was planning
-    var p = W.paper, used = {}, out = [], n = frs.length;
-    var extra = p.blocks.filter(function (b) { return frs.indexOf(b) < 0 && !isRef(b) && !(b.head && b.by === "ai"); });
-    var num = function (x) { x = parseInt(x, 10); return x >= 1 && x <= n ? x : 0; };
-    plan.sections.forEach(function (sec, k) {
-      out.push({ id: uid(), text: "## " + String(sec.title || "").trim(), by: "ai", head: true, sec: k, src: [] });
-      (sec.use || []).forEach(function (x) { x = num(x); if (!x || used[x]) return; used[x] = 1; var b = frs[x - 1]; b.sec = k; b.num = x; out.push(b); });
+  function firstYear(t) { var y = A().years(t); return y.length ? String(Math.min.apply(null, y)) : null; }
+  function ideaById(id) { return (W.paper.map && W.paper.map.ideas || []).filter(function (x) { return x.id === id; })[0]; }
+  function unitById(id) { return (W.paper.units || []).filter(function (x) { return x.id === id; })[0]; }
+  function srcName(id) { var s = (W.paper.texts || []).filter(function (x) { return x.id === id; })[0]; return s ? s.name : ""; }
+  var MATW = { 3: "mature", 2: "developing", 1: "sketch" };
+
+  /* 1 · break: paragraphs → units; exact and near repeats are recognised here, without Gemini */
+  function addMaterial(raw, name) {
+    var p = W.paper;
+    p.texts = p.texts || []; p.units = p.units || [];
+    var src = { id: "s" + Date.now().toString(36), name: name || ("Pasted " + new Date().toLocaleString()), at: Date.now() };
+    var ps = A().paragraphs(raw), units = [], tbl = null;
+    ps.forEach(function (t) {
+      if (/^\|.*\|$/.test(t)) { if (tbl) { tbl.text += "\n" + t; return; } tbl = { text: t }; units.push(tbl); return; }   // a table stays together
+      tbl = null; units.push({ text: t });
     });
-    var st = (W.job && W.job.stats) || {};
-    var stray = [];
-    (plan.repeats || []).forEach(function (r) {
-      var x = num(r && r.n), of = num(r && r.of); if (!x || used[x]) return;
-      var b = frs[x - 1];
-      if (b.by === "me") return;                        // yours stays, placed below
-      var t = of && used[of] ? frs[of - 1] : null;
-      if (!t) return;                                   // nothing to fold it into: it is placed below
-      used[x] = 1; st.folded = (st.folded || 0) + 1;
-      t.src = (t.src && t.src.length ? t.src : [t.text]).concat(b.src && b.src.length ? b.src : [b.text]);
+    var known = {}; p.units.forEach(function (u) { known[hashText(u.text)] = u; });
+    var vecOld = null, added = 0, same = 0;
+    units.forEach(function (u) {
+      if (REF.test(u.text)) return;
+      var h = hashText(u.text);
+      var nu = { id: "u" + (++p.unitSeq || (p.unitSeq = 1)), src: src.id, text: u.text, kind: localKind(u.text), mat: localMat(u.text), when: firstYear(u.text), fresh: true };
+      if (known[h]) { nu.dup = known[h].id; same++; } else known[h] = nu;
+      p.units.push(nu); added++;
     });
-    (plan.unrelated || []).forEach(function (x) {
-      x = num(x); if (!x || used[x]) return;
-      var b = frs[x - 1]; if (b.by === "me") return;
-      used[x] = 1; st.unrelated = (st.unrelated || 0) + 1; p.aside.push({ text: b.text, at: Date.now(), why: "unrelated" });
+    // near repeats (almost the same wording) are versions of the same unit
+    var live = p.units.filter(function (u) { return !u.dup && u.kind !== "note"; });
+    var vec = A().weigh(live.map(function (u) { return A().terms(u.text); }));
+    A().near(vec, 0.9, function (i) { return A().count(live[i].text).total < 15; }).forEach(function (pr) {
+      var a = live[pr[0]], b = live[pr[1]];
+      if (a.dup || b.dup) return;
+      var keep = A().count(a.text).total >= A().count(b.text).total ? a : b, drop = keep === a ? b : a;
+      if (drop.fresh || keep.fresh) { drop.dup = keep.id; same++; }
     });
-    // anything the plan forgot goes into the section it is closest to, so it is written in, not dropped
-    frs.forEach(function (b, i) { if (!used[i + 1]) stray.push(b); });
-    if (stray.length) {
-      var secVec = plan.sections.map(function (sec, k) { var v = {}; out.forEach(function (x) { if (x.sec === k && !x.head) { var t = A().terms(x.text); for (var w in t) v[w] = (v[w] || 0) + t[w]; } }); return v; });
-      stray.forEach(function (b) {
-        var bv = A().terms(b.text), best = plan.sections.length - 1, bs = -1;
-        secVec.forEach(function (v, k) { var c = A().cosine(bv, v); if (c > bs) { bs = c; best = k; } });
-        b.sec = best;
-        var lastOf = -1; out.forEach(function (x, i) { if (x.sec === best) lastOf = i; });
-        out.splice(lastOf + 1, 0, b);
-      });
-    }
-    extra.forEach(function (b) { b.sec = plan.sections.length - 1; out.push(b); });
-    if (W.job) W.job.stats = st;
-    p.plan = { title: plan.title || "", sections: plan.sections.map(function (s) { return { title: s.title, logic: s.logic }; }), at: Date.now() };
-    if (plan.title && (!p.title || p.title === "Untitled")) p.title = String(plan.title);
-    p.blocks = out.concat(p.blocks.filter(isRef));
-    save(); showDoc();
+    p.texts.push(Object.assign(src, { units: added }));
+    return { added: added, same: same, src: src };
   }
-  function secBlocks(k) { return W.paper.blocks.filter(function (b) { return b.sec === k && !b.head; }); }
-  function writeSection(k, job, waitNote) {
-    var p = W.paper, plan = p.plan, bs = secBlocks(k);
-    if (!bs.length || bs.every(function (b) { return b.by === "me"; })) return Promise.resolve();
-    var before = W.paper.blocks.filter(function (b) { return b.sec === k - 1 && !b.head; }).slice(-1)[0];
-    var mine = bs.filter(function (b) { return b.by === "me"; }).map(function (b) { return b.id; });
-    var item = function (b, i) {
-      var vs = (b.src || []).filter(function (v) { return v !== b.text; });
-      return "[" + (i + 1) + "]" + (b.by === "me" ? " [YOURS]" : "") + " " + b.text + vs.map(function (v) { return "\n   (another version) " + v; }).join("");
-    };
-    // a long section is written in parts, each continuing the one before
-    var parts = [], cur = [], size = 0;
-    bs.forEach(function (b, i) { var len = item(b, i).length; if (cur.length && size + len > 14000) { parts.push(cur); cur = []; size = 0; } cur.push(b); size += len; });
-    if (cur.length) parts.push(cur);
-    var out = [], kept = {};
-    var planText = plan.sections.map(function (s, i) { return (i === k ? "→ " : "  ") + (i + 1) + ". " + s.title + " — " + (s.logic || ""); }).join("\n");
-    var run = parts.reduce(function (pr, part, pi) {
+
+  /* Gemini helpers for the stages */
+  function stageGemini(prompt, job, opts) {
+    return gemini(prompt, Object.assign({ json: true, max: 32768, temp: 0.3, job: job, onWait: function (s) { job.label = "Gemini asked to wait " + s + " s (free plan limit)…"; progress(); } }, opts || {}));
+  }
+  function setJob(job, label) { job.label = label; progress(); }
+
+  var CARD_RULES = "You are reading raw material for a literary-studies article (mostly Chinese, with Portuguese, French and English quotations). It mixes finished paragraphs, rough drafts, several versions of the same passage, explanations written by AI tools (often bullet points), the author's own instructions or comments to an AI, outline lines and scraps.\n\n" +
+    "Split each numbered paragraph into IDEA UNITS. An idea unit is one point with its evidence: one scene or event, one fact or document, one argument or interpretation. Most paragraphs are one unit; split only where the paragraph moves to a different point. Use the sentence numbers ①②③….\n\n" +
+    "For each unit give:\n" +
+    "- \"s\": the sentence range, e.g. \"1-3\"\n" +
+    "- \"kind\": \"text\" (content for the article in any form — including AI explanations and bullet notes that contain facts or arguments) | \"note\" (the author's instructions, questions, plans or judgments addressed to a writer or an AI, to-dos, research tasks) | \"fragment\" (an unfinished sentence or a scrap without a complete point) | \"heading\" (a title or outline line)\n" +
+    "- \"mat\": 3 = mature (complete, specific, explained and well written; every claim carries its evidence), 2 = developing (the point is there but vague, unsupported, unexplained or rough), 1 = sketch (keywords, a slogan-like claim, an outline of an idea)\n" +
+    "- \"when\": the time the content is ABOUT (not when it was written): a year or range such as \"1794\" or \"1768-1789\"; null for timeless analysis\n" +
+    "- \"point\": ONE sentence in Chinese saying exactly what the unit says — specific names, dates and the claim — so that two units saying the same thing get nearly the same point\n" +
+    "- \"who\": up to 5 key people, places or works (original spelling)\n" +
+    "Answer JSON only: {\"P1\":[{\"s\":\"1-2\",\"kind\":\"text\",\"mat\":3,\"when\":\"1794\",\"point\":\"…\",\"who\":[\"…\"]}],\"P2\":[…]}";
+  function cardBatches(units) {
+    var out = [], cur = [], size = 0;
+    units.forEach(function (u) { var n = u.text.length; if (cur.length && (size + n > 9000 || cur.length >= 45)) { out.push(cur); cur = []; size = 0; } cur.push(u); size += n; });
+    if (cur.length) out.push(cur);
+    return out;
+  }
+  var CIRC = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+  function numbered(u) { var ss = A().sentences(u.text); u._ss = ss; return ss.map(function (s, i) { return (CIRC[i] || "(" + (i + 1) + ")") + s; }).join(""); }
+  // stage 1 with Gemini: cards (and splits) for every unit not yet read
+  function readCards(job) {
+    var p = W.paper, todo = p.units.filter(function (u) { return !u.dup && !u.carded && !u.parent; });
+    var batches = cardBatches(todo);
+    job.total = batches.length + 3; job.done = 0;
+    return batches.reduce(function (pr, batch, bi) {
       return pr.then(function () {
         if (job.stop) throw new Error("stopped");
-        var last = out.length ? out[out.length - 1] : before;
-        var prompt = context() + "\nThe article: " + (plan.title || W.paper.title) + "\nThe plan:\n" + planText +
-          (last ? "\n\nThe text before ends with:\n\"" + last.text.slice(-600) + "\"" : "\n\nThis is the opening of the article: begin with the most vivid, concrete scene or image in the material.") +
-          "\n\nWrite section " + (k + 1) + ": \"" + plan.sections[k].title + "\" — " + (plan.sections[k].logic || "") +
-          (parts.length > 1 ? "\nThis section is long, so it is written in " + parts.length + " parts; this is part " + (pi + 1) + (pi ? ": continue straight on from the text before, without repeating it" : "") + "." : "") +
-          "\n\n" + WRITE + "\n\nMaterial for this " + (parts.length > 1 ? "part" : "section") + ":\n\n" + part.map(item).join("\n\n");
-        if (job.label && parts.length > 1) { job.label = job.label.replace(/ \(part \d+ of \d+\)$/, "") + " (part " + (pi + 1) + " of " + parts.length + ")"; progress(); }
-        var matLen = part.reduce(function (n, b) { return n + b.text.replace(/\s+/g, "").length; }, 0);
-        var getParas = function (r) { var j = parseJSON(r.text); return j && (j.paragraphs || (Array.isArray(j) ? j : null)); };
-        var lenOf = function (ps) { return (ps || []).reduce(function (n, x) { var t = typeof x === "string" ? x : x && x.text; if (x && x.keep != null) { var kb = part[+x.keep - 1]; t = kb && kb.text; } return n + String(t || "").replace(/\s+/g, "").length; }, 0); };
-        return gemini(prompt, { json: true, max: 32768, job: job, onWait: waitNote }).then(function (r) {
-          var paras = getParas(r);
-          // far shorter than the material: Gemini summarized — ask once more, keeping everything
-          if (paras && paras.length && matLen > 400 && lenOf(paras) < matLen * 0.7) {
-            return gemini(prompt + "\n\nIMPORTANT: an earlier answer was only " + Math.round(lenOf(paras) / matLen * 100) + "% as long as the material and lost content. Keep every point, detail, example and quotation; do not condense.", { json: true, max: 32768, job: job, onWait: waitNote })
-              .then(function (r2) { var p2 = getParas(r2); return p2 && lenOf(p2) > lenOf(paras) ? p2 : paras; }, function () { return paras; });
-          }
-          if (!paras || !paras.length) throw new Error("section " + (k + 1) + " came back empty" + (r.cut ? " (cut off)" : ""));
-          return paras;
-        }).then(function (paras) {
-          paras.forEach(function (x) {
-            if (x && x.keep != null) { var kb = part[+x.keep - 1]; if (kb && kb.by === "me" && !kept[kb.id]) { kept[kb.id] = 1; out.push(kb); } return; }
-            var t = typeof x === "string" ? x : x && x.text; if (!t || !String(t).trim()) return;
-            var from = ((x && x.from) || []).map(function (n) { return part[+n - 1]; }).filter(Boolean), src = [];
-            from.forEach(function (b) { (b.src && b.src.length ? b.src : [b.text]).forEach(function (v) { if (src.indexOf(v) < 0) src.push(v); }); });
-            out.push({ id: uid(), text: String(t).trim(), by: "ai", ai: String(t).trim(), sec: k, src: src, made: Date.now() });
+        setJob(job, "Reading your texts and breaking them into ideas… part " + (bi + 1) + " of " + batches.length);
+        var prompt = context() + "\n" + CARD_RULES + "\n\nParagraphs:\n\n" + batch.map(function (u, i) { return "[P" + (i + 1) + "] " + numbered(u); }).join("\n\n");
+        return stageGemini(prompt, job).then(function (r) {
+          var j = parseJSON(r.text) || {};
+          batch.forEach(function (u, i) {
+            var cards = j["P" + (i + 1)]; u.carded = true;
+            if (!Array.isArray(cards) || !cards.length) return;
+            var apply = function (t, c) { t.kind = /^(text|note|fragment|heading)$/.test(c.kind) ? c.kind : t.kind; t.mat = [1, 2, 3].indexOf(+c.mat) > -1 ? +c.mat : t.mat; t.when = c.when || t.when; t.pt = String(c.point || "").slice(0, 200); t.who = (c.who || []).slice(0, 5); };
+            if (cards.length === 1) { apply(u, cards[0]); return; }
+            // several ideas in one paragraph: it becomes several units (its text is kept whole as their parent)
+            var ss = u._ss || A().sentences(u.text), made = 0;
+            cards.forEach(function (c) {
+              var m = String(c.s || "").match(/(\d+)\s*[-–~]\s*(\d+)|(\d+)/); if (!m) return;
+              var a = +(m[1] || m[3]) - 1, b = +(m[2] || m[3]) - 1; if (a < 0 || b < a || a >= ss.length) return;
+              var t = joinSents(ss.slice(a, Math.min(b, ss.length - 1) + 1)).trim(); if (!t) return;
+              var nu = { id: "u" + (++p.unitSeq), src: u.src, text: t, parent: u.id, carded: true, kind: "text", mat: 2, when: null, fresh: u.fresh };
+              apply(nu, c); p.units.push(nu); made++;
+            });
+            if (made) u.split = true; else apply(u, cards[0]);
           });
-          part.forEach(function (b) { if (b.by === "me" && !kept[b.id]) { kept[b.id] = 1; out.push(b); } });   // yours is never dropped
+          job.done++; progress(); save();
         });
       });
     }, Promise.resolve());
-    return run.then(function () {
-      readDoc();
-      var now = secBlocks(k);
-      // you edited this section while Gemini was writing it: your version stays
-      if (now.some(function (b) { return b.by === "me" && mine.indexOf(b.id) < 0; }) || now.length !== bs.length) return;
-      // fragments Gemini didn't use are kept aside, so nothing is lost
-      var usedTxt = {}; out.forEach(function (b) { (b.src || []).forEach(function (v) { usedTxt[v] = 1; }); usedTxt[b.text] = 1; });
-      // a fragment Gemini didn't name: kept with the paragraph closest to it, to compare (nothing goes missing)
-      var ovs = out.map(function (o) { return A().terms(o.text); });
-      bs.forEach(function (b) {
-        if (b.by === "me" || usedTxt[b.text] || !out.length) return;
-        var bv = A().terms(b.text), bi = 0, bsim = -1;
-        ovs.forEach(function (v, i) { var c = A().cosine(bv, v); if (c > bsim) { bsim = c; bi = i; } });
-        var o = out[bi]; o.src = (o.src || []).concat(b.src && b.src.length ? b.src : [b.text]);
+  }
+  // the units that take part in the map (a split paragraph is represented by its parts)
+  function mapUnits() { return (W.paper.units || []).filter(function (u) { return !u.dup && !u.split; }); }
+
+  var GROUP_RULES = "Below are cards: each is one idea unit from the author's material (id, time it is about, maturity, kind, and its point). Many cards say the same thing in different words, in different texts, or one is a fuller version of another.\n" +
+    "1. Put together the cards that make THE SAME POINT (versions of one idea). Do not group cards that are merely on the same topic: two different facts about the same person are two ideas. For each group choose the best card — the most complete, specific and best-written (prefer maturity 3; if equal, prefer the later text) — and write a short gist in Chinese.\n" +
+    "2. List contradictions: cards that state different facts about the same thing (dates, numbers, durations, names, who did what).\n" +
+    "Answer JSON only: {\"groups\":[{\"cards\":[\"c12\",\"c40\"],\"best\":\"c40\",\"gist\":\"…\"}],\"conflicts\":[{\"cards\":[\"c3\",\"c9\"],\"note\":\"in Chinese: what differs\"}]}\nCards that have no other version need not be listed.";
+  function cardLine(u) { return "[" + u.id + "] (" + (u.when || "—") + " · " + MATW[u.mat || 2] + (u.kind !== "text" ? " · " + u.kind : "") + ") " + (u.pt || u.text.slice(0, 120)); }
+  function groupIdeas(job) {
+    var p = W.paper, us = mapUnits().filter(function (u) { return u.kind === "text" || u.kind === "fragment"; });
+    setJob(job, "Finding the passages that say the same thing… (" + fmtN(us.length) + " ideas)");
+    return stageGemini(context() + "\n" + GROUP_RULES + "\n\nTexts in the order they were added: " + (p.texts || []).map(function (s, i) { return (i + 1) + ". " + s.name; }).join("; ") + "\n\nCards:\n" + us.map(function (u) { return cardLine(u) + " {text " + ((p.texts || []).findIndex(function (s) { return s.id === u.src; }) + 1) + "}"; }).join("\n"), job, { temp: 0.2 })
+      .then(function (r) {
+        var j = parseJSON(r.text) || {}, byId = {}, taken = {};
+        us.forEach(function (u) { byId[u.id] = u; });
+        var ideas = [];
+        (j.groups || []).forEach(function (g) {
+          var ids = (g.cards || []).filter(function (id) { return byId[id] && !taken[id]; }); if (ids.length < 1) return;
+          ids.forEach(function (id) { taken[id] = 1; });
+          var best = ids.indexOf(g.best) > -1 ? g.best : ids.slice().sort(function (a, b) { return (byId[b].mat || 0) - (byId[a].mat || 0) || byId[b].text.length - byId[a].text.length; })[0];
+          ideas.push({ units: ids, best: best, gist: String(g.gist || byId[best].pt || "").slice(0, 160) });
+        });
+        us.forEach(function (u) { if (!taken[u.id]) ideas.push({ units: [u.id], best: u.id, gist: u.pt || u.text.slice(0, 80) }); });
+        p.conflicts = (j.conflicts || []).map(function (c) { return { units: (c.cards || []).filter(function (id) { return byId[id]; }), note: String(c.note || "") }; }).filter(function (c) { return c.units.length > 1; });
+        return ideas;
       });
-      var all = W.paper.blocks, first = all.indexOf(now[0]);
-      W.paper.blocks = all.filter(function (b) { return now.indexOf(b) < 0; });
-      var head = W.paper.blocks.findIndex(function (b) { return b.head && b.sec === k; });
-      var at = head > -1 ? head + 1 : Math.min(first, W.paper.blocks.length);
-      W.paper.blocks.splice.apply(W.paper.blocks, [at, 0].concat(out));
-      save(); showDoc();
-    }, function (e) { if (e.message !== "stopped") throw e; });
   }
-  /* without a key: the same instructions as one prompt, and the answer pasted back */
+  // local version of the same step, for working without a key
+  function groupIdeasLocal() {
+    var us = mapUnits().filter(function (u) { return u.kind === "text" || u.kind === "fragment"; });
+    var items = us.map(function (u) { return { id: u.id, text: u.text, by: "paste", src: [] }; });
+    var vec = A().weigh(items.map(function (it) { return A().terms(it.text); }));
+    // anchors: the rare, specific things a passage mentions (numbers, years, names, quoted words)
+    var anc = items.map(function (it) { var o = {}; (it.text.match(/\d[\d,.]*|[一二三四五六七八九十百千万〇零]{3,}|[A-ZÀ-Ý][a-zà-ÿ]{2,}(?:\s[A-ZÀ-Ý][a-zà-ÿ]+)*|[“"「《（(][^”"」》）)]{2,24}[”"」》）)]/g) || []).forEach(function (a) { o[a.toLowerCase()] = 1; }); return o; });
+    var df = {}; anc.forEach(function (o) { for (var a in o) df[a] = (df[a] || 0) + 1; });
+    var shared = function (i, j) { var n = 0; for (var a in anc[i]) if (anc[j][a] && df[a] <= 12) n++; return n; };
+    var seed = {}, groups = {};
+    A().near(vec, 0.28, function (i) { return A().count(items[i].text).total < 15; }).filter(function (pr) { return pr[2] >= 0.5 || shared(pr[0], pr[1]) >= 2; }).sort(function (a, b) { return b[2] - a[2]; }).forEach(function (pr) {
+      var i = pr[0], j = pr[1];
+      if (seed[i] == null && seed[j] == null) { seed[i] = i; seed[j] = i; groups[i] = [i, j]; }
+      else if (seed[i] === i && seed[j] == null) { seed[j] = i; groups[i].push(j); }
+      else if (seed[j] === j && seed[i] == null) { seed[i] = j; groups[j].push(i); }
+    });
+    var ideas = [], used = {};
+    Object.keys(groups).forEach(function (g) {
+      var ms = groups[g].map(function (k) { used[k] = 1; return us[k]; });
+      var best = ms.slice().sort(function (a, b) { return (b.mat || 0) - (a.mat || 0) || b.text.length - a.text.length; })[0];
+      ideas.push({ units: ms.map(function (u) { return u.id; }), best: best.id, gist: best.text.slice(0, 80) });
+    });
+    us.forEach(function (u, k) { if (!used[k]) ideas.push({ units: [u.id], best: u.id, gist: u.text.slice(0, 80) }); });
+    // keep them in the order they first appear
+    var pos = {}; us.forEach(function (u, k) { pos[u.id] = k; });
+    ideas.sort(function (a, b) { return Math.min.apply(null, a.units.map(function (id) { return pos[id]; })) - Math.min.apply(null, b.units.map(function (id) { return pos[id]; })); });
+    return ideas;
+  }
+
+  var OUTLINE_RULES = "You are the editor of this article. Below are its ideas (id, the time each is about, maturity, number of versions, gist), and the author's own notes found in the material — follow them, they say what she wants.\n\n" +
+    "Design the article the way a fine human editor would:\n" +
+    "1. Find the CHAINS. A chain is one line of cause and effect through the life and work of the person at the centre: an experience, institution, place, encounter, relationship or reading → how it shaped his fears, desires, character or way of seeing → the choices it led to → what it became in the novel. Group ideas by these hidden connections, NOT by shared keywords and NOT by date. Ideas that are scattered across different texts but belong to one chain must end up together. Keep every chain whole.\n" +
+    "2. Inside a chain, order the ideas so that each one prepares the next (usually the order in time).\n" +
+    "3. Order the chains for a reader: open with a concrete, vivid scene or document that raises a question; reveal gradually — do not give away the conclusion in the first section; let each section answer something and raise the next question; explain mechanisms (institutions, laws, social structures) before the phenomena they produce; build toward the thesis; close by drawing the chains together.\n" +
+    "4. Every idea id must be placed in exactly one section, except ideas that are plainly outside this article (list them as \"outside\"). Keep everything else — even sketches belong where their point fits.\n" +
+    "5. Note gaps: places where a link in a chain is asserted but not supported, or where readers would need a missing explanation.\n" +
+    "Section titles short, in Chinese.\n" +
+    "Answer JSON only: {\"title\":\"…\",\"sections\":[{\"title\":\"…\",\"does\":\"what this section does for the reader and why it comes here\",\"chain\":\"the cause-and-effect line, e.g. A → B → C\",\"ideas\":[\"i3\",\"i17\"]}],\"gaps\":[{\"idea\":\"i17\",\"note\":\"…\"}],\"outside\":[\"i40\"]}";
+  function outline(ideas, job) {
+    var p = W.paper, notes = mapUnits().filter(function (u) { return u.kind === "note"; });
+    setJob(job, "Finding the chains of cause and effect and the order for a reader… (" + fmtN(ideas.length) + " ideas)");
+    var lines = ideas.map(function (d) {
+      var b = unitById(d.best) || {};
+      return "[" + d.id + "] (" + (b.when || "—") + " · " + MATW[b.mat || 2] + (d.units.length > 1 ? " · " + d.units.length + " versions" : "") + ") " + d.gist;
+    });
+    var noteText = notes.slice(0, 60).map(function (u) { return "- " + u.text.slice(0, 600); }).join("\n");
+    return stageGemini(context() + "\n" + OUTLINE_RULES + (noteText ? "\n\nThe author's notes:\n" + noteText : "") + "\n\nIdeas:\n" + lines.join("\n"), job, { temp: 0.4 }).then(function (r) {
+      var j = parseJSON(r.text);
+      if (!j || !Array.isArray(j.sections) || !j.sections.length) throw new Error("Gemini's outline couldn't be read" + (r.cut ? " (it was cut off)" : "") + ".");
+      return j;
+    });
+  }
+  function outlineLocal(ideas) {
+    // without Gemini: related ideas grouped by their words; each group named after its main names
+    var items = ideas.map(function (d) { var b = unitById(d.best); return { id: d.id, text: (b && b.text) || d.gist }; });
+    var ordered = threadOrder(items), secs = [], cur = null;
+    ordered.forEach(function (it) {
+      if (!cur || cur.t !== it.thread) { cur = { t: it.thread, ideas: [] }; secs.push(cur); }
+      cur.ideas.push(it.id);
+    });
+    // small groups join the group they are closest to, until the article has a readable number of sections
+    var textOf = {}; items.forEach(function (it) { textOf[it.id] = it.text; });
+    var vecOf = function (s) { var v = {}; s.ideas.forEach(function (id) { var t = A().terms(textOf[id]); for (var w in t) v[w] = (v[w] || 0) + t[w]; }); return v; };
+    var guard = 0;
+    while (secs.length > 1 && guard++ < 500) {
+      var small = secs.slice().sort(function (a, b) { return a.ideas.length - b.ideas.length; })[0];
+      if (small.ideas.length >= 5 && secs.length <= 16) break;
+      var sv = vecOf(small), best = null, bs = -1;
+      secs.forEach(function (o) { if (o === small) return; var c = A().cosine(sv, vecOf(o)); if (c > bs) { bs = c; best = o; } });
+      best.ideas = best.ideas.concat(small.ideas); secs.splice(secs.indexOf(small), 1);
+    }
+    return { title: "", sections: secs.map(function (s, k) {
+      var t = {}; s.ideas.forEach(function (id) { var d = ideas.filter(function (x) { return x.id === id; })[0], b = unitById(d.best); var tm = A().terms(b ? b.text : d.gist); for (var w in tm) t[w] = (t[w] || 0) + tm[w]; });
+      var top = [];
+      Object.keys(t).filter(function (w) { return w.length > 1; }).sort(function (a, b) { return t[b] - t[a]; }).forEach(function (w) { if (top.length < 2 && !top.some(function (x) { return w.split("").some(function (ch) { return x.indexOf(ch) > -1; }); })) top.push(w); });
+      return { title: "Group " + (k + 1) + (top.length ? " · " + top.join(" ") : ""), does: "", chain: "", ideas: s.ideas };
+    }), gaps: [], outside: [] };
+  }
+
+  var FUSE_RULES = "For each idea below you get its versions (★ = the best one). Write ONE passage that contains every piece of information from all versions: every fact, name, date, number, quotation, source reference, and every distinct argument, image or nuance. Start from the ★ version and keep its sentences wherever possible; insert the details that appear only in other versions where they belong; join them smoothly. Remove only what is exactly repeated. Do not summarize, do not shorten, do not add anything that is not in the versions, do not change any claim. If versions contradict each other on a fact, keep the ★ version's and report the difference in \"conflicts\". Same language as the material (Chinese).\n" +
+    "Answer JSON only: {\"i5\":{\"text\":\"…\",\"conflicts\":[\"…\"]},\"i9\":{…}}";
+  function fuseBatches(ideas) {
+    var out = [], cur = [], size = 0;
+    ideas.forEach(function (d) { var n = d.units.reduce(function (s, id) { var u = unitById(id); return s + (u ? u.text.length : 0); }, 0); if (cur.length && (size + n > 10000 || cur.length >= 12)) { out.push(cur); cur = []; size = 0; } cur.push(d); size += n; });
+    if (cur.length) out.push(cur);
+    return out;
+  }
+  function uniqueLen(d) {   // the length of what the versions say, counting each sentence once
+    var seen = {}, n = 0;
+    d.units.forEach(function (id) { var u = unitById(id); if (!u) return; A().sentences(u.text).forEach(function (s) { var k = s.replace(/[\s，。,.、；;：:“”"'‘’（）()]/g, ""); if (k.length > 3 && !seen[k]) { seen[k] = 1; n += k.length; } }); });
+    return n;
+  }
+  function fuse(ideas, job) {
+    var todo = ideas.filter(function (d) { return d.units.length > 1 && !d.me && !d.fusedOk; });
+    var batches = fuseBatches(todo);
+    job.total = job.done + batches.length + 1;
+    return batches.reduce(function (pr, batch, bi) {
+      return pr.then(function () {
+        if (job.stop) throw new Error("stopped");
+        setJob(job, "Fusing the versions of each idea into one passage, keeping every detail… part " + (bi + 1) + " of " + batches.length);
+        var prompt = context() + "\n" + FUSE_RULES + "\n\n" + batch.map(function (d) {
+          return "[" + d.id + "]\n" + d.units.map(function (id) { var u = unitById(id); return u ? (id === d.best ? "★ " : "• ") + u.text : ""; }).filter(Boolean).join("\n");
+        }).join("\n\n");
+        var run = function (extra) { return stageGemini(prompt + (extra || ""), job).then(function (r) { return parseJSON(r.text) || {}; }); };
+        return run().then(function (j) {
+          // anything that came back much shorter than its versions is asked for again once
+          var short = batch.filter(function (d) { var o = j[d.id], t = o && (o.text || (typeof o === "string" ? o : "")); return !t || t.replace(/\s/g, "").length < uniqueLen(d) * 0.75; });
+          if (!short.length) return j;
+          return run("\n\nIMPORTANT: an earlier answer lost details in " + short.map(function (d) { return d.id; }).join(", ") + ". Keep every sentence's information.").then(function (j2) {
+            short.forEach(function (d) { var a = j[d.id], b = j2[d.id], ta = a && (a.text || a), tb = b && (b.text || b); if (tb && (!ta || String(tb).length > String(ta).length)) j[d.id] = b; });
+            return j;
+          }, function () { return j; });
+        }).then(function (j) {
+          batch.forEach(function (d) {
+            var o = j[d.id]; if (!o) return;
+            var t = typeof o === "string" ? o : o.text; if (!t || !String(t).trim()) return;
+            var live = ideaById(d.id) || d; if (live.me) return;
+            live.text = String(t).trim(); live.fused = true; live.fusedOk = true;
+            live.conflicts = (o.conflicts || []).map(String).filter(Boolean);
+          });
+          job.done++; progress(); save();
+        });
+      });
+    }, Promise.resolve());
+  }
+
+  /* the whole run; with a key every stage uses Gemini, without one the same map is made locally */
+  function organize(opts) {
+    opts = opts || {};
+    var p = W.paper;
+    if (W.job) return toast("Still organizing — wait for it to finish, or press Stop.");
+    readDoc(); remember();
+    var job = W.job = { total: 4, done: 0, stop: false, label: "Organizing…", run: Date.now() };
+    W.note = null; progress();
+    var useAI = !!aiKey(), oldMap = p.map;
+    var step1 = useAI ? readCards(job) : Promise.resolve();
+    step1.then(function () {
+      return useAI ? groupIdeas(job) : groupIdeasLocal();
+    }).then(function (ideas) {
+      // ideas keep their id (and your edits) when they contain the same main unit as before
+      var prev = (oldMap && oldMap.ideas) || [], seq = p.ideaSeq || 0, usedOld = {};
+      ideas.forEach(function (d) {
+        var old = prev.filter(function (o) { return !usedOld[o.id] && (o.units.indexOf(d.best) > -1 || d.units.indexOf(o.best) > -1); })[0];
+        if (old) usedOld[old.id] = 1;
+        d.id = old ? old.id : "i" + (++seq);
+        if (old) {
+          if (old.me) { d.me = true; d.text = old.text; d.newVersions = d.units.some(function (id) { return old.units.indexOf(id) < 0; }); }
+          else if (old.fusedOk && old.units.length === d.units.length && old.units.every(function (id) { return d.units.indexOf(id) > -1; })) { d.text = old.text; d.fused = old.fused; d.fusedOk = true; d.conflicts = old.conflicts; }
+          if (old.out) d.out = old.out;
+        }
+        if (!d.text) d.text = (unitById(d.best) || {}).text || d.gist;
+      });
+      p.ideaSeq = seq;
+      // scraps on their own (an unfinished sentence with no other version) stay in the map, not in the draft
+      ideas.forEach(function (d) { if (!d.out && !d.me && d.units.every(function (id) { return (unitById(id) || {}).kind === "fragment"; })) d.out = "fragment"; });
+      job.done++; progress();
+      var forOutline = ideas.filter(function (d) { return !d.out; });
+      return (useAI ? outline(forOutline, job) : Promise.resolve(outlineLocal(forOutline))).then(function (o) { return { ideas: ideas, o: o }; });
+    }).then(function (r) {
+      var ideas = r.ideas, o = r.o, byId = {}, placed = {};
+      ideas.forEach(function (d) { byId[d.id] = d; });
+      var sections = (o.sections || []).map(function (s, k) {
+        var ids = (s.ideas || []).filter(function (id) { return byId[id] && !placed[id]; });
+        ids.forEach(function (id) { placed[id] = 1; });
+        return { id: "sec" + k + "-" + Date.now().toString(36), title: String(s.title || "Section " + (k + 1)), does: String(s.does || ""), chain: String(s.chain || ""), ideas: ids };
+      }).filter(function (s) { return s.ideas.length; });
+      (o.outside || []).forEach(function (id) { if (byId[id] && !placed[id]) { placed[id] = 1; byId[id].out = byId[id].out || "outside"; } });
+      // anything the outline forgot goes into the section closest to it
+      ideas.forEach(function (d) {
+        if (placed[d.id] || d.out) return;
+        var dv = A().terms(d.text), best = sections.length - 1, bs = -1;
+        sections.forEach(function (s, k) { var v = {}; s.ideas.slice(0, 30).forEach(function (id) { var t = A().terms(byId[id].text); for (var w in t) v[w] = (v[w] || 0) + t[w]; }); var c = A().cosine(dv, v); if (c > bs) { bs = c; best = k; } });
+        if (best < 0) { sections.push({ id: "sec-x", title: "Other", does: "", chain: "", ideas: [] }); best = 0; }
+        sections[best].ideas.push(d.id); placed[d.id] = 1;
+      });
+      p.map = { title: o.title || "", sections: sections, ideas: ideas, gaps: (o.gaps || []).filter(function (g) { return byId[g.idea]; }), at: Date.now(), ai: useAI };
+      if (o.title && (!p.title || p.title === "Untitled")) p.title = String(o.title);
+      job.done++; progress(); save();
+      return useAI ? fuse(ideas, job) : null;
+    }).then(function () {
+      p.units.forEach(function (u) { delete u.fresh; });
+      assemble(); job.done = job.total; save();
+    }).catch(function (e) {
+      if (e.message !== "stopped") { job.error = e.message; console.error(e); }
+    }).then(function () {
+      W.job = null;
+      var m = p.map;
+      if (job.error && !m) W.note = { warn: true, html: "Organizing stopped: " + esc(job.error) + ". Everything read so far is saved — press <b>Organize again</b> to continue." };
+      else if (job.stop) W.note = { html: "Stopped. What was done is kept; <b>Organize again</b> continues from here." };
+      else {
+        var ideas = m.ideas.filter(function (d) { return !d.out; }), folded = m.ideas.reduce(function (n, d) { return n + d.units.length - 1; }, 0);
+        var notes = mapUnits().filter(function (u) { return u.kind === "note"; }).length;
+        W.note = { html: (job.error ? "<b>Done, with a problem in the last step</b> (" + esc(job.error) + ") — the map is ready; <b>Organize again</b> finishes it. " : "<b>Organized.</b> ") +
+          fmtN(mapUnits().length) + " passages → " + fmtN(ideas.length) + " ideas in " + m.sections.length + " sections" +
+          (folded ? "; " + fmtN(folded) + " versions folded into the idea they repeat" : "") +
+          ((p.conflicts || []).length ? "; " + p.conflicts.length + " contradictions to check" : "") +
+          (notes ? "; " + notes + " notes to yourself set aside" : "") +
+          ". Nothing was deleted." + (m.ai ? "" : " (Without a Gemini key the grouping is by shared words only.)") };
+        p.view = "map";
+      }
+      save(); if (W.step === 1) render();
+    });
+  }
+
+  /* the rough draft, assembled from the map; paragraphs you edited stay exactly as you wrote them */
+  function assemble() {
+    var p = W.paper, m = p.map; if (!m) return;
+    var old = {}; p.blocks.forEach(function (b) { if (b.idea) old[b.idea] = b; });
+    var blocks = [];
+    m.sections.forEach(function (s) {
+      blocks.push({ id: "h-" + s.id, text: "## " + s.title, by: "ai", head: true, sec: s.id });
+      s.ideas.forEach(function (id) {
+        var d = ideaById(id); if (!d || d.out) return;
+        var b = old[id];
+        if (b && b.by === "me") { d.text = b.text; d.me = true; b.sec = s.id; blocks.push(b); return; }
+        blocks.push({ id: b ? b.id : "b-" + id, text: d.text, by: d.me ? "me" : d.fused ? "ai" : "paste", idea: id, sec: s.id, made: Date.now() });
+      });
+    });
+    p.blocks = blocks.concat(p.blocks.filter(isRef));
+  }
+  // after editing the draft: the map follows (your text becomes the idea's text; new paragraphs become ideas)
+  function syncFromDraft() {
+    var p = W.paper, m = p.map; if (!m) return;
+    var sec = m.sections[0] && m.sections[0].id, seen = {};
+    p.blocks.forEach(function (b) {
+      if (isRef(b)) return;
+      if (b.head) { var s0 = m.sections.filter(function (s) { return "h-" + s.id === b.id; })[0]; if (s0) { sec = s0.id; s0.title = b.text.replace(/^#+\s*/, ""); } return; }
+      var d = b.idea && ideaById(b.idea);
+      if (!d) {   // a paragraph you added
+        d = { id: "i" + (++p.ideaSeq), units: [], best: null, gist: b.text.slice(0, 80), text: b.text, me: true };
+        m.ideas.push(d); b.idea = d.id;
+        var s1 = m.sections.filter(function (s) { return s.id === sec; })[0];
+        if (s1) { var prevIdea = null; p.blocks.slice(0, p.blocks.indexOf(b)).forEach(function (x) { if (x.idea && x.sec === sec) prevIdea = x.idea; }); var at = prevIdea ? s1.ideas.indexOf(prevIdea) + 1 : 0; s1.ideas.splice(at, 0, d.id); }
+      }
+      b.sec = sec; seen[d.id] = 1;
+      if (b.by === "me" && d.text !== b.text) { d.text = b.text; d.me = true; }
+    });
+    // ideas whose paragraph you deleted are kept in the map as "you deleted"
+    m.ideas.forEach(function (d) { if (!d.out && !seen[d.id] && m.sections.some(function (s) { return s.ideas.indexOf(d.id) > -1; })) d.out = "deleted"; });
+  }
+
+  /* ---------- improving the draft with Gemini, on request, with a preview ---------- */
+  var IMPROVE = {
+    read: ["Make it read well", "Make this read as finished, fluent prose: well-built, connected sentences (no short choppy ones), dense with information. Keep every fact, example, quotation, image and nuance, and the author's best sentences and voice."],
+    explain: ["Explain for readers", "Explain for intelligent readers without background: at the first mention of each person, place, institution, term, work or event, add a brief clear explanation woven into the sentence (who, what, when, why it matters). Say what each piece of evidence shows. Keep everything already there."],
+    connect: ["Show the connections", "Make the connections explicit: how each paragraph follows from the one before and leads to the next — causes and consequences, how an experience shaped his fears, desires and character, the choices it led to, and what it became in the novel. Add real transitions and backward or forward references. Keep everything."],
+    mechanism: ["Explain the mechanisms", "Do not let phenomena explain phenomena: for each phenomenon described, explain the mechanism behind it — the institutions, laws, religious rules, economic interests and social structures that produced it — and then how it bears on his life and on the novel. Keep everything."],
+    evidence: ["Mark what is inferred", "Make the level of evidence visible: separate what documents show (naming the source) from what is inferred, and phrase inferences as inferences (e.g. 很可能 / 这只是推测), without weakening documented facts. Keep everything."],
+    scene: ["Open with a scene", "Rewrite the opening of this part as a vivid scene grounded only in the documented details in the text, then turn it into the question the part answers. Keep everything else."]
+  };
+  function styleSamples() {
+    var us = mapUnits().filter(function (u) { return u.kind === "text" && u.mat === 3; }).sort(function (a, b) { return b.text.length - a.text.length; });
+    var out = "", n = 0; us.forEach(function (u) { if (n < 3500) { out += u.text + "\n"; n += u.text.length; } });
+    return out;
+  }
+  function sectionOfCaret() {
+    var sel = window.getSelection(), n = sel && sel.anchorNode, el = n && (n.nodeType === 1 ? n : n.parentElement), pe = el && el.closest && el.closest(".wr-write p[data-id]");
+    var blocks = W.paper.blocks, i = pe ? blocks.findIndex(function (b) { return b.id === pe.getAttribute("data-id"); }) : -1;
+    for (; i >= 0; i--) if (blocks[i].head) return blocks[i].sec || blocks[i].id;
+    return null;
+  }
+  function improve(kind, scope, custom) {
+    var p = W.paper; readDoc(); syncFromDraft();
+    var secs = p.blocks.filter(function (b) { return b.head; }).map(function (b) { return b.sec || b.id; });
+    var target = scope === "all" ? secs : [scope || sectionOfCaret() || secs[0]].filter(Boolean);
+    if (!target.length) { target = [null]; }
+    var instr = kind === "custom" ? custom : IMPROVE[kind][1];
+    if (!aiKey()) {
+      var txt = target.map(function (s) { return p.blocks.filter(function (b) { return !isRef(b) && (s == null || b.sec === s); }).map(function (b) { return b.text; }).join("\n\n"); }).join("\n\n");
+      return copyPrompt(context() + "\n" + instr + "\nKeep the paragraph structure; output only the rewritten text.\n\n" + txt, "Prompt copied. Paste Gemini's answer back with More → Paste an article from the Gemini website.");
+    }
+    var job = W.job = { total: target.length, done: 0, stop: false, label: "Gemini is improving the draft…" }; W.note = null; progress();
+    var proposals = [];
+    target.reduce(function (pr, sid, k) {
+      return pr.then(function () {
+        if (job.stop) return;
+        var bs = p.blocks.filter(function (b) { return !isRef(b) && !b.head && (sid == null || b.sec === sid); }); if (!bs.length) return;
+        var head = p.blocks.filter(function (b) { return b.head && (b.sec || b.id) === sid; })[0], s = p.map && p.map.sections.filter(function (x) { return x.id === sid; })[0];
+        var before = p.blocks[p.blocks.indexOf(bs[0]) - 1]; while (before && before.head) before = p.blocks[p.blocks.indexOf(before) - 1];
+        job.label = "Gemini is improving " + (head ? "“" + head.text.replace(/^#+\s*/, "") + "”" : "the draft") + (target.length > 1 ? " (" + (k + 1) + " of " + target.length + ")" : "") + "…"; progress();
+        var samples = styleSamples();
+        var prompt = context() + (samples ? "\nPassages from the author's own most finished writing — match this voice:\n\"\"\"\n" + samples + "\"\"\"\n" : "") +
+          (s ? "\nThis part: " + s.title + (s.does ? " — " + s.does : "") + (s.chain ? "\nIts chain: " + s.chain : "") : "") +
+          (before ? "\nThe text before it ends with: \"" + before.text.slice(-400) + "\"" : "") +
+          "\n\nTask: " + instr + "\nRules that always apply: keep every fact, name, date, number, quotation and source; never add facts, quotations or sources; same language as the text; paragraphs stay the units of argument.\n" +
+          "Answer JSON only: {\"paragraphs\":[\"…\",\"…\"]}\n\nText:\n\n" + bs.map(function (b) { return b.text; }).join("\n\n");
+        return gemini(prompt, { json: true, max: 32768, job: job }).then(function (r) {
+          var j = parseJSON(r.text), ps = j && (j.paragraphs || (Array.isArray(j) ? j : null));
+          if (ps && ps.length) proposals.push({ sec: sid, title: head ? head.text.replace(/^#+\s*/, "") : "", old: bs, neu: ps.map(function (x) { return String(x.text || x).trim(); }).filter(Boolean) });
+        }).catch(function (e) { job.error = e.message; }).then(function () { job.done++; progress(); });
+      });
+    }, Promise.resolve()).then(function () {
+      W.job = null; progress();
+      if (!proposals.length) { W.note = { warn: true, html: "Gemini didn't return a version" + (job.error ? ": " + esc(job.error) : "") + "." }; progress(); return; }
+      showProposal(proposals, kind === "custom" ? "Your instruction" : IMPROVE[kind][0]);
+    });
+  }
+  function showProposal(props, label) {
+    var w = sheet(label + " — proposal", '<p class="j-hint">Left: now. Right: Gemini\'s version. Nothing changes until you choose.</p>' + props.map(function (pr, k) {
+      return '<div class="wr-prop">' + (pr.title ? "<h4 class=\"wr-sub\">" + esc(pr.title) + "</h4>" : "") + '<div class="wr-prop-cols"><div>' + pr.old.map(function (b) { return "<p>" + esc(b.text) + "</p>"; }).join("") + '</div><div class="wr-prop-new">' + pr.neu.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("") + "</div></div>" +
+        '<p class="owner-tools"><label class="ed-check"><input type="checkbox" data-pk="' + k + '" checked> use this part</label></p></div>';
+    }).join(""));
+    w.querySelector(".ed-panel").classList.add("wide");
+    $(".ed-actions", w).innerHTML = '<button type="button" class="pill" data-x="no">Keep mine</button><button type="button" class="pill solid" data-x="yes">Use the checked parts</button>';
+    w.addEventListener("click", function (e) {
+      var x = e.target.closest("[data-x]"); if (!x) return;
+      if (x.getAttribute("data-x") === "no") return closeSheet();
+      remember();
+      var p = W.paper;
+      props.forEach(function (pr, k) {
+        var cb = w.querySelector('[data-pk="' + k + '"]'); if (cb && !cb.checked) return;
+        var at = p.blocks.indexOf(pr.old[0]); if (at < 0) return;
+        var src = pr.old.map(function (b) { return b.text; });
+        var neu = pr.neu.map(function (t, i) { return { id: uid(), text: t, by: "ai", ai: t, sec: pr.sec, src: src, idea: (pr.old[i] || pr.old[pr.old.length - 1]).idea, made: Date.now() }; });
+        // the ideas of this part now carry Gemini's text; extra paragraphs become new ideas in the map
+        p.blocks = p.blocks.filter(function (b) { return pr.old.indexOf(b) < 0; });
+        p.blocks.splice.apply(p.blocks, [at, 0].concat(neu));
+        if (p.map) {
+          var used = {};
+          neu.forEach(function (b) { if (b.idea && !used[b.idea]) { used[b.idea] = 1; var d = ideaById(b.idea); if (d) { d.text = b.text; d.me = false; d.fused = true; } } else { b.idea = null; } });
+          pr.old.forEach(function (b) { if (b.idea && !used[b.idea]) { var d = ideaById(b.idea); if (d) d.out = "merged"; } });
+          syncFromDraft();
+        }
+      });
+      save(); closeSheet(); p.view = "draft"; render(); W.note = { html: "Used. Purple dots mark Gemini's paragraphs — click one to compare with what was there." }; progress();
+    });
+  }
+
+  /* without a key: one prompt with the same method, and the answer pasted back */
   function copyBuildPrompt() {
-    var frs = buildable();
-    copyPrompt(context() + "\n" + PLAN.replace(/Answer JSON only:[\s\S]*$/, "") + "\nThen write the whole article following that plan.\n" + WRITE.replace(/- Fragments marked[\s\S]*$/, "") +
-      "- Fragments marked [YOURS] were written by the author herself: keep them word for word.\nStart each section with its heading on its own line beginning with \"## \". Output only the article; after it, a line \"---LEFT OUT---\" and the numbers of the fragments you left out as repeats or unrelated.\n\nFragments:\n\n" + fragList(frs),
-      "Prompt copied with your whole draft. Paste it into Gemini, then bring the article back with “Paste Gemini's article”.");
+    var p = W.paper, us = mapUnits().length ? mapUnits().filter(function (u) { return u.kind !== "note"; }) : buildable().map(function (b) { return { text: b.text }; });
+    var notes = mapUnits().filter(function (u) { return u.kind === "note"; });
+    copyPrompt(context() + "\nBelow is the raw material of an article: several texts with repeated versions, sketches, notes and AI explanations mixed together. Turn it into ONE article the way a fine editor would:\n" +
+      "1. Break everything into idea units and put together the versions of each idea; from each group keep the most mature wording and add every detail that appears only in other versions. Never summarize; keep every fact, date, quotation and source.\n" +
+      "2. Find the chains of cause and effect (experience → effect on his character and choices → the novel) and keep each chain together, even when its pieces are scattered across the texts.\n" +
+      "3. Order the chains for a reader: a vivid way in, a gradual reveal, mechanisms before phenomena, the thesis at the end.\n" +
+      "4. Start each section with its heading on a line beginning with \"## \". Output only the article. If it is too long for one answer, stop at a section break and write [CONTINUE]; I will ask for the rest." +
+      (notes.length ? "\n\nThe author's own notes — follow them:\n" + notes.slice(0, 40).map(function (u) { return "- " + u.text.slice(0, 500); }).join("\n") : "") +
+      "\n\nMaterial:\n\n" + us.map(function (u) { return u.text; }).join("\n\n"),
+      "Prompt copied with all your material. Paste it into Gemini, then bring the article back with More → Paste an article from the Gemini website.");
   }
+  function buildable() { return W.paper.blocks.filter(function (b) { return !isRef(b) && !(b.head && b.by === "ai"); }); }
   function pasteArticle(txt) {
-    var main = String(txt).split(/---\s*LEFT OUT\s*---/i)[0];
+    var main = String(txt).split(/---\s*LEFT OUT\s*---/i)[0].replace(/\[CONTINUE\]/g, "");
     var ps = A().paragraphs(main); if (!ps.length) return;
     readDoc(); remember();
-    var old = buildable(), vecs = old.map(function (b) { return A().terms(b.text); }), hit = {}, sec = -1;
+    var old = buildable(), vecs = old.map(function (b) { return A().terms(b.text); }), sec = -1;
     var blocks = ps.map(function (t) {
-      if (isHead(t)) { sec++; return { id: uid(), text: "## " + t.replace(/^#+\s*/, ""), by: "ai", head: true, sec: sec, src: [] }; }
+      if (isHead(t)) { sec++; return { id: uid(), text: "## " + t.replace(/^#+\s*/, ""), by: "ai", head: true, sec: "g" + sec, src: [] }; }
       var v = A().terms(t), sims = vecs.map(function (ov, i) { return [A().cosine(v, ov), i]; }).sort(function (a, b) { return b[0] - a[0]; });
       var src = [];
-      sims.slice(0, 3).forEach(function (x) { if (x[0] >= 0.18) { hit[x[1]] = 1; (old[x[1]].src && old[x[1]].src.length ? old[x[1]].src : [old[x[1]].text]).forEach(function (s) { if (src.indexOf(s) < 0) src.push(s); }); } });
-      var same = sims[0] && sims[0][0] > 0.97 ? old[sims[0][1]] : null;
-      if (same && same.by === "me") return same;
-      return { id: uid(), text: t, by: "ai", ai: t, sec: Math.max(0, sec), src: src };
+      sims.slice(0, 3).forEach(function (x) { if (x[0] >= 0.18) src.push(old[x[1]].text); });
+      return { id: uid(), text: t, by: "ai", ai: t, sec: "g" + Math.max(0, sec), src: src };
     });
-    old.forEach(function (b, i) { if (!hit[i] && blocks.indexOf(b) < 0) W.paper.aside.push({ text: b.text, at: Date.now(), why: "unrelated" }); });
-    W.paper.plan = { title: "", sections: blocks.filter(function (b) { return b.head; }).map(function (b) { return { title: b.text.replace(/^#+\s*/, ""), logic: "" }; }), at: Date.now() };
     W.paper.blocks = blocks.concat(W.paper.blocks.filter(isRef));
-    save(); render(); toast("Gemini's article is in. What it left out is under “Left out”, with a way to put it back.");
+    W.paper.map = null; W.paper.view = "draft";
+    save(); render(); toast("Gemini's article is in. Click a purple dot to compare a paragraph with your material.");
   }
+
   /* one or a few paragraphs rewritten again (from the compare drawer); never touches a paragraph you edited */
   function polish(ids) {
     var p = W.paper;
@@ -736,22 +1041,18 @@
       return pr.then(function (acc) { return readFile(f).then(function (t) { return acc.concat(t); }, function (e) { toast(e.message); return acc; }); });
     }, Promise.resolve([])).then(function (ts) { setStatus(""); return ts.join("\n\n"); });
   }
-  // new material, pasted or from files: it lands in the article at once, then everything is organized into one text
-  function take(raw) {
-    var ps = A().paragraphs(raw); if (!ps.length) return;
+  // new material, pasted or from files: it is added to everything you have, and everything is organized again as one text
+  function take(raw, name) {
     var p = W.paper;
-    readDoc(); remember();
-    W.note = { html: "Adding " + fmtN(ps.length) + " paragraphs…", noUndo: true }; progress();
-    setTimeout(function () {   // let the page show it first
-      try {
-        var note;
-        if (!buildable().length) { var r = arrange(ps); p.blocks = r.blocks.concat(p.blocks.filter(isRef)); note = fmtN(r.blocks.length) + " paragraphs in" + (r.merged ? ", " + r.merged + " exact repeats folded together" : ""); }
-        else note = addText(ps);
-        save(); render();
-        if (aiKey()) build();
-        else { W.note = { html: "<b>Added:</b> " + esc(note) + ". To have everything merged into one article by itself, turn on automatic organizing below." }; progress(); }
-      } catch (e) { console.error(e); W.note = { warn: true, html: "Something went wrong while adding: " + esc(e.message) }; progress(); }
-    }, 30);
+    if (!A().paragraphs(raw).length) return;
+    readDoc(); syncFromDraft();
+    // material that is already in the draft but not yet in the map (an article from before) joins first
+    if (!(p.units || []).length && buildable().length) addMaterial(buildable().map(function (b) { return b.text; }).join("\n\n"), "The draft so far");
+    var r = addMaterial(raw, name);
+    save();
+    W.note = { html: "Added " + fmtN(r.added) + " passages" + (r.same ? " (" + fmtN(r.same) + " already there, word for word)" : "") + ". Organizing everything together…", noUndo: true };
+    progress();
+    setTimeout(function () { organize(); }, 30);
   }
   // new text goes before a Works Cited list, never into it
   function joinMaterial(a, b) {
@@ -766,84 +1067,204 @@
     el.addEventListener("drop", function (e) {
       if (!e.dataTransfer || !e.dataTransfer.files.length) return;
       e.preventDefault(); el.classList.remove("wr-drop");
-      readFiles(e.dataTransfer.files).then(after);
+      var names = Array.prototype.map.call(e.dataTransfer.files, function (f) { return f.name; }).join(", ");
+      readFiles(e.dataTransfer.files).then(function (t) { after(t, names); });
     });
   }
   var FILES = ".docx,.pdf,.txt,.md,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   function keyCard() {
-    return '<div class="wr-keycard"><p><b>Turn on automatic organizing.</b> Paste a free Gemini key once; after that, whatever you paste is merged into one article by itself.</p>' +
+    return '<div class="wr-keycard"><p><b>Turn on Gemini.</b> Without it, passages are only grouped by shared words. With a free key, your texts are broken into ideas, versions are recognised and fused, and the chains of cause and effect are found.</p>' +
       '<ol><li>Open <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and sign in with your Google account.</li><li>Click <b>Create API key</b> and copy it.</li><li>Paste it here:</li></ol>' +
       '<p class="wr-keyrow"><input class="ed-input" type="password" data-key placeholder="AIza…" autocomplete="off"><button type="button" class="pill solid" data-s="savekey">Turn on</button></p></div>';
   }
   function stepWrite(body) {
-    var p = W.paper, has = p.blocks.length > 0;
+    var p = W.paper, m = p.map, view = m && p.view === "map" ? "map" : "draft";
     var left = p.aside.filter(function (a) { return a.why === "repeat" || a.why === "unrelated" || a.why === "unplaced" || a.why === "deleted"; });
     body.innerHTML =
       '<div class="wr-tools">' +
-        (aiKey() ? '<button type="button" class="pill" data-s="build">Organize again</button>' : "") +
+        (m ? '<span class="ed-tabs"><button type="button" class="chip' + (view === "map" ? " on" : "") + '" data-s="view" data-v="map">Map</button><button type="button" class="chip' + (view === "draft" ? " on" : "") + '" data-s="view" data-v="draft">Draft</button></span>' : "") +
+        '<button type="button" class="pill" data-s="build">' + (m ? "Organize again" : "Organize") + "</button>" +
+        (view === "draft" ? '<details class="wr-menu"><summary class="pill">Improve with Gemini</summary><div class="wr-menu-list">' +
+          Object.keys(IMPROVE).map(function (k) { return '<button type="button" class="wr-mi" data-s="improve" data-v="' + k + '"><b>' + IMPROVE[k][0] + '</b><span>' + esc(IMPROVE[k][1].split(":")[0].split(".")[0]) + "</span></button>"; }).join("") +
+          '<button type="button" class="wr-mi" data-s="improve" data-v="custom"><b>Your own instruction…</b></button>' +
+          '<label class="wr-mi wr-scope"><input type="checkbox" data-scope> the whole article (otherwise: the section where your cursor is)</label></div></details>' : "") +
         '<button type="button" class="pill" data-s="copy">Copy all</button><button type="button" class="pill" data-s="docx">Download .docx</button>' +
         '<details class="wr-menu"><summary class="pill">More</summary><div class="wr-menu-list">' +
-          '<label class="wr-mi">Insert a file (.docx .pdf .txt)<input type="file" accept="' + FILES + '" multiple hidden></label>' +
-          '<button type="button" class="wr-mi" data-s="group">Group related paragraphs (without Gemini)</button>' +
+          '<label class="wr-mi">Add a file (.docx .pdf .txt)<input type="file" accept="' + FILES + '" multiple hidden></label>' +
           '<button type="button" class="wr-mi" data-s="prompt">Copy a prompt for the Gemini website</button><button type="button" class="wr-mi" data-s="paste">Paste an article from the Gemini website</button>' +
         "</div></details>" +
-        '<span class="wr-key"><i class="dot ai"></i> written by Gemini <i class="dot me"></i> changed by you</span></div>' +
+        (view === "draft" ? '<span class="wr-key"><i class="dot ai"></i> written by Gemini <i class="dot me"></i> changed by you</span>' : "") + "</div>" +
       (aiKey() ? "" : keyCard()) +
-      '<div class="wr-docwrap"><div class="wr-marks"></div><div class="wr-doc wr-write" contenteditable="true" spellcheck="true" data-ph="Paste or type here. Paste a whole draft — or several — and it is organized into one article for you. You can also drop .docx or .pdf files here."></div></div>' +
-      (p.plan && p.plan.sections && p.plan.sections.length ? '<details class="wr-plan"><summary>How the article is built</summary><ol>' + p.plan.sections.map(function (s) { return "<li><b>" + esc(s.title) + "</b>" + (s.logic ? " — " + esc(s.logic) : "") + "</li>"; }).join("") + "</ol></details>" : "") +
-      (left.length ? '<details class="wr-left"><summary>Left out of the article · ' + leftSummary(left) + '</summary><p class="j-hint">Not in the text, so the article copies cleanly. Put any of them back and it goes next to what it belongs with.</p>' +
-        left.slice().reverse().slice(0, 300).map(function (a) {
+      (view === "map" ? mapHTML() :
+        '<div class="wr-docwrap"><div class="wr-marks"></div><div class="wr-doc wr-write" contenteditable="true" spellcheck="true" data-ph="Paste or type here. Paste whole drafts — several texts, notes, versions, all mixed — or drop .docx / .pdf files: they are broken into ideas, repeats are fused and everything is arranged into one article."></div></div>' +
+        (left.length ? '<details class="wr-left"><summary>Set aside earlier · ' + leftSummary(left) + '</summary>' + left.slice().reverse().slice(0, 200).map(function (a) {
           return '<div class="wr-lo"><span class="wr-why">' + ({ repeat: "repeat", unrelated: "not related", unplaced: "not placed", deleted: "you deleted" })[a.why] + "</span><p>" + esc(a.text.length > 400 ? a.text.slice(0, 400) + "…" : a.text) + '</p><button type="button" class="mini-btn" data-back="' + p.aside.indexOf(a) + '">Put back</button></div>';
-        }).join("") + "</details>" : "");
+        }).join("") + "</details>" : ""));
+    var fileIn = $(".wr-menu input[type=file]", body);
+    fileIn.addEventListener("change", function (e) { var names = Array.prototype.map.call(e.target.files, function (f) { return f.name; }).join(", "); $$(".wr-menu", body).forEach(function (d) { d.open = false; }); readFiles(e.target.files).then(function (t) { if (t) take(t, names); }); });
+    wireDrop(body, function (t, names) { if (t) take(t, names); });
+    body.onclick = function (e) {
+      var b = e.target.closest("[data-s]"), mk = e.target.closest("[data-mark]"), back = e.target.closest("[data-back]"), mp = e.target.closest("[data-mp]");
+      if (mk) return compare(mk.getAttribute("data-mark"));
+      if (back) { putBack(+back.getAttribute("data-back")); return; }
+      if (mp) return mapAction(mp, e);
+      if (!b) return;
+      var k = b.getAttribute("data-s");
+      if (k !== "improve" || !b.closest(".wr-menu")) $$(".wr-menu", body).forEach(function (d) { d.open = false; });
+      if (k === "view") { flush(); p.view = b.getAttribute("data-v"); save(); render(); }
+      if (k === "savekey") {
+        var v = ($("[data-key]", body).value || "").trim(); if (!v) return $("[data-key]", body).focus();
+        b.disabled = true; b.textContent = "Checking…";
+        W.ai = W.ai || {}; W.ai.gemini_key = v; W.skip = {};
+        gemini("Reply with the single word OK.", { max: 20, temp: 0 }).then(function () {
+          saveAI(); render();
+          if ((p.units || []).length || buildable().length) { W.note = { html: "<b>Gemini is on.</b> Organizing what you have…", noUndo: true }; progress(); if (!(p.units || []).length) addMaterial(buildable().map(function (x) { return x.text; }).join("\n\n"), "The draft so far"); organize(); }
+          else { W.note = { html: "<b>Gemini is on.</b> Paste your texts.", noUndo: true }; progress(); }
+        }, function (er) { W.ai.gemini_key = ""; b.disabled = false; b.textContent = "Turn on"; toast("That key didn't work: " + er.message); });
+      }
+      if (k === "build") {
+        if (W.job) return toast("Still working — or press Stop.");
+        readDoc(); syncFromDraft();
+        if (!(p.units || []).length) { if (!buildable().length) return toast("Paste your texts first."); addMaterial(buildable().map(function (x) { return x.text; }).join("\n\n"), "The draft so far"); }
+        organize();
+      }
+      if (k === "improve") {
+        var all = $("[data-scope]", body) && $("[data-scope]", body).checked, kind = b.getAttribute("data-v");
+        var scope = all ? "all" : sectionOfCaret();
+        $$(".wr-menu", body).forEach(function (d) { d.open = false; });
+        if (kind === "custom") {
+          var w = sheet("Your instruction to Gemini", '<p class="j-hint">' + (all ? "For the whole article, section by section." : "For the section where your cursor is.") + ' Gemini will still keep every fact, date, quotation and source. You see a preview before anything changes.</p><textarea class="ed-input" rows="5" data-in placeholder="e.g. 把这一节改成以1794年的沙龙场景开头，再解释freiratismo的制度原因"></textarea>');
+          $(".ed-actions", w).innerHTML = '<button type="button" class="pill solid" data-go>Ask Gemini</button>';
+          $("[data-go]", w).addEventListener("click", function () { var t = $("[data-in]", w).value.trim(); if (!t) return; closeSheet(); improve("custom", scope, t); });
+          return;
+        }
+        improve(kind, scope);
+      }
+      if (k === "prompt") { readDoc(); copyBuildPrompt(); }
+      if (k === "paste") {
+        var w2 = sheet("Article from the Gemini website", '<p class="j-hint">Paste the whole article from Gemini. Each paragraph keeps a link to the passages it came from, for comparing.</p><textarea class="ed-input" rows="16" data-in></textarea>');
+        $(".ed-actions", w2).innerHTML = '<button type="button" class="pill solid" data-go>Use this article</button>';
+        $("[data-go]", w2).addEventListener("click", function () { var t = $("[data-in]", w2).value; closeSheet(); pasteArticle(t); });
+      }
+      if (k === "copy") { readDoc(); navigator.clipboard.writeText(cleanText()).then(function () { toast("Copied — plain paragraphs, nothing extra."); }); }
+      if (k === "docx") { readDoc(); docx(false, "zh"); }
+    };
+    body.onchange = function (e) {
+      var sel = e.target.closest && e.target.closest('[data-mp="move"]'); if (!sel || !sel.value) return;
+      remember(); var id = sel.getAttribute("data-id"), from = secOf(id), to = W.paper.map.sections.filter(function (x) { return x.id === sel.value; })[0];
+      from.ideas.splice(from.ideas.indexOf(id), 1); to.ideas.push(id); mapChanged();
+    };
+    if (view === "map") return;
     var doc = $(".wr-doc", body);
     fillDoc(doc);
     try { document.execCommand("defaultParagraphSeparator", false, "p"); } catch (e) {}
     var empty = function () { doc.classList.toggle("empty", !doc.textContent.trim()); };
     empty(); doc.addEventListener("input", empty);
     var timer;
-    doc.addEventListener("input", function () {
-      clearTimeout(timer); setStatus("Typing…");
-      timer = setTimeout(function () { readDoc(doc); marks(); }, 600);
-    });
+    doc.addEventListener("input", function () { clearTimeout(timer); setStatus("Typing…"); timer = setTimeout(function () { readDoc(doc); syncFromDraft(); marks(); }, 600); });
     doc.addEventListener("paste", function (e) {
       var cd = e.clipboardData; if (!cd) return;
-      if (cd.files && cd.files.length) { e.preventDefault(); readFiles(cd.files).then(function (t) { if (t) take(t); }); return; }
+      if (cd.files && cd.files.length) { e.preventDefault(); var names = Array.prototype.map.call(cd.files, function (f) { return f.name; }).join(", "); readFiles(cd.files).then(function (t) { if (t) take(t, names); }); return; }
       var t = cd.getData("text/plain"); if (t == null) return;
       e.preventDefault();
       if (A().paragraphs(t).length > 2 || t.length > 600) return take(t);
       document.execCommand("insertText", false, t.replace(/\s*\n+\s*/g, " "));
     });
-    $(".wr-menu input[type=file]", body).addEventListener("change", function (e) { $(".wr-menu", body).open = false; readFiles(e.target.files).then(function (t) { if (t) take(t); }); });
-    wireDrop(body, function (t) { if (t) take(t); });
     window.onresize = marks;
-    body.onclick = function (e) {
-      var b = e.target.closest("[data-s]"), m = e.target.closest("[data-mark]"), back = e.target.closest("[data-back]");
-      if (m) return compare(m.getAttribute("data-mark"));
-      if (back) { putBack(+back.getAttribute("data-back")); return; }
-      if (!b) return;
-      var k = b.getAttribute("data-s"), menu = $(".wr-menu", body); if (menu) menu.open = false;
-      if (k === "savekey") {
-        var v = ($("[data-key]", body).value || "").trim(); if (!v) return $("[data-key]", body).focus();
-        b.disabled = true; b.textContent = "Checking…";
-        W.ai = W.ai || {}; W.ai.gemini_key = v; W.skip = {};
-        gemini("Reply with the single word OK.", { max: 20, temp: 0 }).then(function () {
-          saveAI(); W.note = { html: "<b>Automatic organizing is on.</b>" + (buildable().length ? " Organizing what you have now…" : " Paste your texts and they are merged into one article."), noUndo: true }; render();
-          if (buildable().length) build();
-        }, function (er) { W.ai.gemini_key = ""; b.disabled = false; b.textContent = "Turn on"; toast("That key didn't work: " + er.message); });
-      }
-      if (k === "build") { if (W.job) return toast("Gemini is still working."); build(); }
-      if (k === "prompt") { readDoc(doc); copyBuildPrompt(); }
-      if (k === "paste") {
-        var w = sheet("Article from the Gemini website", '<p class="j-hint">Paste the whole article from Gemini. Each paragraph keeps a link to the passages it came from, for comparing; anything Gemini left out goes to “Left out”.</p><textarea class="ed-input" rows="16" data-in></textarea>');
-        $(".ed-actions", w).innerHTML = '<button type="button" class="pill solid" data-go>Use this article</button>';
-        $("[data-go]", w).addEventListener("click", function () { var t = $("[data-in]", w).value; closeSheet(); pasteArticle(t); });
-      }
-      if (k === "group") { readDoc(doc); remember(); W.paper.blocks = regroup(); W.paper.plan = null; save(); render(); W.note = { html: "Related paragraphs grouped together. Your wording is untouched." }; progress(); }
-      if (k === "copy") { readDoc(doc); navigator.clipboard.writeText(cleanText()).then(function () { toast("Copied — plain paragraphs, nothing extra."); }); }
-      if (k === "docx") { readDoc(doc); docx(false, "zh"); }
-    };
-    if (!has) setTimeout(function () { doc.focus(); }, 0);
+    if (!p.blocks.length) setTimeout(function () { doc.focus(); }, 0);
     setTimeout(marks, 30);
+  }
+
+  /* ---------- the map: what the organizing found, and where you decide ---------- */
+  var MATS = { 3: ["●", "mature"], 2: ["◐", "developing"], 1: ["○", "sketch"] };
+  function mapHTML() {
+    var p = W.paper, m = p.map, open = W.mapOpen || {};
+    var out = m.ideas.filter(function (d) { return d.out; }), notes = mapUnits().filter(function (u) { return u.kind === "note" || u.kind === "heading"; });
+    var srcCount = {}; (p.texts || []).forEach(function (s, i) { srcCount[s.id] = i + 1; });
+    var card = function (d, sid) {
+      var b = unitById(d.best) || {}, mat = MATS[b.mat || 2], vs = d.units.map(unitById).filter(Boolean);
+      var srcs = {}; vs.forEach(function (u) { srcs[u.src] = 1; });
+      var conf = (p.conflicts || []).filter(function (c) { return c.units.some(function (id) { return d.units.indexOf(id) > -1; }); }).length + ((d.conflicts || []).length);
+      var gap = (m.gaps || []).filter(function (g) { return g.idea === d.id; });
+      var isOpen = open[d.id];
+      return '<div class="mp-card mat' + (b.mat || 2) + (isOpen ? " open" : "") + (d.me ? " mine" : "") + '" data-idea="' + d.id + '">' +
+        '<button type="button" class="mp-ch" data-mp="toggle" data-id="' + d.id + '"><span class="mp-mat" title="' + mat[1] + '">' + mat[0] + "</span>" +
+          (b.when ? '<span class="mp-when">' + esc(b.when) + "</span>" : "") + '<span class="mp-gist">' + esc(d.gist) + "</span>" +
+          '<span class="mp-meta">' + (vs.length > 1 ? vs.length + " versions" : "") + (Object.keys(srcs).length > 1 ? " · " + Object.keys(srcs).length + " texts" : "") +
+          (conf ? ' · <i class="mp-flag">contradiction</i>' : "") + (gap.length ? ' · <i class="mp-flag gap">gap</i>' : "") + (d.me ? " · yours" : "") + (d.newVersions ? ' · <i class="mp-flag">new material</i>' : "") + "</span></button>" +
+        (isOpen ? '<div class="mp-body">' +
+          '<p class="mp-text">' + esc(d.text) + "</p>" +
+          (d.conflicts && d.conflicts.length ? '<p class="mp-warn">Versions disagree: ' + d.conflicts.map(esc).join("; ") + "</p>" : "") +
+          gap.map(function (g) { return '<p class="mp-warn gap">Gap: ' + esc(g.note) + "</p>"; }).join("") +
+          (vs.length > 1 || d.me ? '<h5 class="wr-sub">' + (vs.length > 1 ? "The versions it was made from" : "Your material") + "</h5>" + vs.map(function (u) {
+            var um = MATS[u.mat || 2];
+            return '<div class="mp-ver' + (u.id === d.best ? " best" : "") + '"><p class="mp-vh"><span title="' + um[1] + '">' + um[0] + " " + um[1] + "</span> · text " + (srcCount[u.src] || "?") + " <i>" + esc(srcName(u.src)) + "</i>" + (u.id === d.best ? " · ★ main" : ' <button type="button" class="mini-btn" data-mp="best" data-id="' + d.id + '" data-u="' + u.id + '">Use as main</button>') +
+              (vs.length > 1 ? ' <button type="button" class="mini-btn" data-mp="detach" data-id="' + d.id + '" data-u="' + u.id + '">Not the same idea</button>' : "") + "</p><p>" + esc(u.text) + "</p></div>";
+          }).join("") : "") +
+          '<p class="owner-tools mp-acts"><button type="button" class="mini-btn" data-mp="up" data-id="' + d.id + '">↑</button><button type="button" class="mini-btn" data-mp="down" data-id="' + d.id + '">↓</button>' +
+            '<select class="ed-input mp-move" data-mp="move" data-id="' + d.id + '"><option value="">Move to…</option>' + m.sections.map(function (s) { return '<option value="' + s.id + '"' + (s.id === sid ? " disabled" : "") + ">" + esc(s.title) + "</option>"; }).join("") + "</select>" +
+            (d.newVersions && d.me ? '<button type="button" class="mini-btn" data-mp="refuse" data-id="' + d.id + '">Fuse the new material into my text</button>' : "") +
+            '<button type="button" class="mini-btn" data-mp="out" data-id="' + d.id + '">Leave out of the draft</button></p></div>' : "") + "</div>";
+    };
+    var mats = { 3: 0, 2: 0, 1: 0 }; m.ideas.forEach(function (d) { if (!d.out) { var b = unitById(d.best) || {}; mats[b.mat || 2]++; } });
+    return '<div class="mp">' +
+      '<aside class="mp-side"><p class="mp-sum">' + fmtN(mapUnits().length) + " passages from " + (p.texts || []).length + " texts → <b>" + fmtN(m.ideas.length - out.length) + " ideas</b> in " + m.sections.length + " sections</p>" +
+        '<p class="mp-legend"><span>● mature ' + mats[3] + "</span><span>◐ developing " + mats[2] + "</span><span>○ sketch " + mats[1] + "</span></p>" +
+        '<ol class="mp-toc">' + m.sections.map(function (s) { return '<li><a href="#" data-mp="jump" data-id="' + s.id + '">' + esc(s.title) + "</a> <span>" + s.ideas.filter(function (id) { var d = ideaById(id); return d && !d.out; }).length + "</span></li>"; }).join("") + "</ol>" +
+        '<p><button type="button" class="pill solid" data-s="view" data-v="draft">Read the draft →</button></p>' +
+        ((p.conflicts || []).length ? '<details class="mp-list"><summary>Contradictions to check · ' + p.conflicts.length + "</summary>" + p.conflicts.map(function (c) {
+          return '<div class="mp-li"><p>' + esc(c.note) + "</p>" + c.units.map(function (id) { var u = unitById(id); return u ? '<p class="mp-q">text ' + (srcCount[u.src] || "?") + ": " + esc(u.text.slice(0, 160)) + (u.text.length > 160 ? "…" : "") + "</p>" : ""; }).join("") + "</div>";
+        }).join("") + "</details>" : "") +
+        ((m.gaps || []).length ? '<details class="mp-list"><summary>Gaps · ' + m.gaps.length + "</summary>" + m.gaps.map(function (g) { var d = ideaById(g.idea); return '<div class="mp-li"><p>' + esc(g.note) + '</p><p class="mp-q"><a href="#" data-mp="find" data-id="' + g.idea + '">' + esc(d ? d.gist : "") + "</a></p></div>"; }).join("") + "</details>" : "") +
+        (notes.length ? '<details class="mp-list"><summary>Your notes &amp; to-dos · ' + notes.length + '</summary><p class="j-hint">Instructions and comments you wrote to yourself or to an AI, and outline lines. They guide the organizing but are not put in the text.</p>' + notes.map(function (u) { return '<div class="mp-li"><p>' + esc(u.text.length > 500 ? u.text.slice(0, 500) + "…" : u.text) + '</p><p class="mp-q">text ' + (srcCount[u.src] || "?") + ' <button type="button" class="mini-btn" data-mp="notnote" data-u="' + u.id + '">This is content, not a note</button></p></div>'; }).join("") + "</details>" : "") +
+        (out.length ? '<details class="mp-list"><summary>Not in the draft · ' + out.length + "</summary>" + out.map(function (d) {
+          return '<div class="mp-li"><p class="mp-q">' + ({ fragment: "scrap", outside: "outside this article", deleted: "you deleted", merged: "merged by Gemini", user: "you left out" })[d.out] + "</p><p>" + esc(d.text.slice(0, 300)) + (d.text.length > 300 ? "…" : "") + '</p><p><button type="button" class="mini-btn" data-mp="in" data-id="' + d.id + '">Put in the draft</button></p></div>';
+        }).join("") + "</details>" : "") +
+        '<details class="mp-list"><summary>Texts · ' + (p.texts || []).length + "</summary>" + (p.texts || []).map(function (s, i) { return '<div class="mp-li"><p>' + (i + 1) + ". " + esc(s.name) + ' <span class="mp-q">' + fmtN(s.units || 0) + " passages · " + new Date(s.at).toLocaleDateString() + "</span></p></div>"; }).join("") + "</details>" +
+      "</aside>" +
+      '<div class="mp-main">' + m.sections.map(function (s, k) {
+        return '<section class="mp-sec" id="mp-' + s.id + '"><div class="mp-sh"><h3><span>' + (k + 1) + "</span> " + esc(s.title) + '</h3><button type="button" class="mini-btn" data-mp="rename" data-id="' + s.id + '">Rename</button>' +
+          (k > 0 ? '<button type="button" class="mini-btn" data-mp="secup" data-id="' + s.id + '">↑</button>' : "") + (k < m.sections.length - 1 ? '<button type="button" class="mini-btn" data-mp="secdown" data-id="' + s.id + '">↓</button>' : "") + "</div>" +
+          (s.does ? '<p class="mp-does">' + esc(s.does) + "</p>" : "") + (s.chain ? '<p class="mp-chain">' + esc(s.chain) + "</p>" : "") +
+          s.ideas.map(function (id) { var d = ideaById(id); return d && !d.out ? card(d, s.id) : ""; }).join("") + "</section>";
+      }).join("") + "</div></div>";
+  }
+  function secOf(id) { return W.paper.map.sections.filter(function (s) { return s.ideas.indexOf(id) > -1; })[0]; }
+  function closestSection(d) {
+    var m = W.paper.map, dv = A().terms(d.text), best = m.sections[0], bs = -1;
+    m.sections.forEach(function (s) { var v = {}; s.ideas.slice(0, 30).forEach(function (id) { var x = ideaById(id); if (x && !x.out) { var t = A().terms(x.text); for (var w in t) v[w] = (v[w] || 0) + t[w]; } }); var c = A().cosine(dv, v); if (c > bs) { bs = c; best = s; } });
+    return best;
+  }
+  function mapChanged(keepOpen) { assemble(); save(); var y = window.scrollY; render(); window.scrollTo(0, y); }
+  function mapAction(el, e) {
+    var p = W.paper, m = p.map, k = el.getAttribute("data-mp"), id = el.getAttribute("data-id"), d = id && ideaById(id);
+    if (k === "move" && e.type === "click") return;   // the select reacts on change
+    if (k === "toggle") { W.mapOpen = W.mapOpen || {}; W.mapOpen[id] = !W.mapOpen[id]; var y = window.scrollY; render(); window.scrollTo(0, y); return; }
+    if (k === "jump" || k === "find") { e.preventDefault(); var t = document.getElementById("mp-" + (k === "find" ? (secOf(id) || {}).id : id)); if (k === "find") { W.mapOpen = W.mapOpen || {}; W.mapOpen[id] = true; render(); t = document.querySelector('[data-idea="' + id + '"]'); } if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    remember();
+    if (k === "up" || k === "down") { var s = secOf(id), i = s.ideas.indexOf(id), j = i + (k === "up" ? -1 : 1); while (j >= 0 && j < s.ideas.length && (ideaById(s.ideas[j]) || {}).out) j += k === "up" ? -1 : 1; if (j < 0 || j >= s.ideas.length) return; s.ideas.splice(i, 1); s.ideas.splice(j, 0, id); }
+    if (k === "secup" || k === "secdown") { var si = m.sections.findIndex(function (x) { return x.id === id; }), sj = si + (k === "secup" ? -1 : 1); var sx = m.sections.splice(si, 1)[0]; m.sections.splice(sj, 0, sx); }
+    if (k === "rename") { var s2 = m.sections.filter(function (x) { return x.id === id; })[0]; var nt = window.prompt("Section title", s2.title); if (!nt) return; s2.title = nt.trim(); }
+    if (k === "out") { d.out = "user"; }
+    if (k === "in") { delete d.out; if (!secOf(id)) closestSection(d).ideas.push(id); }
+    if (k === "best") { d.best = el.getAttribute("data-u"); if (!d.me) { d.text = (unitById(d.best) || {}).text || d.text; d.fused = false; d.fusedOk = false; } W.note = { html: "Main version changed." + (aiKey() ? " Press <b>Organize again</b> to fuse the other versions into it." : ""), noUndo: true }; }
+    if (k === "detach") {   // this version is a different idea: it becomes its own idea, next to this one
+      var uid0 = el.getAttribute("data-u"); d.units = d.units.filter(function (x) { return x !== uid0; }); d.fusedOk = false;
+      if (!d.me) { d.text = (unitById(d.best) || {}).text; d.fused = false; }
+      var u0 = unitById(uid0), nd = { id: "i" + (++p.ideaSeq), units: [uid0], best: uid0, gist: u0.pt || u0.text.slice(0, 80), text: u0.text };
+      m.ideas.push(nd); var s3 = secOf(id); s3.ideas.splice(s3.ideas.indexOf(id) + 1, 0, nd.id);
+    }
+    if (k === "notnote") { var u1 = unitById(el.getAttribute("data-u")); u1.kind = "text"; var nd2 = { id: "i" + (++p.ideaSeq), units: [u1.id], best: u1.id, gist: u1.pt || u1.text.slice(0, 80), text: u1.text }; m.ideas.push(nd2); closestSection(nd2).ideas.push(nd2.id); }
+    if (k === "refuse") {
+      if (!aiKey()) return toast("This needs Gemini.");
+      var job = W.job = { total: 1, done: 0, stop: false, label: "Fusing the new material into your text…" }; progress();
+      var vs = d.units.map(unitById).filter(Boolean);
+      stageGemini(context() + "\n" + FUSE_RULES.replace("(★ = the best one)", "(★ = the author's own text — keep it word for word and only insert what is new)") + "\n\n[" + d.id + "]\n★ " + d.text + "\n" + vs.map(function (u) { return "• " + u.text; }).join("\n"), job).then(function (r) {
+        var j = parseJSON(r.text) || {}, o = j[d.id]; if (o) { d.text = String(o.text || o).trim(); d.newVersions = false; d.me = false; d.fused = true; var b = p.blocks.filter(function (x) { return x.idea === d.id; })[0]; if (b) { b.by = "ai"; b.text = d.text; } }
+      }).catch(function (er) { toast("Gemini didn't answer: " + er.message); }).then(function () { W.job = null; mapChanged(); });
+      return;
+    }
+    mapChanged();
   }
   function leftSummary(left) {
     var n = {}; left.forEach(function (a) { n[a.why] = (n[a.why] || 0) + 1; });
@@ -862,12 +1283,13 @@
   function cleanText() { return W.paper.blocks.map(function (b) { return b.text.replace(/^#+\s*/, ""); }).join("\n\n"); }
   function remember() {
     var p = W.paper; if (!p) return;
-    W.history.push(JSON.stringify({ blocks: p.blocks, aside: p.aside, deleted: p.deleted, plan: p.plan || null }));
-    if (W.history.length > 15) W.history.shift();
+    var snap = JSON.stringify({ blocks: p.blocks, aside: p.aside, deleted: p.deleted, plan: p.plan || null, map: p.map || null, units: p.units || [], texts: p.texts || [], conflicts: p.conflicts || [], unitSeq: p.unitSeq || 0, ideaSeq: p.ideaSeq || 0 });
+    W.history.push(snap);
+    while (W.history.length > (snap.length > 400000 ? 6 : 15)) W.history.shift();
   }
   function undo() {
     var s = JSON.parse(W.history.pop()), p = W.paper;
-    if (Array.isArray(s)) p.blocks = s; else { p.blocks = s.blocks; p.aside = s.aside; p.deleted = s.deleted; p.plan = s.plan; }
+    if (Array.isArray(s)) p.blocks = s; else { p.blocks = s.blocks; p.aside = s.aside; p.deleted = s.deleted; p.plan = s.plan; if ("map" in s) { p.map = s.map; p.units = s.units; p.texts = s.texts; p.conflicts = s.conflicts; p.unitSeq = s.unitSeq; p.ideaSeq = s.ideaSeq; } }
     save(); render(); toast("Undone.");
   }
   // keep the page in step with the draft after Gemini changes it (your cursor stays where it was)
@@ -929,7 +1351,7 @@
   }
   function flush() {
     if (!W.paper) return;
-    if ($(".wr-write")) readDoc();
+    if ($(".wr-write")) { readDoc(); syncFromDraft(); }
     if ($(".wr-check")) readCheck($(".wr-check"));
     if ($(".mla-page")) readFormat($(".mla-page"), fmtLang());
   }
@@ -955,7 +1377,7 @@
     W.paper.blocks.forEach(function (b) {
       var el = map[b.id]; if (!el || b.head) return;
       var kind = b.by === "ai" ? "ai" : b.by === "me" ? "me" : "";
-      var hasVersions = b.src && b.src.length > 1;
+      var hasVersions = blockSources(b).length > 1;
       if (!kind && !hasVersions) return;
       html += '<button type="button" class="wr-mark' + (kind ? " " + kind : "") + (hasVersions ? " v" : "") + '" style="top:' + (el.offsetTop + 6) + 'px" data-mark="' + b.id + '" title="' +
         (kind === "ai" ? "Written by Gemini" : kind === "me" ? "Changed by you" : "Your wording") + (hasVersions ? " · other versions available" : "") + ' — click to compare"></button>';
@@ -996,14 +1418,19 @@
     flushD();
     return out;
   }
+  function blockSources(b) {
+    var d = b.idea && W.paper.map && ideaById(b.idea);
+    if (d && d.units.length) { var vs = d.units.map(unitById).filter(Boolean); vs.sort(function (x, y) { return (x.id === d.best ? -1 : 0) - (y.id === d.best ? -1 : 0); }); var t = vs.map(function (u) { return u.text; }); (b.src || []).forEach(function (x) { if (t.indexOf(x) < 0) t.unshift(x); }); return t; }
+    return b.src || [];
+  }
   function compare(id) {
     readDoc();
     var b = W.paper.blocks.filter(function (x) { return x.id === id; })[0]; if (!b) return;
-    var versions = (b.src || []).filter(function (v) { return v !== b.text; });
+    var srcs = blockSources(b), versions = srcs.filter(function (v) { return v !== b.text; });
     var al = sentenceAlign(b.text, versions);
     var who = b.by === "ai" ? (b.src && b.src.length > 1 ? "Gemini wrote this from " + b.src.length + " versions of yours." : "Gemini rewrote this from your wording.") : b.by === "me" ? "You changed this paragraph." : "Your own wording" + (versions.length ? ", with other versions you wrote." : ".");
     var html = '<p class="j-hint">' + esc(who) + (b.hook ? " It opens the article." : "") + "</p>" +
-      (versions.length ? '<h4 class="wr-sub">What changed, compared with your original</h4><p class="wr-diff">' + diffHTML(b.src[0], b.text) + "</p>" : "") +
+      (versions.length ? '<h4 class="wr-sub">What changed, compared with your original</h4><p class="wr-diff">' + diffHTML(versions[0], b.text) + "</p>" : "") +
       '<h4 class="wr-sub">Sentence by sentence' + (versions.length ? " — tap another wording to use it" : "") + "</h4>" +
       al.rows.map(function (r, ri) {
         return '<div class="wr-srow"><p class="wr-scur">' + esc(r.s) + "</p>" + r.alts.map(function (a) { return '<button type="button" class="wr-salt" data-c="swap" data-r="' + ri + '" data-t="' + esc(a) + '">' + esc(a) + "</button>"; }).join("") + "</div>";
@@ -1021,7 +1448,7 @@
       remember();
       if (k === "swap") { var s = al.rows[+c.getAttribute("data-r")].s; b.text = b.text.replace(s, c.getAttribute("data-t")); b.by = "me"; c.classList.add("taken"); al.rows[+c.getAttribute("data-r")].s = c.getAttribute("data-t"); save(); W.needRender = true; return; }
       if (k === "add") { b.text = b.text + (CJK.test(b.text) ? "" : " ") + c.getAttribute("data-t"); b.by = "me"; c.disabled = true; c.classList.add("taken"); save(); W.needRender = true; return; }
-      if (k === "orig") { b.text = b.src[0]; b.by = "paste"; save(); closeSheet(); render(); return; }
+      if (k === "orig") { b.text = versions[0]; b.by = "paste"; var dd = b.idea && ideaById(b.idea); if (dd) { dd.text = b.text; dd.me = false; dd.fused = false; } save(); closeSheet(); render(); return; }
       if (k === "del") { W.paper.aside.push({ text: b.text, at: Date.now(), why: "deleted" }); W.paper.deleted.push(hashText(b.text)); W.paper.blocks = W.paper.blocks.filter(function (x) { return x !== b; }); save(); closeSheet(); render(); return; }
       if (k === "again") { if (b.by === "me") { b.by = "paste"; } closeSheet(); polish([b.id]); return; }
       if (k === "explain") {
@@ -1516,6 +1943,7 @@
   function settings() {
     var p = W.paper, ai = W.ai || {};
     var w = sheet("Thesis & style",
+      '<label class="ed-field"><span class="ed-label">About this article — what it argues, who the people are, the key terms and what is new. Gemini reads this before every step.</span><textarea class="ed-input" data-s="brief" rows="9">' + esc(p.brief || "") + "</textarea></label>" +
       '<label class="ed-field"><span class="ed-label">Thesis — the argument everything serves</span><textarea class="ed-input" data-s="thesis" rows="3">' + esc(p.thesis) + "</textarea></label>" +
       '<label class="ed-field"><span class="ed-label">Key names and terms</span><input class="ed-input" data-s="keywords" value="' + esc(p.keywords) + '"></label>' +
       '<label class="ed-field"><span class="ed-label">Who reads it, and what they already know</span><input class="ed-input" data-s="readers" value="' + esc(p.readers) + '"></label>' +
