@@ -1,15 +1,6 @@
 {
   "items": [
     {
-      "title": "Smiley Tee",
-      "category": "Clothing",
-      "price": "$38",
-      "status": "available",
-      "note": "",
-      "image": "",
-      "url": ""
-    },
-    {
       "title": "Studio Notebook",
       "category": "Keychain & Bag Charm",
       "price": "$18",
