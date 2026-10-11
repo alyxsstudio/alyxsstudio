@@ -1203,14 +1203,12 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
 .wc-no { font-family: var(--mono); font-size: calc(var(--u) * 12); color: var(--mute); }
 .wc-title { margin: 0; font-family: var(--head); font-weight: 500; font-size: calc(var(--u) * 22); line-height: 1.25; }
 .wc-meta { font-size: calc(var(--u) * 12); color: var(--mute); }
-.wc-new { color: var(--ink); border-bottom: 2px solid var(--sun); }
 .wc-sg { color: var(--ink); }
 .wc-btns { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
 .wc-btns .mini-btn[disabled] { opacity: .3; cursor: default; }
 .wc-text { max-width: 44rem; font-size: calc(var(--size-body) * 1.06); line-height: 1.85; cursor: text; border-radius: 8px; margin: 0 -10px; padding: 4px 10px; }
 .wc-text:hover { background: var(--tile); }
 .wc-text p { margin: 0 0 .9em; }
-.wc-text p.new, .ew-body .new { box-shadow: -10px 0 0 -7px var(--sun); }
 .wc-text .wc-sub, .ew-body h3 { font-family: var(--head); font-weight: 500; font-size: 1.05em; margin: 1.2em 0 .5em; }
 .wc-text .empty { color: var(--mute); }
 .wr-empty { padding: 26px 0; border-top: 1px solid var(--line); }

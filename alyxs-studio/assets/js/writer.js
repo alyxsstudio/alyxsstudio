@@ -1,7 +1,7 @@
 /* Alyx's Studio — Thesis: a private place to write an article chapter by chapter, like a serial.
    1 Write      the article is a row of chapters (one topic each). The page shows every chapter with its
-                full text; click one to write in it. New material pasted into a chapter is marked as new,
-                and ✦ Gemini writes it in: the chapter written again with the new material worked in,
+                full text; click one to write in it. What you paste in is remembered (not shown),
+                so ✦ Gemini writes it in: the chapter written again with the new material worked in,
                 every fact kept; your version stays one click away.
    2 Translate  the chapters put together as one article, paragraph by paragraph with DeepL.
    3 Sources    the whole article: sentences that need a citation, published matches, AI-sounding writing.
@@ -481,7 +481,7 @@
   /* ================= 1 · WRITE: the chapters, each with its full text ================= */
   function paraHTML(b) {
     if (isHead(b.text)) return '<h3 class="wc-sub" data-b="' + b.id + '">' + richHTML(b.text.replace(/^#+\s*/, "")) + "</h3>";
-    return '<p data-b="' + b.id + '"' + (b.added ? ' class="new" title="New — not yet fitted in"' : "") + ">" + richHTML(b.text) + "</p>";
+    return '<p data-b="' + b.id + '"' + ">" + richHTML(b.text) + "</p>";
   }
   function insertHere(after, label) {
     return '<div class="wc-ins"><button type="button" data-c="insert" data-after="' + esc(after) + '" title="' + esc(label) + '"><span>+</span> ' + esc(label) + "</button></div>";
@@ -509,12 +509,12 @@
         return '<a href="#ch-' + esc(c.id) + '" data-c="goto" data-id="' + esc(c.id) + '"><b>' + (i + 1) + "</b> " + esc(chapName(c, i)) + "</a>";
       }).join("") + "</nav>" : "") +
       (cs.length ? '<div class="wc-list">' + insertHere("", "Insert a chapter at the beginning") + cs.map(function (c, i) {
-        var nw = c.blocks.filter(function (b) { return b.added; }).length, t = chapTitle(c.head);
+        var t = chapTitle(c.head);
         return '<article class="wc-ch" id="ch-' + esc(c.id) + '" data-id="' + esc(c.id) + '">' +
           '<header class="wc-head"><span class="wc-no">No. ' + (i + 1) + "</span>" +
             (t ? '<h2 class="wc-title">' + esc(t) + "</h2>" : "") +
             '<span class="wc-meta">' + esc(fmtDate(c.head.date)) + " · " + fmtN(chapCount(c)) + " 字" +
-              (nw ? ' · <span class="wc-new">' + nw + " new</span>" : "") + "</span>" +
+              "</span>" +
             '<span class="wc-btns"><button type="button" class="mini-btn" data-c="up" data-id="' + esc(c.id) + '" title="Move up"' + (i ? "" : " disabled") + ">↑</button>" +
               '<button type="button" class="mini-btn" data-c="down" data-id="' + esc(c.id) + '" title="Move down"' + (i < cs.length - 1 ? "" : " disabled") + ">↓</button>" +
               '<button type="button" class="pill" data-c="edit" data-id="' + esc(c.id) + '">Write</button></span></header>' +
@@ -553,7 +553,7 @@
   function bodyHTML(c) {
     return c.blocks.map(function (b) {
       if (isHead(b.text)) return '<h3 data-id="' + b.id + '">' + richHTML(b.text.replace(/^#+\s*/, "")) + "</h3>";
-      return '<p data-id="' + b.id + '"' + (b.added ? ' class="new"' : "") + ">" + richHTML(b.text) + "</p>";
+      return '<p data-id="' + b.id + '">' + richHTML(b.text) + "</p>";
     }).join("");
   }
   function writeChapter(id, spot) {
@@ -573,7 +573,7 @@
       '<div class="ew-tools" role="toolbar">' +
         '<button type="button" data-cmd="italic" title="Italic — titles of works (⌘I)"><i>I</i></button>' +
         '<button type="button" data-cmd="h" title="Subheading inside the chapter">H</button>' +
-        '<span class="ew-hint">Paste new material anywhere — it is marked as new until it fits in. Shift+Enter keeps lines of a poem together.</span>' +
+        '<span class="ew-hint">Paste anything anywhere. Shift+Enter keeps lines of a poem together.</span>' +
         '<span class="ew-count"></span></div>' +
       '<div class="wc-split"><div class="ew-page">' +
         '<div class="ew-meta"><input class="ew-date" type="datetime-local" value="' + esc(c.head.date || "") + '"></div>' +
@@ -601,7 +601,7 @@
       else document.execCommand("formatBlock", false, /^h/i.test(document.queryCommandValue("formatBlock")) ? "p" : "h3");
       changed();
     });
-    // pasted text comes in as plain paragraphs; a passage (not just a few words) is marked as new
+    // pasted text comes in as plain paragraphs; a passage (not just a few words) is remembered as new, for Gemini
     body.addEventListener("paste", function (ev) {
       var t = ev.clipboardData && ev.clipboardData.getData("text/plain"); if (t == null) return;
       ev.preventDefault();
@@ -619,7 +619,7 @@
       e.preventDefault();
       readFiles(e.dataTransfer.files).then(function (t) {
         var ps = splitPasted(t); if (!ps.length) return;
-        body.insertAdjacentHTML("beforeend", ps.map(function (x) { return '<p data-new="1" class="new">' + richHTML(x) + "</p>"; }).join(""));
+        body.insertAdjacentHTML("beforeend", ps.map(function (x) { return '<p data-new="1">' + richHTML(x) + "</p>"; }).join(""));
         changed();
       });
     });
@@ -654,7 +654,7 @@
   // pasted passages become paragraphs of their own, between paragraphs (a paragraph is split where the cursor is)
   function insertParas(body, ps) {
     var sel = window.getSelection(), r = sel.rangeCount ? sel.getRangeAt(0) : null;
-    var nodes = ps.map(function (x) { var el = document.createElement("p"); el.className = "new"; el.setAttribute("data-new", "1"); el.innerHTML = richHTML(x); return el; });
+    var nodes = ps.map(function (x) { var el = document.createElement("p"); el.setAttribute("data-new", "1"); el.innerHTML = richHTML(x); return el; });
     var cur = r && body.contains(r.startContainer) ? (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement).closest(".ew-body > *") : null;
     if (r && !r.collapsed && cur) r.deleteContents();
     if (!cur) nodes.forEach(function (el) { body.appendChild(el); });
@@ -789,7 +789,7 @@
     var nw = c.blocks.filter(function (b) { return b.added; }).length, last = c.head.prev;
     side.hidden = false; w.classList.add("with-side");
     side.innerHTML = '<div class="wc-side-head"><b>✦ Gemini writes it in</b><button type="button" class="ed-x" data-y="hide" aria-label="Close">×</button></div>' +
-      '<p class="j-hint">' + (nw ? "Gemini writes this chapter again with the " + nw + (nw === 1 ? " new paragraph" : " new paragraphs") + " (yellow line) worked in" : "Gemini writes this chapter again so it reads as one piece") +
+      '<p class="j-hint">' + (nw ? "Gemini writes this chapter again with what you pasted in worked in" : "Gemini writes this chapter again so it reads as one piece") +
         ": transitions, quotations framed, terms explained — keeping every fact, date and quotation. Your version is kept; one click brings it back.</p>" +
       '<label class="ed-field"><span class="ed-label">Anything to tell Gemini about this chapter (optional)</span><textarea class="ed-input" data-y="extra" rows="2" placeholder="例如：开头用 1794 年沙龙的画面；多解释血统纯洁制度">' + esc(state.extra || "") + "</textarea></label>" +
       '<p class="wc-side-btns"><button type="button" class="pill solid" data-y="write"' + (state.busy ? " disabled" : "") + ">" + (state.busy ? "Gemini is writing…" : "Write it") + "</button>" +
@@ -802,7 +802,7 @@
       (state.notes && state.notes.length ? '<h4 class="wr-sub">Your notes, left out of the text</h4><ul class="wc-notes">' + state.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>" : "") +
       (last ? '<p class="wc-side-btns"><button type="button" class="mini-btn" data-y="back">↩ Back to my version (' + esc(fmtDate(last.at)) + ")</button>" + '<button type="button" class="mini-btn" data-y="showprev">See my version</button></p>' : "") +
       (state.showPrev && last ? '<div class="wc-prev">' + last.blocks.map(function (b) { return "<p>" + richHTML(b.text) + "</p>"; }).join("") + "</div>" : "") +
-      (nw ? '<p><button type="button" class="mini-btn" data-y="clear">Clear new marks</button></p>' : "");
+      "";
     side.oninput = function (e) { if (e.target.getAttribute("data-y") === "extra") state.extra = e.target.value; };
     side.onclick = function (e) {
       var b = e.target.closest("[data-y]"); if (!b || b.tagName === "TEXTAREA") return;
@@ -825,7 +825,6 @@
         save(); state.msg = "Your version is back. (Gemini's is kept: the same button switches again.)"; state.missing = []; reopen(w);
       }
       if (k === "showprev") { state.showPrev = !state.showPrev; writePanel(w); }
-      if (k === "clear") { c.blocks.forEach(function (bl) { delete bl.added; }); save(); $$(".ew-body .new", w).forEach(function (el) { el.classList.remove("new"); }); writePanel(w); }
     };
   }
   // show the chapter again in the page (after it was replaced), with the panel open
@@ -1469,7 +1468,7 @@
       remember();
       if (a.why === "chapter") addChapter(a.title || "", splitMarkdown(a.text));
       else { var cs = chapters(), last = cs[cs.length - 1]; if (!last) last = { id: addChapter("", []).id, blocks: [] }; putChapter(last.id, last.blocks.concat([{ id: uid(), text: a.text, by: "paste", src: [], added: Date.now() }])); }
-      save(); closeSheet(); W.step = 1; render(); toast(a.why === "chapter" ? "Chapter put back at the end." : "Put back at the end of the last chapter, marked as new.");
+      save(); closeSheet(); W.step = 1; render(); toast(a.why === "chapter" ? "Chapter put back at the end." : "Put back at the end of the last chapter.");
     });
   }
 
