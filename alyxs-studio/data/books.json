@@ -1,26 +1,6 @@
 {
   "items": [
     {
-      "links": [
-        {
-          "label": "Kindle",
-          "url": ""
-        },
-        {
-          "label": "Apple Books",
-          "url": ""
-        },
-        {
-          "label": "Amazon",
-          "url": ""
-        }
-      ],
-      "title": "Dictionary",
-      "category": "Language",
-      "note": "",
-      "image": "/assets/uploads/books-1-9a6d.webp"
-    },
-    {
       "title": "Brazil Oriental",
       "category": "Research",
       "note": "",
@@ -39,6 +19,26 @@
           "url": ""
         }
       ]
+    },
+    {
+      "links": [
+        {
+          "label": "Kindle",
+          "url": ""
+        },
+        {
+          "label": "Apple Books",
+          "url": ""
+        },
+        {
+          "label": "Amazon",
+          "url": ""
+        }
+      ],
+      "title": "Dictionary",
+      "category": "Language",
+      "note": "",
+      "image": "/assets/uploads/books-1-9a6d.webp"
     }
   ]
 }
