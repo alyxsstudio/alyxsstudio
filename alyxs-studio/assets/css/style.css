@@ -1243,3 +1243,6 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
   .wc-write .ew-hint { display: none; }
 }
 @media (max-width: 640px) { .wc-btns { margin-left: 0; } .wc-text { margin: 0; padding: 0; } }
+.wc-prev { max-height: 40vh; overflow: auto; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px; font-size: calc(var(--u) * 13); color: var(--mute); }
+.wc-prev p { margin: 0 0 .7em; }
+.wc-notes { margin: 0 0 12px; padding-left: 18px; font-size: calc(var(--u) * 13); }

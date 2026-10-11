@@ -1,8 +1,8 @@
 /* Alyx's Studio — Thesis: a private place to write an article chapter by chapter, like a serial.
    1 Write      the article is a row of chapters (one topic each). The page shows every chapter with its
                 full text; click one to write in it. New material pasted into a chapter is marked as new,
-                and ✦ Suggestions says how to write it in and which other chapter it belongs with —
-                it never changes your text by itself.
+                and ✦ Gemini writes it in: the chapter written again with the new material worked in,
+                every fact kept; your version stays one click away.
    2 Translate  the chapters put together as one article, paragraph by paragraph with DeepL.
    3 Sources    the whole article: sentences that need a citation, published matches, AI-sounding writing.
    4 Format     the whole article as an MLA 9 page and a Word file.
@@ -194,7 +194,6 @@
     return out;
   }
   function chapterById(id) { return chapters().filter(function (c) { return c.id === id; })[0] || null; }
-  function chapNo(id) { return chapters().findIndex(function (c) { return c.id === id; }) + 1; }
   function chapName(c, i) { return chapTitle(c.head) || cut1(c.blocks.map(function (b) { return b.text; }).join(" "), 22) || "Untitled"; }
   function cut1(t, n) { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n) + "…" : t; }
   // in steps 2–4 a chapter without a title just flows on; titles can also be left out of the article altogether
@@ -484,7 +483,6 @@
     return "<p" + (b.added ? ' class="new" title="New — not yet fitted in"' : "") + ">" + richHTML(b.text) + "</p>";
   }
   function chapCount(c) { return A().count(c.blocks.map(function (b) { return b.text; }).join("\n")).total; }
-  function openSugg(id) { var s = (W.paper.sugg || {})[id]; return s ? (s.items || []).filter(function (x) { return !x.done; }).length : 0; }
   function stepWrite(body) {
     var cs = chapters();
     body.innerHTML =
@@ -496,12 +494,12 @@
         return '<a href="#ch-' + esc(c.id) + '" data-c="goto" data-id="' + esc(c.id) + '"><b>' + (i + 1) + "</b> " + esc(chapName(c, i)) + "</a>";
       }).join("") + "</nav>" : "") +
       (cs.length ? '<div class="wc-list">' + cs.map(function (c, i) {
-        var nw = c.blocks.filter(function (b) { return b.added; }).length, sg = openSugg(c.id), t = chapTitle(c.head);
+        var nw = c.blocks.filter(function (b) { return b.added; }).length, t = chapTitle(c.head);
         return '<article class="wc-ch" id="ch-' + esc(c.id) + '" data-id="' + esc(c.id) + '">' +
           '<header class="wc-head"><span class="wc-no">No. ' + (i + 1) + "</span>" +
             (t ? '<h2 class="wc-title">' + esc(t) + "</h2>" : "") +
             '<span class="wc-meta">' + esc(fmtDate(c.head.date)) + " · " + fmtN(chapCount(c)) + " 字" +
-              (nw ? ' · <span class="wc-new">' + nw + " new</span>" : "") + (sg ? ' · <span class="wc-sg">✦ ' + sg + (sg === 1 ? " suggestion" : " suggestions") + "</span>" : "") + "</span>" +
+              (nw ? ' · <span class="wc-new">' + nw + " new</span>" : "") + "</span>" +
             '<span class="wc-btns"><button type="button" class="mini-btn" data-c="up" data-id="' + esc(c.id) + '" title="Move up"' + (i ? "" : " disabled") + ">↑</button>" +
               '<button type="button" class="mini-btn" data-c="down" data-id="' + esc(c.id) + '" title="Move down"' + (i < cs.length - 1 ? "" : " disabled") + ">↓</button>" +
               '<button type="button" class="pill" data-c="edit" data-id="' + esc(c.id) + '">Write</button></span></header>' +
@@ -553,7 +551,7 @@
         '<button type="button" class="mini-btn" data-x="prev"' + (idx ? "" : " disabled") + ">← Previous</button>" +
         '<button type="button" class="mini-btn" data-x="next"' + (idx < cs.length - 1 ? "" : " disabled") + ">Next →</button>" +
         '<span class="ew-status" aria-live="polite">' + esc(W.status) + "</span>" +
-        '<button type="button" class="pill" data-x="sugg">✦ Suggestions</button>' +
+        '<button type="button" class="pill" data-x="sugg">✦ Gemini writes it in</button>' +
         '<button type="button" class="pill danger" data-x="del">Delete</button></header>' +
       '<div class="ew-tools" role="toolbar">' +
         '<button type="button" data-cmd="italic" title="Italic — titles of works (⌘I)"><i>I</i></button>' +
@@ -613,7 +611,7 @@
       var k = b.getAttribute("data-x");
       if (k === "close") closeWriter();
       if (k === "prev" || k === "next") { readChapter(w); var cs2 = chapters(), i2 = cs2.findIndex(function (x) { return x.id === w._ch; }) + (k === "prev" ? -1 : 1); if (cs2[i2]) writeChapter(cs2[i2].id); }
-      if (k === "sugg") { readChapter(w); var side = $(".wc-side", w); if (side.hidden) suggPanel(w); else { side.hidden = true; w.classList.remove("with-side"); } }
+      if (k === "sugg") { readChapter(w); var side = $(".wc-side", w); if (side.hidden) writePanel(w); else { side.hidden = true; w.classList.remove("with-side"); } }
       if (k === "del") {
         if (!window.confirm("Delete this chapter? Its text is kept aside (Thesis & style → Kept aside) in case you want it back.")) return;
         remember(); removeChapter(w._ch); save(); closeWriter(); toast("Chapter deleted — kept aside.");
@@ -625,7 +623,6 @@
     });
     (chapTitle(c.head) || c.blocks.length ? body : $(".ew-title", w)).focus();
     if (c.blocks.length) { var r = document.createRange(); r.selectNodeContents(body); r.collapse(false); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
-    if (openSugg(id)) suggPanel(w);
   }
   // where the cursor is in its paragraph: "start", "middle", "end" or "" (outside / empty paragraph)
   function caretPlace(body) {
@@ -659,6 +656,7 @@
   function closeWriter(quiet) {
     var w = W.writer; if (!w) return;
     if (w._flush) w._flush();
+    w._dead = true;
     saveNow();
     var id = w._ch;
     w.remove(); W.writer = null;
@@ -681,6 +679,7 @@
     return out.replace(/ /g, " ").replace(/\*\*/g, "").split("\n").map(function (l) { return l.replace(/[ \t]+/g, " ").trim(); }).join("\n").replace(/\n{2,}/g, "\n").trim();
   }
   function readChapter(w) {
+    if (w._dead) return;   // a page already replaced must not write its old text back
     var p = W.paper, id = w._ch, c = chapterById(id); if (!c) return;
     var body = $(".ew-body", w), by = {}, seen = {}, out = [], changed = false;
     c.blocks.forEach(function (b) { by[b.id] = b; });
@@ -718,163 +717,124 @@
     var st = $(".ew-status", w); if (st) st.textContent = W.status;
   }
 
-  /* ---------- ✦ suggestions: how to write the new material in, and where else it belongs ---------- */
-  var SUGG_TYPES = { place: "Where it goes", bridge: "Bridge", explain: "Explain", quote: "Frame the quotation", move: "Other chapter", repeat: "Repeat", conflict: "Contradiction", evidence: "Evidence", order: "Order", related: "Related passage" };
-  // what other chapters say about the same things, from the words alone (instant, no key needed)
-  function localSugg(c) {
-    var cs = chapters(), all = [];
-    cs.forEach(function (o) { o.blocks.forEach(function (b) { if (!isHead(b.text) && A().count(b.text).total > 15) all.push({ b: b, ch: o }); }); });
-    var vecs = A().weigh(all.map(function (x) { return A().terms(x.b.text); })), at = {};
-    all.forEach(function (x, i) { at[x.b.id] = i; });
-    var targets = c.blocks.filter(function (b) { return b.added && at[b.id] != null; });
-    if (!targets.length) targets = c.blocks.filter(function (b) { return at[b.id] != null; });
-    var items = [];
-    targets.forEach(function (b) {
-      var v = vecs[at[b.id]], best = null;
-      all.forEach(function (x, i) {
-        if (x.b === b) return;
-        var s = A().cosine(v, vecs[i]);
-        if (!best || s > best.s) best = { s: s, x: x, v: vecs[i] };
-      });
-      if (!best || best.s < 0.18) return;
-      if (best.x.ch.id === c.id && best.s < 0.55) return;   // close neighbours in the same chapter are expected
-      var shared = Object.keys(v).filter(function (k) { return best.v[k]; }).sort(function (a, k) { return v[k] * best.v[k] - v[a] * best.v[a]; }).slice(0, 6);
-      items.push({ local: true, type: best.s >= 0.55 ? "repeat" : "related", ids: [b.id], ch: best.x.ch.id, other: best.x.b.id, sim: Math.round(best.s * 100), shared: shared });
-    });
-    return items;
+  /* ---------- ✦ Gemini writes the new material into the chapter ---------- */
+  // what must survive a rewrite: years and numbers, words in other languages, titles of works
+  function mustKeep(t) {
+    var out = {};
+    (String(t).match(/\d{3,4}|[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]{3,}|《[^》]{1,30}》/g) || []).forEach(function (x) { out[x] = 1; });
+    return Object.keys(out);
   }
-  function localAdvice(x, c) {
-    var o = chapterById(x.ch), n = chapNo(x.ch), ob = o && o.blocks.filter(function (b) { return b.id === x.other; })[0];
-    var where = x.ch === c.id ? "本章" : "第 " + n + " 章（No. " + n + (o && chapTitle(o.head) ? "《" + chapTitle(o.head) + "》" : "") + "）";
-    var pi = o && ob ? o.blocks.indexOf(ob) + 1 : 0;
-    var s = x.type === "repeat" ? "和" + where + "第 " + pi + " 段几乎在说同一件事（相近度 " + x.sim + "%）。保留一处：把两段里更具体的细节合到更合适的那一章，另一处删去或改成一句回指。"
-      : "和" + where + "第 " + pi + " 段讲的是相关的事（共同的词：" + x.shared.join("、") + "）。看它是否应当和那一段放在一起，或在这里加一句把两处连起来。";
-    return { text: s, quote: ob ? cut1(ob.text, 160) : "" };
-  }
-  function suggPrompt(c) {
+  function writePrompt(c, extra, plain) {
     var cs = chapters(), no = cs.indexOf(c) + 1, total = 0;
     var others = cs.map(function (o, i) {
-      if (o === c) return "No. " + (i + 1) + " — (the CURRENT chapter, below)";
-      var t = o.blocks.map(function (b) { return b.text; }).join("\n");
-      total += t.length;
+      if (o === c) return "";
+      var t = o.blocks.map(function (b) { return b.text; }).join("\n"); total += t.length;
       return "No. " + (i + 1) + (chapTitle(o.head) ? " 《" + chapTitle(o.head) + "》" : "") + "\n" + t;
-    });
-    // a very long article: the other chapters by their opening lines only
-    if (total > 70000) others = cs.map(function (o, i) { return o === c ? "No. " + (i + 1) + " — (the CURRENT chapter, below)" : "No. " + (i + 1) + (chapTitle(o.head) ? " 《" + chapTitle(o.head) + "》" : "") + "\n" + o.blocks.map(function (b) { return cut1(b.text, 140); }).join("\n"); });
+    }).filter(Boolean);
+    if (total > 60000) others = cs.filter(function (o) { return o !== c; }).map(function (o) { return "No. " + (cs.indexOf(o) + 1) + (chapTitle(o.head) ? " 《" + chapTitle(o.head) + "》" : "") + "\n" + o.blocks.map(function (b) { return cut1(b.text, 120); }).join("\n"); });
     var hasNew = c.blocks.some(function (b) { return b.added; });
     return context() +
-      "\nShe writes this article chapter by chapter, like a serial — one topic per chapter — and keeps pasting new material into chapters: new findings, sources, quotations in the original language she wants to keep, notes to herself. Pasted material often does not fit yet: it repeats something, breaks the line of the argument, belongs in another chapter, or is a raw quotation with no frame.\n" +
-      "You are her editor. Read the CURRENT chapter" + (hasNew ? ", paying most attention to the paragraphs marked [NEW]" : "") + ", and give concrete editing suggestions. Do NOT rewrite the chapter or any paragraph — she writes it herself.\n" +
-      "For each new paragraph or quotation, say:\n" +
-      "- whether it belongs in this chapter, exactly where (after which paragraph), and what job it does for the argument (how his life shows in the choices he made in the novel);\n" +
-      "- what has to be written around it so it no longer clashes: what the bridge from the paragraph before and to the one after must connect (specifically), which names, terms or events a reader needs explained, and for a quotation: who wrote it, where and when, and what exactly it shows;\n" +
-      "- if it fits better with another chapter: which one (its number) and why — what the two share;\n" +
-      "- if it repeats something already written, here or in another chapter: where, and which version has the details worth keeping;\n" +
-      "- contradictions with other chapters (dates, numbers, names, counts of years) and speculation written as fact.\n" +
-      "Mention other serious problems of order or logic in the chapter briefly.\n" +
-      "Be specific: name the paragraph by its number and quote a few of its words. Write the advice in Chinese. \"example\" is optional: at most two sentences in her voice showing how a bridge could go — a sample, never a replacement for her paragraph.\n" +
-      'Answer JSON only: {"overall": "two or three sentences on how the chapter reads with the new material", "items": [{"p": [paragraph numbers in the CURRENT chapter], "type": "place|bridge|explain|quote|move|repeat|conflict|evidence|order", "advice": "…", "chapter": number of another chapter or null, "example": "optional"}]}\n\n' +
-      "The chapters of the article, in order:\n\n" + others.join("\n\n") +
-      "\n\nCURRENT — No. " + no + (chapTitle(c.head) ? " 《" + chapTitle(c.head) + "》" : "") + ", paragraphs numbered:\n" +
-      c.blocks.map(function (b, i) { return "[" + (i + 1) + "]" + (b.added ? " [NEW]" : "") + " " + b.text; }).join("\n");
+      "\nShe writes this article chapter by chapter, one topic per chapter. " + (hasNew ? "She has just pasted new material into the CURRENT chapter (marked [NEW]): new findings, sources, quotations she wants to keep, notes. It does not fit yet." : "The CURRENT chapter was written in pieces and does not read as one yet.") + "\n" +
+      "Write the CURRENT chapter again as one finished piece of her article" + (hasNew ? ", with the new material worked in" : "") + ":\n" +
+      "- Put every piece where it belongs in the line of the argument (how his life shows in the choices he made in the novel), and write the transitions so nothing clashes.\n" +
+      "- Frame each quotation: who wrote it, in what work, when, and what exactly it shows. Copy quotations exactly, in their original language, with their line breaks.\n" +
+      "- Explain, briefly and clearly inside the sentence, any name, term, institution or event a reader without background needs.\n" +
+      "- Explain mechanisms (the law, institution, religion, economy behind a fact), not one phenomenon by another.\n" +
+      "- Keep EVERY fact, name, date, number, quotation, citation, example and image from all paragraphs, old and new. Do not summarise and do not shorten: the result is at least as long as her text. Where two paragraphs say the same thing, merge them into one that keeps the details of both.\n" +
+      "- Keep her wording wherever it already works; change only what is needed for the chapter to read as one.\n" +
+      "- Speculation stays marked as speculation. Never add facts, sources or quotations that are not in the material.\n" +
+      "- A note she wrote to herself or to an AI (an instruction, a to-do, a question) is not part of the article: leave it out of the text and list it under notes.\n" +
+      "- Same language as her text (Chinese). Literary analysis, not history. Well-built, flowing sentences with high information density; no stock phrases.\n" +
+      (extra ? "- Her instruction for this chapter: " + extra + "\n" : "") +
+      (plain ? "Answer with the chapter only: paragraphs separated by a blank line (lines of a poem on their own lines inside the paragraph). Then, if there are notes, a line '---NOTES---' and the notes.\n"
+             : 'Answer JSON only: {"paragraphs": ["paragraph", "…"], "notes": ["…"]} (inside a paragraph, \\n keeps lines of a poem apart).\n') +
+      (others.length ? "\nThe other chapters, for context only (do not repeat what they already say; keep dates and names consistent with them):\n\n" + others.join("\n\n") + "\n" : "") +
+      "\nCURRENT — No. " + no + (chapTitle(c.head) ? " 《" + chapTitle(c.head) + "》" : "") + ":\n" +
+      c.blocks.map(function (b, i) { return "[" + (i + 1) + "]" + (b.added ? " [NEW]" : "") + " " + b.text; }).join("\n\n");
   }
-  function suggPanel(w, busy) {
-    var p = W.paper, id = w._ch, c = chapterById(id), side = $(".wc-side", w); if (!c || !side) return;
-    var s = (p.sugg || {})[id], nw = c.blocks.filter(function (b) { return b.added; }).length;
+  function writePanel(w, state) {
+    var id = w._ch, c = chapterById(id), side = $(".wc-side", w); if (!c || !side) return;
+    state = state || w._ws || {};
+    w._ws = state;
+    var nw = c.blocks.filter(function (b) { return b.added; }).length, last = c.head.prev;
     side.hidden = false; w.classList.add("with-side");
-    side.innerHTML = '<div class="wc-side-head"><b>✦ Suggestions</b><button type="button" class="ed-x" data-y="hide" aria-label="Close">×</button></div>' +
-      '<p class="j-hint">' + (nw ? nw + (nw === 1 ? " new paragraph" : " new paragraphs") + " (the line on the left) will be read against the rest of this chapter and the other chapters." : "Nothing is marked new, so the whole chapter is read against the others.") +
-        " Your text is never changed — you decide what to do.</p>" +
-      '<p class="wc-side-btns"><button type="button" class="pill solid" data-y="ask"' + (busy ? " disabled" : "") + ">" + (busy ? "Reading…" : aiKey() ? "Ask Gemini for suggestions" : "Find where it belongs") + "</button>" +
-        '<button type="button" class="mini-btn" data-y="prompt" title="Copy the request with this chapter and the others, to paste into Gemini yourself">Copy for Gemini</button>' +
-        (nw ? '<button type="button" class="mini-btn" data-y="clear">Clear new marks</button>' : "") + "</p>" +
-      (aiKey() ? "" : '<p class="j-hint">With a Gemini key you also get advice on how to write each new piece in. ' +
-        '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free key</a>, paste it here: <span class="wr-keyrow"><input class="ed-input" type="password" data-key placeholder="AIza…" autocomplete="off"><button type="button" class="mini-btn" data-y="savekey">Turn on</button></span></p>') +
-      '<div class="wc-sugs">' + (s ? suggHTML(s, c) : "") + "</div>";
+    side.innerHTML = '<div class="wc-side-head"><b>✦ Gemini writes it in</b><button type="button" class="ed-x" data-y="hide" aria-label="Close">×</button></div>' +
+      '<p class="j-hint">' + (nw ? "Gemini writes this chapter again with the " + nw + (nw === 1 ? " new paragraph" : " new paragraphs") + " (yellow line) worked in" : "Gemini writes this chapter again so it reads as one piece") +
+        ": transitions, quotations framed, terms explained — keeping every fact, date and quotation. Your version is kept; one click brings it back.</p>" +
+      '<label class="ed-field"><span class="ed-label">Anything to tell Gemini about this chapter (optional)</span><textarea class="ed-input" data-y="extra" rows="2" placeholder="例如：开头用 1794 年沙龙的画面；多解释血统纯洁制度">' + esc(state.extra || "") + "</textarea></label>" +
+      '<p class="wc-side-btns"><button type="button" class="pill solid" data-y="write"' + (state.busy ? " disabled" : "") + ">" + (state.busy ? "Gemini is writing…" : "Write it") + "</button>" +
+        '<button type="button" class="mini-btn" data-y="prompt" title="Copy the request to paste into gemini.google.com yourself">Copy for Gemini</button>' +
+        '<button type="button" class="mini-btn" data-y="pastein">Paste Gemini\'s answer</button></p>' +
+      (aiKey() ? "" : '<p class="j-hint">To let the site ask Gemini itself: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">get a free key</a> and paste it here <span class="wr-keyrow"><input class="ed-input" type="password" data-key placeholder="AIza…" autocomplete="off"><button type="button" class="mini-btn" data-y="savekey">Turn on</button></span></p>') +
+      (state.paste ? '<label class="ed-field"><span class="ed-label">Gemini\'s chapter</span><textarea class="ed-input" data-y="answer" rows="8"></textarea></label><p><button type="button" class="pill solid" data-y="useanswer">Put it in the chapter</button></p>' : "") +
+      (state.msg ? '<div class="wc-overall">' + state.msg + "</div>" : "") +
+      (state.missing && state.missing.length ? '<p class="j-hint"><b>Not in Gemini\'s version</b> (check whether they should be): ' + state.missing.map(esc).join(" · ") + "</p>" : "") +
+      (state.notes && state.notes.length ? '<h4 class="wr-sub">Your notes, left out of the text</h4><ul class="wc-notes">' + state.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>" : "") +
+      (last ? '<p class="wc-side-btns"><button type="button" class="mini-btn" data-y="back">↩ Back to my version (' + esc(fmtDate(last.at)) + ")</button>" + '<button type="button" class="mini-btn" data-y="showprev">See my version</button></p>' : "") +
+      (state.showPrev && last ? '<div class="wc-prev">' + last.blocks.map(function (b) { return "<p>" + richHTML(b.text) + "</p>"; }).join("") + "</div>" : "") +
+      (nw ? '<p><button type="button" class="mini-btn" data-y="clear">Clear new marks</button></p>' : "");
+    side.oninput = function (e) { if (e.target.getAttribute("data-y") === "extra") state.extra = e.target.value; };
     side.onclick = function (e) {
-      var b = e.target.closest("[data-y]");
-      var card = e.target.closest(".wc-sugg");
-      if (!b) { if (card) light(w, s.items[+card.getAttribute("data-k")]); return; }
-      var k = b.getAttribute("data-y"), x = card && s ? s.items[+card.getAttribute("data-k")] : null;
+      var b = e.target.closest("[data-y]"); if (!b || b.tagName === "TEXTAREA") return;
+      var k = b.getAttribute("data-y");
       if (k === "hide") { side.hidden = true; w.classList.remove("with-side"); }
-      if (k === "ask") askSugg(w);
-      if (k === "prompt") copyPrompt(suggPrompt(c), "Copied. Paste it into Gemini; its suggestions come back there.");
-      if (k === "clear") { c.blocks.forEach(function (bl) { delete bl.added; }); save(); $$(".ew-body .new", w).forEach(function (el) { el.classList.remove("new"); }); suggPanel(w); }
-      if (k === "savekey") { var v = $("[data-key]", side).value.trim(); if (!v) return; W.ai.gemini_key = v; W.skip = {}; saveAI(); suggPanel(w); askSugg(w); }
-      if (!x) return;
-      if (k === "done") {
-        x.done = !x.done;
-        if (x.done) (x.ids || []).forEach(function (bid) { var bl = c.blocks.filter(function (y) { return y.id === bid; })[0]; if (bl) delete bl.added; var el = $('.ew-body [data-id="' + bid + '"]', w); if (el) el.classList.remove("new"); });
-        save(); suggPanel(w);
+      if (k === "write") { if (!aiKey()) { state.msg = "Paste a Gemini key below first, or use “Copy for Gemini” and paste its answer back."; writePanel(w); return; } writeIn(w); }
+      if (k === "prompt") { readChapter(w); copyPrompt(writePrompt(chapterById(id), state.extra, true), "Copied. Paste it into Gemini, then bring its chapter back with “Paste Gemini's answer”."); state.paste = true; writePanel(w); }
+      if (k === "pastein") { state.paste = !state.paste; writePanel(w); }
+      if (k === "useanswer") {
+        var raw = $("[data-y=answer]", side).value; if (!raw.trim()) return;
+        var parts = raw.split(/\n-{3}\s*NOTES\s*-{3}\n?/i);
+        applyWritten(w, splitMarkdown(parts[0].replace(/^```\w*\n?|```$/g, "")), parts[1] ? splitMarkdown(parts[1]) : [], "Gemini (pasted)");
       }
-      if (k === "copyex") navigator.clipboard.writeText(x.example || "").then(function () { toast("Example copied."); });
-      if (k === "open") { readChapter(w); writeChapter(x.ch); }
-      if (k === "move") {
-        var to = chapterById(x.ch); if (!to || to === c) return;
-        var moving = c.blocks.filter(function (bl) { return (x.ids || []).indexOf(bl.id) > -1; }); if (!moving.length) return;
-        if (!window.confirm("Move " + (moving.length === 1 ? "this paragraph" : "these " + moving.length + " paragraphs") + " to the end of No. " + chapNo(x.ch) + "?")) return;
-        remember(); readChapter(w);
-        c = chapterById(id);
-        putChapter(id, c.blocks.filter(function (bl) { return moving.indexOf(bl) < 0; }));
-        to = chapterById(x.ch); putChapter(x.ch, to.blocks.concat(moving));
-        x.done = true; save(); toast("Moved to No. " + chapNo(x.ch) + ".");
-        writeChapter(id);
+      if (k === "savekey") { var v = $("[data-key]", side).value.trim(); if (!v) return; W.ai.gemini_key = v; W.skip = {}; saveAI(); writeIn(w); }
+      if (k === "back") {
+        var cc = chapterById(id); if (!cc || !cc.head.prev) return;
+        remember();
+        var mine = cc.head.prev; cc.head.prev = { at: Date.now(), blocks: cc.blocks.map(function (x) { return { id: x.id, text: x.text, by: x.by, added: x.added }; }) };
+        putChapter(id, mine.blocks.map(function (x) { return { id: uid(), text: x.text, by: x.by || "me", src: [], added: x.added }; }));
+        save(); state.msg = "Your version is back. (Gemini's is kept: the same button switches again.)"; state.missing = []; reopen(w);
       }
+      if (k === "showprev") { state.showPrev = !state.showPrev; writePanel(w); }
+      if (k === "clear") { c.blocks.forEach(function (bl) { delete bl.added; }); save(); $$(".ew-body .new", w).forEach(function (el) { el.classList.remove("new"); }); writePanel(w); }
     };
-    side.onmouseover = function (e) { var card = e.target.closest(".wc-sugg"); if (card && s) light(w, s.items[+card.getAttribute("data-k")], true); };
   }
-  function light(w, x, soft) {
-    $$(".ew-body .hl", w).forEach(function (el) { el.classList.remove("hl"); });
-    if (!x) return;
-    var first = null;
-    (x.ids || []).forEach(function (bid) { var el = $('.ew-body [data-id="' + bid + '"]', w); if (el) { el.classList.add("hl"); first = first || el; } });
-    if (first && !soft) first.scrollIntoView({ behavior: "smooth", block: "center" });
+  // show the chapter again in the page (after it was replaced), with the panel open
+  function reopen(w) { var st = w._ws; w._flush = null; w._dead = true; writeChapter(w._ch); if (W.writer) { W.writer._ws = st; writePanel(W.writer); } }
+  function applyWritten(w, paras, notes, model) {
+    var id = w._ch, c = chapterById(id), st = w._ws || {};
+    paras = (paras || []).map(function (x) { return String(x || "").trim(); }).filter(Boolean);
+    if (!c || !paras.length) { st.msg = "Gemini's answer had no text."; writePanel(w); return; }
+    remember();
+    var before = c.blocks.map(function (b) { return b.text; }).join("\n"), after = paras.join("\n");
+    c.head.prev = { at: Date.now(), blocks: c.blocks.map(function (b) { return { id: b.id, text: b.text, by: b.by, added: b.added }; }) };
+    putChapter(id, paras.map(function (t) { return { id: uid(), text: t, by: "ai", src: [] }; }));
+    save();
+    var n0 = A().count(before).total, n1 = A().count(after).total;
+    st.missing = mustKeep(before).filter(function (x) { return after.indexOf(x) < 0; }).slice(0, 40);
+    st.notes = notes || [];
+    st.msg = "<b>Written in.</b> " + paras.length + " paragraphs, " + fmtN(n1) + " 字 (yours: " + fmtN(n0) + ")" + (model ? " · " + esc(model) : "") + ". Read it through; ↩ brings your version back.";
+    st.busy = false; st.paste = false; st.showPrev = false;
+    reopen(w);
   }
-  function suggHTML(s, c) {
-    var num = function (bid) { var i = c.blocks.findIndex(function (b) { return b.id === bid; }); return i > -1 ? "¶" + (i + 1) : ""; };
-    var card = function (x, k) {
-      var adv = x.local ? localAdvice(x, c) : { text: x.advice || "", quote: "" };
-      var n = x.ch && x.ch !== c.id ? chapNo(x.ch) : 0;
-      return '<div class="wc-sugg' + (x.done ? " done" : "") + '" data-k="' + k + '">' +
-        '<p class="wc-sg-top"><span class="wc-type t-' + esc(x.type || "") + '">' + esc(SUGG_TYPES[x.type] || x.type || "Note") + "</span> " + esc((x.ids || []).map(num).filter(Boolean).join(" ")) + "</p>" +
-        "<p>" + esc(adv.text) + "</p>" +
-        (adv.quote ? '<blockquote class="wc-q">' + esc(adv.quote) + "</blockquote>" : "") +
-        (x.example ? '<p class="wc-ex"><span>Example only — </span>' + esc(x.example) + ' <button type="button" class="mini-btn" data-y="copyex">Copy</button></p>' : "") +
-        '<p class="wc-sg-btns">' +
-          (n ? '<button type="button" class="mini-btn" data-y="open">Open No. ' + n + "</button>" + ((x.ids || []).some(function (bid) { return c.blocks.some(function (b) { return b.id === bid; }); }) && x.type !== "conflict" ? '<button type="button" class="mini-btn" data-y="move">Move ' + esc((x.ids || []).map(num).filter(Boolean).join(" ")) + " to No. " + n + "</button>" : "") : "") +
-          '<button type="button" class="mini-btn" data-y="done">' + (x.done ? "Not done" : "✓ Done") + "</button></p></div>";
-    };
-    var ai = [], loc = [];
-    (s.items || []).forEach(function (x, k) { (x.local ? loc : ai).push(card(x, k)); });
-    return (s.overall ? '<p class="wc-overall">' + esc(s.overall) + "</p>" : "") +
-      ai.join("") +
-      (loc.length ? '<h4 class="wr-sub">Related passages in the article <span class="j-hint">(found by shared words)</span></h4>' + loc.join("") : "") +
-      (!ai.length && !loc.length ? '<p class="empty">Nothing to suggest' + (s.overall ? "" : " — no other chapter talks about the same things") + ".</p>" : "") +
-      '<p class="j-hint">' + esc(fmtDate(s.at)) + (s.model ? " · " + esc(s.model) : "") + "</p>";
-  }
-  function askSugg(w) {
-    var p = W.paper, id = w._ch;
+  function writeIn(w) {
     readChapter(w);
-    var c = chapterById(id); if (!c) return;
-    p.sugg = p.sugg || {};
-    var local = localSugg(c);
-    if (!aiKey()) { p.sugg[id] = { at: Date.now(), items: local }; save(); suggPanel(w); return; }
-    suggPanel(w, true);
-    var blocks = c.blocks.slice();
-    gemini(suggPrompt(c), { json: true, temp: 0.4, max: 8192 }).then(function (r) {
-      var j = parseJSON(r.text) || {}, cs = chapters();
-      var items = (Array.isArray(j.items) ? j.items : []).filter(function (x) { return x && x.advice; }).map(function (x) {
-        var ids = (Array.isArray(x.p) ? x.p : [x.p]).map(function (n) { return blocks[+n - 1] && blocks[+n - 1].id; }).filter(Boolean);
-        var o = x.chapter && cs[+x.chapter - 1];
-        return { type: String(x.type || "").toLowerCase(), ids: ids, ch: o ? o.id : null, advice: String(x.advice), example: x.example ? String(x.example) : "" };
-      });
-      // a related passage the words found is shown only if Gemini didn't already point there
-      local = local.filter(function (l) { return !items.some(function (x) { return x.ch === l.ch && x.ids.some(function (i) { return l.ids.indexOf(i) > -1; }); }); });
-      p.sugg[id] = { at: Date.now(), overall: String(j.overall || ""), items: items.concat(local), model: r.model };
-      save();
+    var id = w._ch, c = chapterById(id), st = w._ws = w._ws || {}; if (!c || !c.blocks.length) return;
+    st.busy = true; st.msg = ""; writePanel(w);
+    var n0 = A().count(c.blocks.map(function (b) { return b.text; }).join("\n")).total, prompt = writePrompt(c, st.extra);
+    var ask = function (pr) { return gemini(pr, { json: true, temp: 0.5, max: 32768 }).then(function (r) { var j = parseJSON(r.text) || {}; j.model = r.model; j.cut = r.cut; return j; }); };
+    ask(prompt).then(function (j) {
+      var len = A().count((j.paragraphs || []).join("\n")).total;
+      // shorter than her text: details were dropped, so once more, firmly
+      if (len < n0 * 0.9) return ask(prompt + "\n\nYour previous answer was only " + Math.round(len / Math.max(1, n0) * 100) + "% as long as her text — details were lost. Write it again and keep every detail.").then(function (j2) { return A().count((j2.paragraphs || []).join("\n")).total > len ? j2 : j; });
+      return j;
+    }).then(function (j) {
+      if (W.writer !== w) return;
+      if (!Array.isArray(j.paragraphs) || !j.paragraphs.length) throw new Error(j.cut ? "the answer was cut off — try a shorter chapter" : "no text came back");
+      applyWritten(w, j.paragraphs, Array.isArray(j.notes) ? j.notes.map(String) : [], j.model);
     }).catch(function (e) {
-      p.sugg[id] = { at: Date.now(), items: local, overall: "Gemini didn't answer (" + e.message + "). Below: what the words alone show." };
-    }).then(function () { if (W.writer === w) suggPanel(w); });
+      st.busy = false; st.msg = "Gemini didn't answer: " + esc(e.message) + ". You can use “Copy for Gemini” instead.";
+      if (W.writer === w) writePanel(w);
+    });
   }
 
   /* ---------- a serial moved here from Novel: its chapters become this article's chapters ---------- */
