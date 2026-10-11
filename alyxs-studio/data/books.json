@@ -1,6 +1,26 @@
 {
   "items": [
     {
+      "links": [
+        {
+          "label": "Kindle",
+          "url": ""
+        },
+        {
+          "label": "Apple Books",
+          "url": ""
+        },
+        {
+          "label": "Amazon",
+          "url": ""
+        }
+      ],
+      "title": "Dictionary",
+      "category": "Ongoing",
+      "note": "",
+      "image": "/assets/uploads/books-1-9a6d.webp"
+    },
+    {
       "title": "Small Things, White Rooms",
       "category": "Publication",
       "note": "Essays, 2026",
