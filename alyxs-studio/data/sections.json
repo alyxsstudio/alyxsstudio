@@ -9,8 +9,15 @@
     },
     {
       "key": "ongoing",
-      "title": "Novel",
-      "short": "",
+      "title": "Serial",
+      "short": "Novels, stories and picture books, a little at a time.",
+      "intro": "",
+      "in_menu": true
+    },
+    {
+      "key": "write",
+      "title": "Thesis",
+      "short": "Articles in progress · only you",
       "intro": "",
       "in_menu": true
     },
@@ -30,8 +37,8 @@
     },
     {
       "key": "books",
-      "title": "Book",
-      "short": "Published on Amazon and Apple Books.",
+      "title": "Library",
+      "short": "Books to read, download or buy.",
       "intro": "",
       "in_menu": true
     },

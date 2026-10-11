@@ -187,6 +187,24 @@
           return gh(privPath(p), { allow404: true }).then(function (j) { return put(j && j.sha); });
         }).then(function (r) { return r && r.content && r.content.sha; });
       });
+    },
+    // pictures and other files, for the inspiration board
+    writeBlob: function (p, blob) {
+      return priv.ready().then(function (ok) {
+        if (!ok) throw new Error("private storage unavailable");
+        return b64FromBlob(blob).then(function (b64) {
+          return gh(privPath(p), { method: "PUT", body: { message: "Inspiration " + p, content: b64 } });
+        }).then(function (r) { return r && r.content && r.content.sha; });
+      });
+    },
+    readBlob: function (p) {
+      return fetch(API + privPath(p), { headers: { Authorization: "Bearer " + token(), Accept: "application/vnd.github.raw+json" }, cache: "force-cache" })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.blob(); });
+    },
+    remove: function (p) {
+      return gh(privPath(p), { allow404: true }).then(function (j) {
+        if (j) return gh(privPath(p), { method: "DELETE", body: { message: "Remove " + p, sha: j.sha } });
+      });
     }
   };
 
@@ -455,7 +473,7 @@
           field("Source name", input("ltitle", p.link && p.link.title)) +
           '<label class="ed-field"><span class="ed-label">Quote</span><textarea class="ed-input" name="lquote" rows="2">' + esc(p.link && p.link.quote) + "</textarea></label></details>" +
         field("Tags (comma separated)", input("tags", list(p.tags).join(", "))) +
-        '<label class="ed-check"><input type="checkbox" name="hidden"' + (p.hidden ? " checked" : "") + "> Keep as a draft (not shown on the site)</label>");
+        '<label class="ed-check"><input type="checkbox" name="hidden"' + (p.hidden ? " checked" : "") + "> Hide from visitors (you still see it, marked “Hidden”)</label>");
       var imgs = imagePicker(p.images), aud = audioPicker(p.audio);
       $("[data-slot=images]", wrap).appendChild(imgs.el);
       $("[data-slot=audio]", wrap).appendChild(aud.el);
@@ -824,7 +842,7 @@
         '<div class="ed-row2">' + field("When", input("date", x.date, "datetime-local")) +
           field("Show it in", select("shelf", x.shelf || "auto", [["auto", "Automatic"], ["watch", "Watch"], ["listen", "Listen"]])) + "</div>" +
         field("Kind (for Listen)", select("category", x.category || "auto", [["auto", "Automatic"], ["Music", "Music"], ["Podcasts", "Podcasts"], ["Video", "Video"]])) +
-        '<label class="ed-check"><input type="checkbox" name="hidden"' + (x.hidden ? " checked" : "") + "> Keep as a draft (not shown on the site)</label>");
+        '<label class="ed-check"><input type="checkbox" name="hidden"' + (x.hidden ? " checked" : "") + "> Hide from visitors (you still see it, marked “Hidden”)</label>");
       var cover = imagePicker(x.cover ? [x.cover] : [], "Cover picture (optional — links get one automatically)");
       $("[data-slot=cover]", wrap).appendChild(cover.el);
       wrap.addEventListener("paste", function (e) { if (e.target.name !== "url") cover.onPaste(e); });
@@ -1447,7 +1465,12 @@
         if (isNew) it.links = [{ label: "Kindle", url: "" }, { label: "Apple Books", url: "" }, { label: "Amazon", url: "" }];
         body = field("Title", input("title", it.title)) +
           field("Category (pick one or type a new one)", input("category", it.category, "text", ' list="cats-books"')) + datalist("cats-books", categoriesOf("books", "category")) +
-          field("One line (optional)", input("note", it.note)) + '<div data-slot="img"></div><div class="ed-field"><span class="ed-label">Where to buy or read</span><div data-slot="rows"></div></div>';
+          field("One line (optional)", input("note", it.note)) + '<div data-slot="img"></div>' +
+          field("About the book (optional, shown on its page)", area("about", it.about, 5)) +
+          '<div class="ed-field"><span class="ed-label">The book itself as a PDF (optional, up to 95 MB)</span><div class="ed-pdf"></div>' +
+            '<div class="ed-row"><label class="pill">Choose a PDF<input type="file" accept="application/pdf" data-pdf hidden></label><button type="button" class="pill" data-pdf-rm>Remove PDF</button></div></div>' +
+          field("Who can read the PDF", select("pdf_access", it.pdf_access || "public", [["public", "Everyone"], ["private", "Only me"]])) +
+          '<div class="ed-field"><span class="ed-label">Where to buy or read</span><div data-slot="rows"></div></div>';
       }
       if (file === "store") {
         body = field("Name", input("title", it.title)) +
@@ -1468,6 +1491,21 @@
       if (file === "books" || file === "store") { pic = imagePicker(it.image ? [it.image] : [], file === "books" ? "Cover" : "Picture"); $("[data-slot=img]", wrap).appendChild(pic.el); wrap.addEventListener("paste", pic.onPaste); }
       if (file === "books") { rows = rowsEditor(it.links, [{ key: "label", label: "Kindle" }, { key: "url", label: "https://…", wide: true }], "+ Add a link"); $("[data-slot=rows]", wrap).appendChild(rows.el); }
       if (file === "follow") { rows = rowsEditor(it.links, [{ key: "label", label: "Platform" }, { key: "url", label: "https://…", wide: true }, { key: "handle", label: "@name (optional)" }], "+ Add a platform"); $("[data-slot=rows]", wrap).appendChild(rows.el); }
+      var pdf = { blob: null, path: it.pdf || "" };
+      if (file === "books") {
+        var showPdf = function () {
+          $(".ed-pdf", wrap).innerHTML = pdf.blob ? '<span class="ed-hint">' + esc(pdf.blob.name) + " · " + (pdf.blob.size / 1048576).toFixed(1) + " MB</span>"
+            : pdf.path ? '<a href="' + esc(CTX.asset(pdf.path)) + '" target="_blank" rel="noopener">' + esc(pdf.path.split("/").pop()) + "</a>" : '<span class="ed-hint">No PDF</span>';
+          $("[data-pdf-rm]", wrap).hidden = !(pdf.blob || pdf.path);
+        };
+        $("[data-pdf]", wrap).addEventListener("change", function (e) {
+          var fl = e.target.files[0]; if (!fl) return;
+          if (fl.size > 95 * 1048576) { toast("That PDF is over 95 MB — please make it smaller first (for example with Preview → Export → Reduce File Size)."); e.target.value = ""; return; }
+          pdf.blob = fl; showPdf();
+        });
+        $("[data-pdf-rm]", wrap).addEventListener("click", function () { pdf.blob = null; pdf.path = ""; showPdf(); });
+        showPdf();
+      }
       autosave(wrap, "item:" + file + ":" + (isNew ? "new" : i));
       var f = $("form", wrap);
       f.addEventListener("submit", function (ev) {
@@ -1477,6 +1515,13 @@
             Array.prototype.forEach.call(f.elements, function (el) { if (el.name && el.type !== "file" && !el.hasAttribute("data-r")) it[el.name] = el.value.trim ? el.value.trim() : el.value; });
             if (pic) it.image = m.paths[0] || "";
             if (rows) it.links = rows.value();
+            if (file === "books") {
+              if (pdf.blob) {
+                var pname = "book-" + (slugify(it.title) || "book") + "-" + Math.random().toString(36).slice(2, 6) + ".pdf";
+                m.files = m.files.concat([{ path: BASE + "assets/uploads/" + pname, blob: pdf.blob }]);
+                it.pdf = "/assets/uploads/" + pname;
+              } else it.pdf = pdf.path;
+            }
             return changeFile("data/" + file + ".json", function (o) {
               var a = o[L.key] = o[L.key] || [];
               if (isNew) { if (L.first) a.unshift(it); else a.push(it); } else a[i] = it;
@@ -1552,7 +1597,7 @@
         '<div class="ed-row2">' + field("Type (pick or type)", input("kind", s.kind, "text", ' list="vkinds"')) + field("Date", input("date", s.date, "date")) + "</div>" +
         datalist("vkinds", ["Wallpaper", "Avatar", "Cover", "Drawing", "Other"]) +
         field("Who can download", select("download", s.download || "public", [["public", "Everyone"], ["private", "Only me"]])) +
-        check("hidden", !!s.hidden, "Hide this series (draft)"));
+        check("hidden", !!s.hidden, "Hide from visitors (you still see it, marked “Hidden”)"));
       autosave(wrap, "series:" + id);
       var f = $("form", wrap);
       f.addEventListener("submit", function (ev) {
@@ -1623,7 +1668,7 @@
           field("Order", select("sort", p.sort || "date-asc", [["date-asc", "Oldest first"], ["date-desc", "Newest first"], ["title", "A–Z"], ["number", "By number"]])) + "</div>" +
         '<div class="ed-row2">' + field("Status", select("status", p.status || "ongoing", [["ongoing", "Ongoing"], ["finished", "Finished"]])) +
           field("Who can download", select("download", p.download || "private", [["private", "Only me"], ["public", "Everyone"]])) + "</div>" +
-        '<div data-slot="cover"></div>' + check("hidden", !!p.hidden, "Hide this collection (draft)"));
+        '<div data-slot="cover"></div>' + check("hidden", !!p.hidden, "Hide from visitors (you still see it, marked “Hidden”)"));
       var cover = imagePicker(p.cover ? [p.cover] : [], "Cover (optional; otherwise the first picture)");
       $("[data-slot=cover]", wrap).appendChild(cover.el);
       autosave(wrap, "project:" + id);
@@ -1821,6 +1866,16 @@
   function ownerAction(spec) {
     var m = spec.mode;
     if (m === "desk") return desk(spec.file, spec.val);
+    if (m === "unhide") {
+      toast("Showing it to everyone…", true);
+      return changeFile(spec.file, function (o) { delete o.hidden; return o; }, "Show “" + spec.file.split("/").pop().replace(".json", "") + "” again").then(function () {
+        var id = spec.file.split("/").pop().replace(".json", ""), D = CTX.D;
+        [((D.daily || {}).posts), ((D.media || {}).items), ((D.design || {}).items), ((D.visual || {}).series), ((D.ongoing || {}).projects)].forEach(function (arr) {
+          (arr || []).forEach(function (x) { if (x.id === id) delete x.hidden; });
+        });
+        toast("Visible to everyone in about a minute."); CTX.redraw();
+      }).catch(function (e) { toast(explain(e)); });
+    }
     if (m === "item") return editItem(spec.file, spec.i);
     if (m === "item-move") return moveItem(spec.file, +spec.i, spec.dir);
     if (m === "rename-cat") return renameCategory(spec.file, spec.val);
@@ -1841,7 +1896,7 @@
   /* ---------- entry point ---------- */
   function open(spec, ctx) {
     CTX = ctx || CTX;
-    if (["sheet", "item", "item-move", "rename-cat", "block", "vimage-move", "desk"].indexOf(spec.mode) > -1) {
+    if (["sheet", "item", "item-move", "rename-cat", "block", "vimage-move", "desk", "unhide"].indexOf(spec.mode) > -1) {
       // home blocks change on the page first and wait for Publish; no sign-in needed yet
       if (spec.mode === "block") return ownerAction(spec);
       if (!token()) return signIn(function () { open(spec, ctx); });

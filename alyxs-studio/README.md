@@ -9,11 +9,12 @@
 | 栏目 | 放什么 | 在后台哪里改 |
 |---|---|---|
 | Daily | 碎碎念、感悟、图片、语音、转载、截图。网站上有日历，有更新的那天显示缩略图 | Daily 日常 |
-| Ongoing | 每天在长的合集：连载小说、图片词典、图片连载……会按设定自动排序，可以打包下载 | 先在「Ongoing 合集设置」建合集，再在「Ongoing 每日更新」里往合集加条目 |
+| Serial（原 Ongoing / Novel） | 每天在长的合集：连载小说、图片词典、图片连载……会按设定自动排序，可以打包下载 | 先在「Ongoing 合集设置」建合集，再在「Ongoing 每日更新」里往合集加条目 |
+| Thesis（只有你看得到） | 论文写作间，四步：写 → 翻译 → 出处 → 排版。访客的菜单里没有这一栏 | 网页上直接用（`/write/`） |
 | Watch | 视频：贴 YouTube、TikTok、Instagram、B站、抖音、Vimeo 的链接，网站上直接显示视频；也可以上传短视频文件 | 网页上点 **+**，或后台「Watch · Listen 视频和音乐」 |
 | Listen | 音乐和播客：贴 Spotify、Apple Music、Apple Podcasts、SoundCloud、Bandcamp、网易云的链接，显示播放器；自己的歌可以直接上传，有 Play all | 同上 |
-| Books | 出版在 Amazon / Apple Books 的书，分 Writing / Language / Art | Books · Store · Traces → Books |
-| Visual | 壁纸、头像、封面系列，可以设置成访客能下载 | Visual 图片系列 |
+| Library（原 Books） | 书：封面、简介、购买链接；可以上传 PDF（最大 95MB），设置成访客能读/下载，或只有你能看。点封面进入这本书的单独页面 | 网页上点书的 Edit |
+| Gallery（Visual） | 壁纸、头像、封面系列，可以设置成访客能下载。另有只给你看的 **Inspiration 灵感板** | Visual 图片系列 |
 | Design | 草图、构思图 | Design 草图·构思 |
 | Store | 衣服、帽子、包、挂件……附购买链接 | Books · Store · Traces → Store |
 | Traces | 作品去过的地方：发表、展出、对谈、合作、协会、报道 | Books · Store · Traces → Traces |
@@ -106,35 +107,48 @@
 - 哪些软件、网站算工作或休息：改 `~/Library/Application Support/AlyxActivity/apps.json`。
 - 卸载：`curl -fsSL https://raw.githubusercontent.com/alyxsstudio/alyxsstudio/main/tools/mac-activity/uninstall.sh | bash`
 
-## 写作间 Writing room（只有你能看）
-✎ Owner → **Writing room ✎**（网址 `/write/`）。写论文、长文章用。全部自动存进私密仓库 `studio-drafts/papers/`，不会出现在网站上。
-- **Write**：直接写或粘贴。顶部显示字数（汉字 + 英文单词）。每段右边有标签：
-  - ★ 数字：这一段的信息密度（名字、年代、引文、出处、具体术语越多、废话越少，分数越高）。
-  - 同一种颜色的竖条 = 讲同一件事的重复段落；"best version" 是其中最好的一段。
-  - "off topic?"：和论点、和全文都没什么关联的段落（只是提示）。
-  - "cite?"：有引文或"某某认为"，但没有出处。
-  - 年份：这一段讲的是哪一年。
-  - 点标签：**解释给读者听**、**写得更密**、**扣回论点**、**找出处**、**合并重复**、**放到一边**、**看其他版本**（点其他版本里的某一句，就能把这句加进当前段落）。
-- **Paste & sort（粘贴整理）**：从 Gemini 拿到新的版本，或者一次贴进三十页草稿，都贴这里：
-  - 一模一样的段落自动跳过。
-  - 同一段的新写法放在原段旁边当"版本"；如果新写法明显更密，就替换原段，旧的留作版本。
-  - 相关内容放到相关段落后面，新内容放在 Works Cited 前面。
-  - 什么都不会丢，顶部有 **Undo**。在 Write 里一次粘贴三段以上，也会问要不要这样自动整理。
-- **Review**：逐句标注：绿底 = 信息密集的好句子，灰字 = 空洞的句子，删除线 = 套话或 AI 腔，红色虚线 = 需要出处。
-- **Organize**：
-  - **By topic**：按主题把段落归在一起。
-  - **By time**：按年代排。
-  - **Repeats**：一键保留每组最好的一段，其他放到一边。
-  - **Off topic?**、**Set aside**：被放到一边的内容都在这里，可以放回去。
-  - 都可以一键"Put the draft in this order"，或者请 Gemini 给出最佳顺序。
-- **Check**：缺出处的句子（Gemini 联网帮你找是谁说的，给出 MLA 9 引用；找不到会直说）；MLA 9 的常见错误（一键修正）；葡萄牙语拼写（LanguageTool 免费检查，葡萄牙 / 巴西两种拼法可选；1820 年代的旧拼法可能被标出来，如果是引文请保留）。
-- **English**：需要时才用。每段旁边写英文，有 DeepL 和 Gemini 按钮；段落移动后英文跟着走。
-- **Thesis & style**：
-  - 写下论点、关键词、读者是谁。
-  - 把你喜欢的文笔段落（哪怕内容已经不用了）贴进"Style you like"，Gemini 改写时会模仿这种文风。
-  - Gemini 钥匙也在这里填（和私人日历共用）：在 aistudio.google.com 免费申请。
-  - 没有钥匙也能用：每个按钮会复制一段写好的提示词并打开 Gemini，你把 Gemini 的回答贴回 "Paste & sort" 就行。
-- MLA 用的是第 9 版（目前最新版）。
+## Thesis 论文写作间（只有你能看）
+菜单里的 **Thesis**（网址 `/write/`）。访客看不到这一栏。全部自动存进私密仓库 `studio-drafts/papers/`，不会出现在网站上。
+页面上**不再显示任何标注和数字**：分析都在后台做判断，正文就是干净的文字，复制到别的文档里不用删东西。四步按顺序走：
+
+**1 Write 写**
+- 把草稿整个贴进去（几页、几百页都行，笔记、Gemini 的不同版本混在一起也行），会自动：
+  - 按时间线重新排序（没写年份的段落，跟着内容最相近的段落走）；
+  - 讲同一件事的段落合并成一段，留下写得最好的那一版，其他版本藏在这一段后面；
+  - 有 Gemini 钥匙的话，接着让 Gemini 把每一段改写成流畅、信息密度高、不用短句、论证完整的段落（不明白的人名、术语顺手解释清楚），并从全文里挑出最有画面感的段落，写成开头的钩子。
+- 直接在页面上改，自动保存。
+- 页边的小圆点：**紫色 = Gemini 写的**，**黑色 = 你改过的**，空心 = 你的原文但有其他版本。点圆点打开这一段：
+  - 和原文对比（绿色 = 新加的，红色删除线 = 去掉的）；
+  - 一句一句对照：每句下面列出你其他版本里的写法，点一下就换进去；没用上的句子点一下就加进去；
+  - **Back to my original**、**Ask Gemini again**、**Explain more for readers**、**Delete**。
+- 记得你的修改：你改过的段落 Gemini 不会再动；你删掉的段落以后再粘贴进来也会被跳过（在 Thesis & style 里的 "Kept aside" 可以找回）。
+- **Add more text**：以后有新版本、新笔记，贴这里，会自动放到该放的位置。还有 **Put in time order again**、**Copy all**、**Download .docx**、**Undo**。
+
+**2 Translate 翻译（DeepL）**
+- DeepL 的免费 API 已经关了，所以用 DeepL 网站：每段旁边有 **DeepL ↗**，打开就是这一段的翻译，复制英文贴回来；或者 **Copy Chinese for DeepL** 一次把全文复制去 DeepL，再用 **Paste DeepL's whole translation** 一次贴回来，按段落自动对齐。
+- 葡萄牙语、英语的引文和《外文书名》会先换成 [Q1]、[Q2]…，DeepL 不会翻译它们，贴回来时自动换回原文（书名变成斜体）。
+- 左中右对照修改；中文改过以后会提示"The Chinese changed"。**Copy all English**、**Download English .docx**。
+
+**3 Sources 出处**
+- 列出需要出处的句子（引文、"某某认为"、具体的年代和事实），可能和已发表的文字太接近的也在里面。
+- 每句都有 **Google AI Mode**、**Google Scholar**、**PDFs** 搜索链接；有钥匙的话还有 **Ask Gemini (with search)**：找出是谁说的、哪本书、PDF 链接，并给出 MLA 9 引用（找不到会直说）。做完的打勾。
+
+**4 Format 排版（MLA 9）**
+- 选英文或中文版本，填名字、老师/期刊、课程、日期，Works Cited 一行一条（可以 A–Z 排序，或请 Gemini 按 MLA 9 检查）。
+- MLA 常见错误一键修正；葡萄牙语引文拼写检查（LanguageTool，葡萄牙 / 巴西）。
+- **Download MLA .docx**：Times New Roman 12、双倍行距、1 英寸页边距、右上角姓 + 页码、标题居中、首行缩进、Works Cited 另起一页悬挂缩进。以后可以再加别的格式。
+
+**Thesis & style**（右上角）：论点、关键词、读者是谁、你喜欢的文笔段落（Gemini 会模仿）、Gemini 钥匙和模型（Pro 文笔最好，Flash 更快）。钥匙在 aistudio.google.com 免费申请，和私人日历共用。没有钥匙也能用：按钮会复制写好的提示词并打开 Gemini，把回答贴回 **Add more text** 就行。
+
+## Gallery 灵感板 Inspiration（只有你能看）
+Gallery 页面上方 **Inspiration · only you**（网址 `/visual/#inspiration`）。
+- 在页面任何地方粘贴（⌘V）：截图、复制的图片、图片链接、网页链接（Pinterest、Instagram、小红书、商店、文章……会取网页的预览图），也可以拖进来或 **Choose pictures**。
+- 每张图马上存成 JPG，放进私密仓库 `studio-drafts/inspiration/`，不会出现在网站上；原链接也记下来。
+- 自动分类：有 Gemini 钥匙时，Gemini 看图起主题名（尽量用已有的主题）和标签；同时按颜色、按来源自动归类。上方切换 **By theme / By colour / By source / Newest**。没有钥匙的图在 "Not sorted yet"，有钥匙后点 **Sort with Gemini**，或者自己填主题。
+- 点图片：看大图、改主题/标题/标签、**Download JPG**、删除。每组右边 **Download all (JPG)** 打包成 zip。
+
+## 隐藏的内容
+勾了"Hide from visitors"的东西不会消失：访客看不到，但你在网站上还能看到，带着红色虚线的 **Hidden · show it**，点一下就恢复公开。（之前不小心藏起来的 Picture Dictionary 已经恢复。）
 
 ## 引用卡片
 在任何文章或章节里选中一段文字，会出现 **Quote card** 按钮，点一下生成一张 Story 尺寸的引用图。手机上会直接调出分享面板。

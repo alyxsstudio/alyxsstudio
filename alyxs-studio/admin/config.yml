@@ -586,6 +586,8 @@ collections:
           value: daily
         - label: Ongoing 进行中的合集
           value: ongoing
+        - label: Thesis 论文写作间（只有你看得到）
+          value: write
         - label: Watch 视频
           value: watch
         - label: Listen 音乐和播客

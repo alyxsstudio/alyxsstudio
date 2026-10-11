@@ -93,7 +93,7 @@ async function main() {
 
   // Daily
   const daily = (await read("daily"))
-    .filter((p) => p.date && !p.hidden)
+    .filter((p) => p.date)   // hidden ones stay in, marked; the site shows them only to the owner
     .map((p) => {
       const out = { ...p, day: dayOf(p.date), images: asList(p.images) };
       if (p.link && p.link.url && metaFor(p.link.url)) out.link = { ...p.link, meta: metaFor(p.link.url) };
@@ -103,7 +103,7 @@ async function main() {
   await write("daily.json", { posts: daily });
 
   // Ongoing: projects + entries
-  const projects = (await read("projects")).filter((p) => !p.hidden);
+  const projects = await read("projects");
   const entries = (await read("entries")).map((e) => ({ ...e, images: asList(e.images) }));
   const summary = [];
   for (const p of projects) {
@@ -120,17 +120,17 @@ async function main() {
   await write("ongoing.json", { projects: summary, recent });
 
   // Visual series
-  const visual = (await read("visual")).filter((s) => !s.hidden)
+  const visual = (await read("visual"))
     .map((s) => ({ ...s, images: asList(s.images) })).sort(byDateDesc);
   await write("visual.json", { series: visual });
 
   // Design sketches
-  const design = (await read("design")).filter((s) => !s.hidden)
+  const design = (await read("design"))
     .map((s) => ({ ...s, images: asList(s.images) })).sort(byDateDesc);
   await write("design.json", { items: design });
 
   // Watch & Listen
-  const media = (await read("media")).filter((m) => !m.hidden && (m.url || m.file))
+  const media = (await read("media")).filter((m) => m.url || m.file)
     .map((m) => ({ ...m, meta: metaFor(m.url) })).sort(byDateDesc);
   await write("media.json", { items: media });
 

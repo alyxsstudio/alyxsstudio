@@ -7,7 +7,8 @@
 
   var ROOT = app.getAttribute("data-root") || "";
   var PAGE = app.getAttribute("data-page") || "home";
-  var SECTIONS = ["daily", "ongoing", "watch", "listen", "books", "visual", "design", "store", "traces", "follow"];
+  var SECTIONS = ["daily", "ongoing", "write", "watch", "listen", "books", "visual", "design", "store", "traces", "follow"];
+  var PRIVATE_SECTIONS = { write: 1 };   // only the owner sees these in the menu
   var D = {};          // everything loaded: D.settings, D.theme, D.sections, D.daily …
   var RAW = {};        // owner mode: the same, as loaded (before the language swap)
   var STATE = {};      // per-page view state (calendar month, filters …)
@@ -114,7 +115,7 @@
   function hash() { try { return decodeURIComponent((location.hash || "").replace(/^#/, "")); } catch (e) { return ""; } }
 
   /* ---------- sections: one place for names, notes and menu order ---------- */
-  function sections() { return ((D.sections || {}).sections || []).filter(function (s) { return s && SECTIONS.indexOf(s.key) > -1; }); }
+  function sections() { return ((D.sections || {}).sections || []).filter(function (s) { return s && SECTIONS.indexOf(s.key) > -1 && (OWNER || !PRIVATE_SECTIONS[s.key]); }); }
   function sec(key) {
     var s = sections().filter(function (x) { return x.key === key; })[0];
     return s || { key: key, title: key.charAt(0).toUpperCase() + key.slice(1), short: "", intro: "" };
@@ -284,7 +285,7 @@
     if (!EDIT) return null;
     return function (it) {
       return it.id ? '<p class="tile-more"><button type="button" class="mini-btn" data-act="edit" data-kind="' + kind + '" data-id="' + esc(it.id) + '">Edit</button>' +
-        (it.src ? deskBtn("content/" + (kind === "entry" ? "entries" : kind) + "/" + it.id + ".json", it.src) : "") + "</p>" : "";
+        (it.src ? deskBtn("content/" + (kind === "entry" ? "entries" : kind) + "/" + it.id + ".json", it.src) + hiddenBtn("content/" + (kind === "entry" ? "entries" : kind) + "/" + it.id + ".json", it.src) : "") + "</p>" : "";
     };
   }
   /* Edit / ← / → under items kept in one list file (books, store) */
@@ -302,6 +303,23 @@
     if (!zh.length) return "";
     var done = zh.every(function (k) { return it[k + "_en"]; });
     return ' <button type="button" class="mini-btn ' + (done ? "en-ok" : "en-todo") + '" data-act="desk" data-file="' + esc(file) + '" data-val="' + esc(label || "") + '">' + (done ? "English ✓" : "English") + "</button>";
+  }
+  /* things marked "hidden" are kept: visitors never see them, the owner sees them with a way back */
+  function dropHidden() {
+    var keep = function (x) { return x && !x.hidden; };
+    if (D.daily && D.daily.posts) D.daily.posts = D.daily.posts.filter(keep);
+    if (D.media && D.media.items) D.media.items = D.media.items.filter(keep);
+    if (D.design && D.design.items) D.design.items = D.design.items.filter(keep);
+    if (D.visual && D.visual.series) D.visual.series = D.visual.series.filter(keep);
+    if (D.ongoing && D.ongoing.projects) {
+      var gone = {}; D.ongoing.projects.forEach(function (p) { if (p.hidden) gone[p.id] = 1; });
+      D.ongoing.projects = D.ongoing.projects.filter(keep);
+      D.ongoing.recent = (D.ongoing.recent || []).filter(function (e) { return !gone[e.project]; });
+    }
+  }
+  function hiddenBtn(file, it) {
+    if (!EDIT || !it || !it.hidden) return "";
+    return ' <button type="button" class="mini-btn hid" data-act="unhide" data-file="' + esc(file) + '" title="Only you can see this. Click to show it to everyone.">Hidden · show it</button>';
   }
   function addButton(label, attrs) {
     return EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" ' + attrs + ">" + esc(label) + "</button></p>" : "";
@@ -362,7 +380,7 @@
       (opts.showDay ? esc(fmtDay(p.day)) + " · " : "") + esc(timeOf(p.date)) + "</a>" +
       (hasEnglish(p) && (OWNER || (D.settings || {}).language_switch) ? ' <button type="button" class="mini-btn" data-act="orig" data-id="' + esc(p.id) + '">' + (LANG === "zh" ? "English" : "原文") + "</button>" : "") +
       (OWNER && !PREVIEW ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '">Edit</button>' : "") +
-      deskBtn("content/daily/" + p.id + ".json", p, cut(plain(p.text_zh || p.text), 30)) + "</p>";
+      deskBtn("content/daily/" + p.id + ".json", p, cut(plain(p.text_zh || p.text), 30)) + hiddenBtn("content/daily/" + p.id + ".json", p) + "</p>";
     return '<article class="post" id="p-' + esc(p.id) + '">' + meta +
       (p.text ? '<div class="prose post-text"' + (EDIT ? ' data-act="edit" data-kind="daily" data-id="' + esc(p.id) + '" title="Click to edit"' : "") + ">" + md(p.text) + "</div>" : "") +
       gallery + audio + link + tags + shareRow(p) + "</article>";
@@ -482,7 +500,7 @@
       (info.title && info.type !== "card" ? '<p class="m-title">' + esc(info.title) + "</p>" : "") +
       (it.note ? '<p class="m-note">' + esc(it.note) + "</p>" : "") +
       '<p class="m-meta">' + esc(bits) + (info.link && info.type !== "card" ? (bits ? " · " : "") + '<a href="' + esc(info.link) + '" target="_blank" rel="noopener">' + esc(info.platform || "Open") + " ↗</a>" : "") +
-      (withEdit && OWNER && !PREVIEW && it.id ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="media" data-id="' + esc(it.id) + '">Edit</button>' + deskBtn("content/media/" + it.id + ".json", it) : "") + "</p></div>";
+      (withEdit && OWNER && !PREVIEW && it.id ? ' <button type="button" class="mini-btn" data-act="edit" data-kind="media" data-id="' + esc(it.id) + '">Edit</button>' + deskBtn("content/media/" + it.id + ".json", it) + hiddenBtn("content/media/" + it.id + ".json", it) : "") + "</p></div>";
   }
   function mediaFigure(info, cls, opts) {
     return '<figure class="m-item ' + (cls || "") + '" id="m-' + esc(info.id || "") + '">' + player(info, opts) + mediaCaption(info, true) + "</figure>";
@@ -818,7 +836,7 @@
     visual: "Visual", design: "Design", store: "Store", books: "Books", follow: "Links to everywhere", text: "Text", image: "Picture", spacer: "Space" };
   function projectTile(p) {
     var meta = p.count + (p.count === 1 ? " entry" : " entries") + (p.updated ? " · " + fmtDay(p.updated) : "");
-    return { pid: p.id, title: p.title, note: meta, image: p.cover, url: href("ongoing", p.id), badge: p.status === "finished" ? "Finished" : "" };
+    return { pid: p.id, title: p.title, note: meta, image: p.cover, url: href("ongoing", p.id), badge: p.hidden ? "Hidden" : p.status === "finished" ? "Finished" : "" };
   }
   function storeAction(it) {
     var st = (it.status || "available").toLowerCase();
@@ -896,7 +914,8 @@
       var all = OWNER ? '<div class="dl-bar"><span class="dl-label">Owner</span><button type="button" class="pill" data-act="export-all">Download everything</button></div>' : "";
       return pageHead("ongoing") + all + addButton("+ New collection", 'data-act="new" data-kind="project"') +
         (projects.length ? tiles(projects.map(projectTile), "4 / 5", 3, EDIT ? function (it) {
-          return '<p class="tile-more"><button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(it.pid) + '">Settings</button></p>';
+          var pr = ((D.ongoing || {}).projects || []).filter(function (x) { return x.id === it.pid; })[0];
+          return '<p class="tile-more"><button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(it.pid) + '">Settings</button>' + hiddenBtn("content/projects/" + it.pid + ".json", pr) + "</p>";
         } : null) : emptyNote());
     },
 
@@ -918,14 +937,34 @@
 
     books: function () {
       var its = (D.books || {}).items || [];
+      // one book: cover, about, links and the PDF
+      var bm = hash().match(/^b-(\d+)$/), book = bm ? its[+bm[1]] : null;
+      if (book) {
+        var bi = +bm[1], canPdf = book.pdf && (book.pdf_access !== "private" || OWNER);
+        return '<p class="reader-back"><a href="' + esc(href("books")) + '">← ' + esc(title("books")) + "</a></p>" +
+          '<article class="book-page"><div class="book-cover">' + (book.image ? '<img src="' + esc(asset(book.image)) + '" alt="' + esc(book.title) + '">' : '<span class="blank"></span>') + "</div>" +
+          '<div class="book-info"><p class="series-meta">' + esc(book.category || "") + "</p><h1>" + esc(book.title || "") + "</h1>" +
+            (book.note ? '<p class="intro">' + esc(book.note) + "</p>" : "") +
+            (book.about ? '<div class="prose">' + md(book.about) + "</div>" : "") +
+            (canPdf ? '<p class="links"><a class="pill solid" href="' + esc(asset(book.pdf)) + '" target="_blank" rel="noopener">Read the PDF</a><a class="pill" href="' + esc(asset(book.pdf)) + '" download>Download PDF</a>' +
+              (book.pdf_access === "private" ? ' <span class="mini-btn hid">only you</span>' : "") + "</p>" : "") +
+            linkPills(book.links) + listTools("books", bi, its.length) + "</div></article>";
+      }
       var cats = []; its.forEach(function (i) { if (i.category && cats.indexOf(i.category) < 0) cats.push(i.category); });
       var cur = STATE.bookCat || "All";
       var shown = its.filter(function (i) { return cur === "All" || i.category === cur; });
       return pageHead("books") + chips(cats, cur, "book-cat", "books") + addButton("+ New book", 'data-act="item" data-file="books"') +
-        (shown.length ? tiles(shown, shape("books", "2 / 3"), cols("books", 4), function (it) { return linkPills(it.links) + listTools("books", its.indexOf(it), its.length); }) : emptyNote());
+        (shown.length ? tiles(shown.map(function (it) { return Object.assign({}, it, { url: href("books", "b-" + its.indexOf(it)), _i: its.indexOf(it) }); }), shape("books", "2 / 3"), cols("books", 4), function (it) {
+          var pdf = it.pdf && (it.pdf_access !== "private" || OWNER) ? '<a class="pill" href="' + esc(asset(it.pdf)) + '" target="_blank" rel="noopener">PDF</a>' : "";
+          return (pdf ? '<p class="links">' + pdf + "</p>" : "") + linkPills(it.links) + listTools("books", it._i, its.length);
+        }) : emptyNote());
     },
 
     visual: function () {
+      // the inspiration board: only for you, saved privately (assets/js/inspo.js)
+      var insp = EDIT && hash() === "inspiration";
+      var tabs = EDIT ? '<div class="chips in-tabs"><a class="chip' + (insp ? "" : " on") + '" href="#">Series</a><a class="chip' + (insp ? " on" : "") + '" href="#inspiration">Inspiration · only you</a></div>' : "";
+      if (insp) return pageHead("visual") + tabs + '<div id="inspo" class="inspo"></div>';
       var series = (D.visual || {}).series || [];
       var kinds = []; series.forEach(function (s) { if (s.kind && kinds.indexOf(s.kind) < 0) kinds.push(s.kind); });
       var cur = STATE.visualKind || "All";
@@ -939,7 +978,7 @@
           '<p class="series-meta">' + esc([s.kind, imgs.length + (imgs.length === 1 ? " image" : " images")].filter(Boolean).join(" · ")) + "</p>" +
           (s.note || EDIT ? '<p class="intro"' + ed(vp + "note", s, "note", "A line about this series (optional)", true) + ">" + esc(s.note || "") + "</p>" : "") + dl +
           (EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="visual" data-id="' + esc(s.id) + '">+ Add images</button> ' +
-            '<button type="button" class="mini-btn" data-act="sheet" data-sheet="series" data-id="' + esc(s.id) + '">Series settings</button>' + deskBtn("content/visual/" + s.id + ".json", s) + "</p>" : "") + "</div>" +
+            '<button type="button" class="mini-btn" data-act="sheet" data-sheet="series" data-id="' + esc(s.id) + '">Series settings</button>' + deskBtn("content/visual/" + s.id + ".json", s) + hiddenBtn("content/visual/" + s.id + ".json", s) + "</p>" : "") + "</div>" +
           (imgs.length ? tiles(imgs.map(function (im, i) {
             return { title: im.title, image: im.image, i: i, act: 'data-act="lightbox" data-src="visual:' + esc(s.id) + '" data-i="' + i + '"' };
           }), shape("visual", "3 / 4"), cols("visual", 4), EDIT ? function (it) {
@@ -948,7 +987,7 @@
               (it.i < imgs.length - 1 ? '<button type="button" class="mini-btn" data-act="vimage-move" data-id="' + esc(s.id) + '" data-i="' + it.i + '" data-dir="1" aria-label="Move later">→</button>' : "") + "</p>";
           } : null) : emptyNote()) + "</section>";
       }).join("");
-      return pageHead("visual") + chips(kinds, cur, "visual-kind") + addButton("+ New series", 'data-act="new" data-kind="visual" data-id="__new"') + (html || emptyNote());
+      return pageHead("visual") + tabs + chips(kinds, cur, "visual-kind") + addButton("+ New series", 'data-act="new" data-kind="visual" data-id="__new"') + (html || emptyNote());
     },
 
     design: function () {
@@ -1078,7 +1117,7 @@
       '<p class="series-meta">' + esc([es.length + (es.length === 1 ? " entry" : " entries"), SORT_LABEL[p.sort] || "", p.status === "finished" ? "Finished" : "Ongoing"].filter(Boolean).join(" · ")) + "</p>" +
       (can && es.length ? downloadBar("project:" + p.id, formats, "Download") : "") +
       (EDIT ? '<p class="owner-tools"><button type="button" class="pill solid" data-act="new" data-kind="entry" data-project="' + esc(p.id) + '">+ New entry</button> ' +
-        '<button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(p.id) + '">Collection settings</button>' + deskBtn("content/projects/" + p.id + ".json", p) + "</p>" : "") + "</div>";
+        '<button type="button" class="mini-btn" data-act="sheet" data-sheet="project" data-id="' + esc(p.id) + '">Collection settings</button>' + deskBtn("content/projects/" + p.id + ".json", p) + hiddenBtn("content/projects/" + p.id + ".json", p) + "</p>" : "") + "</div>";
 
     if (entryId) {
       var idx = -1; es.forEach(function (e, i) { if (e.id === entryId) idx = i; });
@@ -1347,7 +1386,7 @@
         t.textContent = showing ? (LANG === "zh" ? "English" : "原文") : (LANG === "zh" ? "中文" : "English");
       }
     }
-    if (["sheet", "item", "item-move", "vimage-move", "rename-cat", "block", "desk"].indexOf(act) > -1) {
+    if (["sheet", "item", "item-move", "vimage-move", "rename-cat", "block", "desk", "unhide"].indexOf(act) > -1) {
       e.preventDefault();
       openEditor({ mode: act, sheet: t.getAttribute("data-sheet"), file: t.getAttribute("data-file"), i: t.getAttribute("data-i"),
                    dir: +t.getAttribute("data-dir") || 0, id: t.getAttribute("data-id"), val: t.getAttribute("data-val") });
@@ -1419,7 +1458,7 @@
   }
   function withEditor(fn) {
     if (window.AlyxEditor) return fn();
-    loadScript(ROOT + "assets/js/editor.js?v=9").then(function () { if (window.AlyxEditor) fn(); });
+    loadScript(ROOT + "assets/js/editor.js?v=10").then(function () { if (window.AlyxEditor) fn(); });
   }
   function withJournal(fn) {
     withEditor(function () {
@@ -1430,7 +1469,13 @@
   function withWriter(fn) {
     withEditor(function () {
       if (window.AlyxWriter && window.AlyxAnalyze) return fn();
-      Promise.all([loadScript(ROOT + "assets/js/analyze.js?v=1"), loadScript(ROOT + "assets/js/writer.js?v=1")]).then(function () { if (window.AlyxWriter) fn(); });
+      Promise.all([loadScript(ROOT + "assets/js/analyze.js?v=2"), loadScript(ROOT + "assets/js/writer.js?v=2")]).then(function () { if (window.AlyxWriter) fn(); });
+    });
+  }
+  function withInspo(fn) {
+    withEditor(function () {
+      if (window.AlyxInspo) return fn();
+      loadScript(ROOT + "assets/js/inspo.js?v=1").then(function () { if (window.AlyxInspo) fn(); });
     });
   }
   function openEditor(spec) { withEditor(function () { window.AlyxEditor.open(spec, editorCtx()); }); }
@@ -1467,7 +1512,10 @@
     wireMedia(); markTracks();
     if (EDIT) withEditor(function () { window.AlyxEditor.decorate(editorCtx()); });
     if (EDIT && page === "write") withWriter(function () {
-      window.AlyxWriter.mount({ el: app.querySelector("#writer"), hash: hash(), setHash: function (h) { location.hash = h; } });
+      window.AlyxWriter.mount({ el: app.querySelector("#writer"), hash: hash(), title: title("write"), root: ROOT, setHash: function (h) { location.hash = h; } });
+    });
+    if (EDIT && page === "visual" && app.querySelector("#inspo")) withInspo(function () {
+      window.AlyxInspo.mount({ el: app.querySelector("#inspo"), root: ROOT });
     });
     if (EDIT && page === "daily" && app.querySelector("#journal-day")) withJournal(function () {
       window.AlyxJournal.mount({ app: app, day: STATE.selDay, month: STATE.month, redraw: function () { draw(true); } });
@@ -1544,6 +1592,7 @@
       .concat([loadScript(ROOT + "assets/js/vendor/marked.min.js"), loadScript(ROOT + "assets/js/media.js?v=5")])
   ).then(function () {
     mergeDraftsInto("all");
+    if (!OWNER) dropHidden();
     if (EDIT) { try { RAW = JSON.parse(JSON.stringify(D)); } catch (e) { RAW = {}; } }
     localize(D);
     applyTheme(D.theme);
