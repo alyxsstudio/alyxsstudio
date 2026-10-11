@@ -1,8 +1,8 @@
 /* Alyx's Studio — Thesis: a private place to write an article chapter by chapter, like a serial.
    1 Write      the article is a row of chapters (one topic each). The page shows every chapter with its
-                full text; click one to write in it. What you paste in is remembered (not shown),
-                so ✦ Gemini writes it in: the chapter written again with the new material worked in,
-                every fact kept; your version stays one click away.
+                full text; click one to write in it. “Copy all chapters” copies the whole
+                text without numbers or titles; “Copy for Gemini” copies a chapter with the request to write
+                what you pasted in into it.
    2 Translate  the chapters put together as one article, paragraph by paragraph with DeepL.
    3 Sources    the whole article: sentences that need a citation, published matches, AI-sounding writing.
    4 Format     the whole article as an MLA 9 page and a Word file.
@@ -503,6 +503,7 @@
     body.innerHTML =
       '<div class="wr-tools">' +
         '<button type="button" class="pill solid" data-c="new">+ New chapter</button>' +
+        (cs.length ? '<button type="button" class="pill" data-c="copyall" title="All chapters as one text: no numbers, titles or dates">Copy all chapters</button>' : "") +
         '<label class="pill wr-file">Add a file as a chapter<input type="file" accept="' + FILES + '" multiple hidden data-c="file"></label>' +
         '<span class="wr-key">' + cs.length + (cs.length === 1 ? " chapter" : " chapters") + " · Translate, Sources and Format put them together as one article</span></div>" +
       (cs.length > 1 ? '<nav class="wc-toc" aria-label="Chapters">' + cs.map(function (c, i) {
@@ -527,12 +528,26 @@
     body.onclick = function (e) {
       var b = e.target.closest("[data-c]"); if (!b || b.tagName === "INPUT") return;
       var k = b.getAttribute("data-c"), id = b.getAttribute("data-id");
+      if (k === "copyall") { copyAll(); return; }
       if (k === "goto") { e.preventDefault(); var el = document.getElementById("ch-" + id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
       if (k === "new") { remember(); var h = addChapter("", []); save(); writeChapter(h.id); }
       if (k === "insert") { remember(); var after = b.getAttribute("data-after"), h2 = addChapter("", [], after ? { after: after } : { first: true }); save(); writeChapter(h2.id); }
       if (k === "up" || k === "down") { remember(); moveChapter(id, k === "up" ? -1 : 1); save(); render(); var el2 = document.getElementById("ch-" + id); if (el2) el2.scrollIntoView({ block: "center" }); }
       if (k === "edit") { if (String(window.getSelection() || "").length > 1) return; writeChapter(id, b.classList.contains("wc-text") ? spotAt(e) : null); }   // selecting text to copy doesn't open it
     };
+  }
+  // every chapter's text, one after another — no numbers, titles or dates; italics stay italics where pasted as formatted text
+  function copyAll() {
+    var paras = [];
+    chapters().forEach(function (c) { c.blocks.forEach(function (b) { var t = b.text.replace(/^#+\s*/, "").trim(); if (t) paras.push(t); }); });
+    var plain = paras.map(function (t) { return t.replace(/\*([^*\n]+)\*/g, "$1"); }).join("\n\n");
+    var html = paras.map(function (t) { return "<p>" + richHTML(t) + "</p>"; }).join("");
+    var done = function () { toast("All " + chapters().length + " chapters copied — " + fmtN(A().count(plain).total) + " 字."); };
+    var fallback = function () { navigator.clipboard.writeText(plain).then(done, function () { window.prompt("Copy the text", plain); }); };
+    try {
+      if (window.ClipboardItem && navigator.clipboard.write) navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([plain], { type: "text/plain" }), "text/html": new Blob([html], { type: "text/html" }) })]).then(done, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
   }
   // each file becomes a chapter named after it
   function addFiles(files) {
@@ -568,7 +583,7 @@
         '<button type="button" class="mini-btn" data-x="prev"' + (idx ? "" : " disabled") + ">← Previous</button>" +
         '<button type="button" class="mini-btn" data-x="next"' + (idx < cs.length - 1 ? "" : " disabled") + ">Next →</button>" +
         '<span class="ew-status" aria-live="polite">' + esc(W.status) + "</span>" +
-        '<button type="button" class="pill" data-x="sugg">✦ Gemini writes it in</button>' +
+        '<button type="button" class="pill" data-x="gemini" title="Copies this chapter with the request to write it again with what you pasted in worked in, and opens Gemini">Copy for Gemini</button>' +
         '<button type="button" class="pill danger" data-x="del">Delete</button></header>' +
       '<div class="ew-tools" role="toolbar">' +
         '<button type="button" data-cmd="italic" title="Italic — titles of works (⌘I)"><i>I</i></button>' +
@@ -579,7 +594,7 @@
         '<div class="ew-meta"><input class="ew-date" type="datetime-local" value="' + esc(c.head.date || "") + '"></div>' +
         '<input class="ew-title" placeholder="Chapter title 章节名 (optional)" value="' + esc(chapTitle(c.head)) + '">' +
         '<div class="ew-body" contenteditable="true" spellcheck="true" data-placeholder="开始写… Start writing, or paste."></div></div>' +
-        '<aside class="wc-side" hidden></aside></div>';
+        "</div>";
     document.body.appendChild(w);
     document.documentElement.classList.add("lb-open");
     W.writer = w;
@@ -628,7 +643,7 @@
       var k = b.getAttribute("data-x");
       if (k === "close") closeWriter();
       if (k === "prev" || k === "next") { readChapter(w); var cs2 = chapters(), i2 = cs2.findIndex(function (x) { return x.id === w._ch; }) + (k === "prev" ? -1 : 1); if (cs2[i2]) writeChapter(cs2[i2].id); }
-      if (k === "sugg") { readChapter(w); var side = $(".wc-side", w); if (side.hidden) writePanel(w); else { side.hidden = true; w.classList.remove("with-side"); } }
+      if (k === "gemini") { readChapter(w); var cg = chapterById(w._ch); if (cg) copyPrompt(writePrompt(cg, "", true), "Copied. Paste it into Gemini; bring back what you want to keep."); }
       if (k === "del") {
         if (!window.confirm("Delete this chapter? Its text is kept aside (Thesis & style → Kept aside) in case you want it back.")) return;
         remember(); removeChapter(w._ch); save(); closeWriter(); toast("Chapter deleted — kept aside.");
@@ -747,13 +762,8 @@
     var st = $(".ew-status", w); if (st) st.textContent = W.status;
   }
 
-  /* ---------- ✦ Gemini writes the new material into the chapter ---------- */
+  /* ---------- Copy for Gemini: the chapter with the request to write the new material in ---------- */
   // what must survive a rewrite: years and numbers, words in other languages, titles of works
-  function mustKeep(t) {
-    var out = {};
-    (String(t).match(/\d{3,4}|[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]{3,}|《[^》]{1,30}》/g) || []).forEach(function (x) { out[x] = 1; });
-    return Object.keys(out);
-  }
   function writePrompt(c, extra, plain) {
     var cs = chapters(), no = cs.indexOf(c) + 1, total = 0;
     var others = cs.map(function (o, i) {
@@ -782,90 +792,6 @@
       "\nCURRENT — No. " + no + (chapTitle(c.head) ? " 《" + chapTitle(c.head) + "》" : "") + ":\n" +
       c.blocks.map(function (b, i) { return "[" + (i + 1) + "]" + (b.added ? " [NEW]" : "") + " " + b.text; }).join("\n\n");
   }
-  function writePanel(w, state) {
-    var id = w._ch, c = chapterById(id), side = $(".wc-side", w); if (!c || !side) return;
-    state = state || w._ws || {};
-    w._ws = state;
-    var nw = c.blocks.filter(function (b) { return b.added; }).length, last = c.head.prev;
-    side.hidden = false; w.classList.add("with-side");
-    side.innerHTML = '<div class="wc-side-head"><b>✦ Gemini writes it in</b><button type="button" class="ed-x" data-y="hide" aria-label="Close">×</button></div>' +
-      '<p class="j-hint">' + (nw ? "Gemini writes this chapter again with what you pasted in worked in" : "Gemini writes this chapter again so it reads as one piece") +
-        ": transitions, quotations framed, terms explained — keeping every fact, date and quotation. Your version is kept; one click brings it back.</p>" +
-      '<label class="ed-field"><span class="ed-label">Anything to tell Gemini about this chapter (optional)</span><textarea class="ed-input" data-y="extra" rows="2" placeholder="例如：开头用 1794 年沙龙的画面；多解释血统纯洁制度">' + esc(state.extra || "") + "</textarea></label>" +
-      '<p class="wc-side-btns"><button type="button" class="pill solid" data-y="write"' + (state.busy ? " disabled" : "") + ">" + (state.busy ? "Gemini is writing…" : "Write it") + "</button>" +
-        '<button type="button" class="mini-btn" data-y="prompt" title="Copy the request to paste into gemini.google.com yourself">Copy for Gemini</button>' +
-        '<button type="button" class="mini-btn" data-y="pastein">Paste Gemini\'s answer</button></p>' +
-      (aiKey() ? "" : '<p class="j-hint">To let the site ask Gemini itself: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">get a free key</a> and paste it here <span class="wr-keyrow"><input class="ed-input" type="password" data-key placeholder="AIza…" autocomplete="off"><button type="button" class="mini-btn" data-y="savekey">Turn on</button></span></p>') +
-      (state.paste ? '<label class="ed-field"><span class="ed-label">Gemini\'s chapter</span><textarea class="ed-input" data-y="answer" rows="8"></textarea></label><p><button type="button" class="pill solid" data-y="useanswer">Put it in the chapter</button></p>' : "") +
-      (state.msg ? '<div class="wc-overall">' + state.msg + "</div>" : "") +
-      (state.missing && state.missing.length ? '<p class="j-hint"><b>Not in Gemini\'s version</b> (check whether they should be): ' + state.missing.map(esc).join(" · ") + "</p>" : "") +
-      (state.notes && state.notes.length ? '<h4 class="wr-sub">Your notes, left out of the text</h4><ul class="wc-notes">' + state.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>" : "") +
-      (last ? '<p class="wc-side-btns"><button type="button" class="mini-btn" data-y="back">↩ Back to my version (' + esc(fmtDate(last.at)) + ")</button>" + '<button type="button" class="mini-btn" data-y="showprev">See my version</button></p>' : "") +
-      (state.showPrev && last ? '<div class="wc-prev">' + last.blocks.map(function (b) { return "<p>" + richHTML(b.text) + "</p>"; }).join("") + "</div>" : "") +
-      "";
-    side.oninput = function (e) { if (e.target.getAttribute("data-y") === "extra") state.extra = e.target.value; };
-    side.onclick = function (e) {
-      var b = e.target.closest("[data-y]"); if (!b || b.tagName === "TEXTAREA") return;
-      var k = b.getAttribute("data-y");
-      if (k === "hide") { side.hidden = true; w.classList.remove("with-side"); }
-      if (k === "write") { if (!aiKey()) { state.msg = "Paste a Gemini key below first, or use “Copy for Gemini” and paste its answer back."; writePanel(w); return; } writeIn(w); }
-      if (k === "prompt") { readChapter(w); copyPrompt(writePrompt(chapterById(id), state.extra, true), "Copied. Paste it into Gemini, then bring its chapter back with “Paste Gemini's answer”."); state.paste = true; writePanel(w); }
-      if (k === "pastein") { state.paste = !state.paste; writePanel(w); }
-      if (k === "useanswer") {
-        var raw = $("[data-y=answer]", side).value; if (!raw.trim()) return;
-        var parts = raw.split(/\n-{3}\s*NOTES\s*-{3}\n?/i);
-        applyWritten(w, splitMarkdown(parts[0].replace(/^```\w*\n?|```$/g, "")), parts[1] ? splitMarkdown(parts[1]) : [], "Gemini (pasted)");
-      }
-      if (k === "savekey") { var v = $("[data-key]", side).value.trim(); if (!v) return; W.ai.gemini_key = v; W.skip = {}; saveAI(); writeIn(w); }
-      if (k === "back") {
-        var cc = chapterById(id); if (!cc || !cc.head.prev) return;
-        remember();
-        var mine = cc.head.prev; cc.head.prev = { at: Date.now(), blocks: cc.blocks.map(function (x) { return { id: x.id, text: x.text, by: x.by, added: x.added }; }) };
-        putChapter(id, mine.blocks.map(function (x) { return { id: uid(), text: x.text, by: x.by || "me", src: [], added: x.added }; }));
-        save(); state.msg = "Your version is back. (Gemini's is kept: the same button switches again.)"; state.missing = []; reopen(w);
-      }
-      if (k === "showprev") { state.showPrev = !state.showPrev; writePanel(w); }
-    };
-  }
-  // show the chapter again in the page (after it was replaced), with the panel open
-  function reopen(w) { var st = w._ws; w._flush = null; w._dead = true; writeChapter(w._ch); if (W.writer) { W.writer._ws = st; writePanel(W.writer); } }
-  function applyWritten(w, paras, notes, model) {
-    var id = w._ch, c = chapterById(id), st = w._ws || {};
-    paras = (paras || []).map(function (x) { return String(x || "").trim(); }).filter(Boolean);
-    if (!c || !paras.length) { st.msg = "Gemini's answer had no text."; writePanel(w); return; }
-    remember();
-    var before = c.blocks.map(function (b) { return b.text; }).join("\n"), after = paras.join("\n");
-    c.head.prev = { at: Date.now(), blocks: c.blocks.map(function (b) { return { id: b.id, text: b.text, by: b.by, added: b.added }; }) };
-    putChapter(id, paras.map(function (t) { return { id: uid(), text: t, by: "ai", src: [] }; }));
-    save();
-    var n0 = A().count(before).total, n1 = A().count(after).total;
-    st.missing = mustKeep(before).filter(function (x) { return after.indexOf(x) < 0; }).slice(0, 40);
-    st.notes = notes || [];
-    st.msg = "<b>Written in.</b> " + paras.length + " paragraphs, " + fmtN(n1) + " 字 (yours: " + fmtN(n0) + ")" + (model ? " · " + esc(model) : "") + ". Read it through; ↩ brings your version back.";
-    st.busy = false; st.paste = false; st.showPrev = false;
-    reopen(w);
-  }
-  function writeIn(w) {
-    readChapter(w);
-    var id = w._ch, c = chapterById(id), st = w._ws = w._ws || {}; if (!c || !c.blocks.length) return;
-    st.busy = true; st.msg = ""; writePanel(w);
-    var n0 = A().count(c.blocks.map(function (b) { return b.text; }).join("\n")).total, prompt = writePrompt(c, st.extra);
-    var ask = function (pr) { return gemini(pr, { json: true, temp: 0.5, max: 32768 }).then(function (r) { var j = parseJSON(r.text) || {}; j.model = r.model; j.cut = r.cut; return j; }); };
-    ask(prompt).then(function (j) {
-      var len = A().count((j.paragraphs || []).join("\n")).total;
-      // shorter than her text: details were dropped, so once more, firmly
-      if (len < n0 * 0.9) return ask(prompt + "\n\nYour previous answer was only " + Math.round(len / Math.max(1, n0) * 100) + "% as long as her text — details were lost. Write it again and keep every detail.").then(function (j2) { return A().count((j2.paragraphs || []).join("\n")).total > len ? j2 : j; });
-      return j;
-    }).then(function (j) {
-      if (W.writer !== w) return;
-      if (!Array.isArray(j.paragraphs) || !j.paragraphs.length) throw new Error(j.cut ? "the answer was cut off — try a shorter chapter" : "no text came back");
-      applyWritten(w, j.paragraphs, Array.isArray(j.notes) ? j.notes.map(String) : [], j.model);
-    }).catch(function (e) {
-      st.busy = false; st.msg = "Gemini didn't answer: " + esc(e.message) + ". You can use “Copy for Gemini” instead.";
-      if (W.writer === w) writePanel(w);
-    });
-  }
-
   /* ---------- a serial moved here from Novel: its chapters become this article's chapters ---------- */
   // where the chapters were when they left the public site (so no GitHub search is needed)
   var MOVED = [{ project: "brazil-oriental", id: "lucas", title: "Lucas", commit: "8de0f37f354103fc86d0b467d5f046d63d0ce0b7",
