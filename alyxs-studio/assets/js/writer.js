@@ -457,7 +457,7 @@
       }
       if (b.getAttribute("data-l") === "del") {
         var did = b.getAttribute("data-id");
-        if (!window.confirm("Remove this article from the list? (Its file stays in your private repository.)")) return;
+        if (!twice(b, "Click again to remove")) return;
         W.list = W.list.filter(function (x) { return x.id !== did; }); (W.removed = W.removed || []).push(did); saveList(); renderList(el);
       }
     };
@@ -602,9 +602,12 @@
       if (k === "copyall") { copyAll(); return; }
       if (k === "del") {
         var dc = chapterById(id); if (!dc) return;
-        if (dc.blocks.length && !window.confirm("Delete No. " + (chapters().findIndex(function (x) { return x.id === id; }) + 1) + "? Its text is kept aside (Thesis & style → Kept aside).")) return;
+        // no browser pop-up (some browsers silently block them): it goes at once, and Undo brings it back
+        var no = chapters().findIndex(function (x) { return x.id === id; }) + 1;
         remember(); removeChapter(id); save();
-        W.note = { html: "Chapter deleted." + (dc.blocks.length ? " Its text is kept aside." : "") }; render(); return;
+        W.note = { html: "No. " + no + " deleted." + (dc.blocks.length ? " Its text is also kept in Thesis & style → Kept aside." : "") }; render();
+        var jb = $(".wr-job"); if (jb) jb.scrollIntoView({ block: "center" });
+        return;
       }
       if (k === "goto") { e.preventDefault(); var el = document.getElementById("ch-" + id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
       if (k === "new") { remember(); var h = addChapter("", []); save(); writeChapter(h.id); }
@@ -625,6 +628,13 @@
       if (window.ClipboardItem && navigator.clipboard.write) navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([plain], { type: "text/plain" }), "text/html": new Blob([html], { type: "text/html" }) })]).then(done, fallback);
       else fallback();
     } catch (e) { fallback(); }
+  }
+  // a second click within a few seconds confirms (instead of a browser pop-up, which some browsers block)
+  function twice(b, label) {
+    if (b.dataset.armed) { clearTimeout(+b.dataset.armed); delete b.dataset.armed; return true; }
+    var old = b.textContent; b.textContent = label; b.classList.add("armed");
+    b.dataset.armed = setTimeout(function () { delete b.dataset.armed; b.textContent = old; b.classList.remove("armed"); }, 4000);
+    return false;
   }
   // each file becomes a chapter named after it
   function addFiles(files) {
@@ -722,8 +732,11 @@
       if (k === "prev" || k === "next") { readChapter(w); var cs2 = chapters(), i2 = cs2.findIndex(function (x) { return x.id === w._ch; }) + (k === "prev" ? -1 : 1); if (cs2[i2]) writeChapter(cs2[i2].id); }
       if (k === "gemini") { readChapter(w); var cg = chapterById(w._ch); if (cg) copyPrompt(writePrompt(cg, "", true), "Copied. Paste it into Gemini; bring back what you want to keep."); }
       if (k === "del") {
-        if (!window.confirm("Delete this chapter? Its text is kept aside (Thesis & style → Kept aside) in case you want it back.")) return;
-        remember(); removeChapter(w._ch); save(); closeWriter(); toast("Chapter deleted — kept aside.");
+        readChapter(w);
+        var no2 = chapters().findIndex(function (x) { return x.id === w._ch; }) + 1;
+        remember(); removeChapter(w._ch); save();
+        W.note = { html: "No. " + no2 + " deleted. Its text is also kept in Thesis & style → Kept aside." };
+        closeWriter(); var jb2 = $(".wr-job"); if (jb2) jb2.scrollIntoView({ block: "center" });
       }
     });
     w.addEventListener("keydown", function (k) {
