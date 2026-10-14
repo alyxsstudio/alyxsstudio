@@ -1253,3 +1253,6 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
 .wc-ins:hover::before { border-top-color: var(--line); }
 .wc-ins button:hover { color: var(--ink); border-color: var(--ink); }
 @media (hover: none) { .wc-ins button { opacity: 1; } .wc-ins { height: 34px; margin: 0; } }
+.wc-auto { font-size: calc(var(--u) * 15); color: var(--mute); }
+.wc-toc a { max-width: 17em; }
+.mini-btn.danger { color: #b3261e; }

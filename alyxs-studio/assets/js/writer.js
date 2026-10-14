@@ -194,7 +194,76 @@
     return out;
   }
   function chapterById(id) { return chapters().filter(function (c) { return c.id === id; })[0] || null; }
-  function chapName(c, i) { return chapTitle(c.head) || cut1(c.blocks.map(function (b) { return b.text; }).join(" "), 22) || "Untitled"; }
+  function chapText(c) { return c.blocks.map(function (b) { return b.text; }).join("\n"); }
+  /* ---------- a short name for what each chapter is about (when it has no title of its own) ---------- */
+  // from its words: a year, and the names, quoted terms and phrases that are its own (not common to all chapters)
+  var FUNCH = "的了是在和与也而就都被把这那他她它们个之其为以及于对从着过上下中不有一二三四五六七八九十百千年月日时后前里将所再又并或但如若即因此其更最已还很能会要可让使给向由到得地来去说并非等";
+  var CN = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "〇": 0, "零": 0, "○": 0 };
+  function yearOf(t) {
+    var m = t.match(/1[5-9]\d\d(?=\s*年|\D)/), c = t.match(/[一][五六七八九][一二三四五六七八九〇零○]{2}(?=年)/);
+    var cy = c ? c[0].split("").map(function (x) { return CN[x]; }).join("") : null;
+    if (m && c) return t.indexOf(m[0]) < t.indexOf(c[0]) ? m[0] : cy;
+    return m ? m[0] : cy;
+  }
+  function cands(t) {
+    var out = {};
+    var add = function (k, w) { k = k.trim(); if (k.length < 2) return; out[k] = (out[k] || 0) + w; };
+    (t.match(/[“「]([㐀-鿿]{2,8})[”」]/g) || []).forEach(function (q) { add(q.slice(1, -1), 3); });
+    (t.match(/《[^》]{1,12}》/g) || []).forEach(function (q) { add(q, 3); });
+    (t.match(/[㐀-鿿]{1,8}(?:·[㐀-鿿]{1,8})+/g) || []).forEach(function (n) { var parts = n.split("·"); add(n.length <= 7 ? n : parts[parts.length - 1], 2.5); });
+    (t.match(/[㐀-鿿]+/g) || []).forEach(function (run) {
+      for (var L = 2; L <= 4; L++) for (var i = 0; i + L <= run.length; i++) {
+        var g = run.substr(i, L);
+        if (FUNCH.indexOf(g.charAt(0)) > -1 || FUNCH.indexOf(g.charAt(L - 1)) > -1) continue;
+        add(g, L === 2 ? 0.6 : L === 3 ? 1 : 1.2);
+      }
+    });
+    return out;
+  }
+  function localLabels(texts) {
+    var cs = texts.map(cands), N = texts.length, df = {};
+    cs.forEach(function (c) { Object.keys(c).forEach(function (k) { df[k] = (df[k] || 0) + 1; }); });
+    return texts.map(function (t, i) {
+      var c = cs[i];
+      // a phrase the chapter quotes, a name or a title counts at once; other words must come back at least twice
+      var sc = Object.keys(c).map(function (k) { var d = df[k]; if (N > 3 && d > N * 0.5) return null; if (c[k] < 2) return null; return { k: k, s: c[k] * Math.log(1 + N / d) }; }).filter(Boolean);
+      sc.sort(function (a, b) { return b.s - a.s || b.k.length - a.k.length; });
+      var pick = [];
+      sc.forEach(function (x) {
+        if (pick.length >= 2) return;
+        if (pick.some(function (p) { return p.indexOf(x.k) > -1 || x.k.indexOf(p) > -1; })) return;
+        pick.push(x.k);
+      });
+      var y = yearOf(t);
+      // too little to go on: the first clause, cut short
+      if (pick.length < 2 && t.replace(/\s/g, "").length < 400) { var first = (t.replace(/\s+/g, " ").match(/^[^。；！？.;!?]{2,}/) || [""])[0].trim(); return first.length > 14 ? first.slice(0, 13) + "…" : first; }
+      return [y].concat(pick).filter(Boolean).join(" · ");
+    });
+  }
+  // Gemini's label when there is a key (kept until the chapter changes), otherwise the words' label
+  function autoLabels() {
+    var p = W.paper, cs = chapters(), loc = localLabels(cs.map(chapText)), out = {};
+    p.labels = p.labels || {};
+    cs.forEach(function (c, i) { var g = p.labels[c.id]; out[c.id] = g && g.h === hashText(chapText(c)) ? g.t : loc[i]; });
+    return out;
+  }
+  function chapName(c, labels) { return chapTitle(c.head) || (labels || autoLabels())[c.id] || "Untitled"; }
+  function refreshLabels() {
+    var p = W.paper; if (!aiKey() || W.labeling || !p) return;
+    p.labels = p.labels || {};
+    var cs = chapters(), stale = cs.filter(function (c) { var g = p.labels[c.id]; return !chapTitle(c.head) && c.blocks.length && (!g || g.h !== hashText(chapText(c))); });
+    if (!stale.length) return;
+    W.labeling = true;
+    var prompt = "Below are chapters of a literary-studies article in Chinese. For each, write a label saying what the chapter is about — its subject and its point — in at most 10 Chinese characters (a name or a year may be part of it). Not its first words; no punctuation at the end.\n" +
+      'Answer JSON only: {"1": "label", "2": "…"} with exactly these keys.\n\n' +
+      stale.map(function (c, i) { return "[" + (i + 1) + "]\n" + chapText(c).slice(0, 3000); }).join("\n\n");
+    gemini(prompt, { json: true, temp: 0.2, max: 2048, tier: "flash" }).then(function (r) {
+      var j = parseJSON(r.text) || {};
+      stale.forEach(function (c, i) { var t = String(j[String(i + 1)] || "").trim(); if (t) p.labels[c.id] = { h: hashText(chapText(c)), t: t.slice(0, 16) }; });
+      save();
+      if (W.paper === p && W.step === 1 && !W.writer) { var y = window.scrollY; render(); window.scrollTo(0, y); }
+    }).catch(function () {}).then(function () { W.labeling = false; });
+  }
   function cut1(t, n) { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n) + "…" : t; }
   // in steps 2–4 a chapter without a title just flows on; titles can also be left out of the article altogether
   function skip(b) { return !!b.chap && (!chapTitle(b) || W.paper.chapTitles === "hide"); }
@@ -499,7 +568,7 @@
   }
   function chapCount(c) { return A().count(c.blocks.map(function (b) { return b.text; }).join("\n")).total; }
   function stepWrite(body) {
-    var cs = chapters();
+    var cs = chapters(), labels = autoLabels();
     body.innerHTML =
       '<div class="wr-tools">' +
         '<button type="button" class="pill solid" data-c="new">+ New chapter</button>' +
@@ -507,28 +576,36 @@
         '<label class="pill wr-file">Add a file as a chapter<input type="file" accept="' + FILES + '" multiple hidden data-c="file"></label>' +
         '<span class="wr-key">' + cs.length + (cs.length === 1 ? " chapter" : " chapters") + " · Translate, Sources and Format put them together as one article</span></div>" +
       (cs.length > 1 ? '<nav class="wc-toc" aria-label="Chapters">' + cs.map(function (c, i) {
-        return '<a href="#ch-' + esc(c.id) + '" data-c="goto" data-id="' + esc(c.id) + '"><b>' + (i + 1) + "</b> " + esc(chapName(c, i)) + "</a>";
+        return '<a href="#ch-' + esc(c.id) + '" data-c="goto" data-id="' + esc(c.id) + '"><b>' + (i + 1) + "</b> " + esc(chapName(c, labels)) + "</a>";
       }).join("") + "</nav>" : "") +
       (cs.length ? '<div class="wc-list">' + insertHere("", "Insert a chapter at the beginning") + cs.map(function (c, i) {
         var t = chapTitle(c.head);
         return '<article class="wc-ch" id="ch-' + esc(c.id) + '" data-id="' + esc(c.id) + '">' +
           '<header class="wc-head"><span class="wc-no">No. ' + (i + 1) + "</span>" +
-            (t ? '<h2 class="wc-title">' + esc(t) + "</h2>" : "") +
+            (t ? '<h2 class="wc-title">' + esc(t) + "</h2>" : labels[c.id] ? '<span class="wc-auto" title="What this chapter is about (give it a title to change this)">' + esc(labels[c.id]) + "</span>" : "") +
             '<span class="wc-meta">' + esc(fmtDate(c.head.date)) + " · " + fmtN(chapCount(c)) + " 字" +
               "</span>" +
             '<span class="wc-btns"><button type="button" class="mini-btn" data-c="up" data-id="' + esc(c.id) + '" title="Move up"' + (i ? "" : " disabled") + ">↑</button>" +
               '<button type="button" class="mini-btn" data-c="down" data-id="' + esc(c.id) + '" title="Move down"' + (i < cs.length - 1 ? "" : " disabled") + ">↓</button>" +
+              '<button type="button" class="mini-btn danger" data-c="del" data-id="' + esc(c.id) + '" title="Delete this chapter">Delete</button>' +
               '<button type="button" class="pill" data-c="edit" data-id="' + esc(c.id) + '">Write</button></span></header>' +
           '<div class="wc-text" data-c="edit" data-id="' + esc(c.id) + '">' + (c.blocks.length ? c.blocks.map(paraHTML).join("") : '<p class="empty">Empty — click to write.</p>') + "</div></article>" +
           insertHere(c.id, i < cs.length - 1 ? "Insert a chapter between No. " + (i + 1) + " and No. " + (i + 2) : "Add a chapter at the end");
       }).join("") + "</div>" :
       '<div class="wr-empty"><p>Write the article one chapter at a time — one topic each, in any order; you can move them later.</p><p class="j-hint">You can also drop .docx, .pdf, .md or .txt files here: each becomes a chapter.</p></div>');
     wireDrop(body, function (files) { addFiles(files); });
+    clearTimeout(W.timers.labels); W.timers.labels = setTimeout(refreshLabels, 600);
     body.onchange = function (e) { if (e.target.matches("input[type=file][data-c=file]")) { addFiles(e.target.files); e.target.value = ""; } };
     body.onclick = function (e) {
       var b = e.target.closest("[data-c]"); if (!b || b.tagName === "INPUT") return;
       var k = b.getAttribute("data-c"), id = b.getAttribute("data-id");
       if (k === "copyall") { copyAll(); return; }
+      if (k === "del") {
+        var dc = chapterById(id); if (!dc) return;
+        if (dc.blocks.length && !window.confirm("Delete No. " + (chapters().findIndex(function (x) { return x.id === id; }) + 1) + "? Its text is kept aside (Thesis & style → Kept aside).")) return;
+        remember(); removeChapter(id); save();
+        W.note = { html: "Chapter deleted." + (dc.blocks.length ? " Its text is kept aside." : "") }; render(); return;
+      }
       if (k === "goto") { e.preventDefault(); var el = document.getElementById("ch-" + id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
       if (k === "new") { remember(); var h = addChapter("", []); save(); writeChapter(h.id); }
       if (k === "insert") { remember(); var after = b.getAttribute("data-after"), h2 = addChapter("", [], after ? { after: after } : { first: true }); save(); writeChapter(h2.id); }
@@ -703,7 +780,8 @@
     if (w._flush) w._flush();
     w._dead = true;
     saveNow();
-    var id = w._ch;
+    var id = w._ch, ec = chapterById(id);
+    if (ec && !ec.blocks.length && !chapTitle(ec.head)) { removeChapter(id); save(); }
     w.remove(); W.writer = null;
     if (!$(".ed-sheet")) document.documentElement.classList.remove("lb-open");
     if (quiet) return;
