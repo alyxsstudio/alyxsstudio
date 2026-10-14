@@ -1256,3 +1256,4 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
 .wc-auto { font-size: calc(var(--u) * 15); color: var(--mute); }
 .wc-toc a { max-width: 17em; }
 .mini-btn.danger { color: #b3261e; }
+.wc-gone { margin: 6px 0; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 10px; font-size: calc(var(--u) * 13); color: var(--mute); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

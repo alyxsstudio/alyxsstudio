@@ -105,7 +105,7 @@
     return p;
   }
   function openPaper(id) {
-    W.paper = null; W.history = []; W.step = W.step || 1;
+    W.paper = null; W.history = []; W.gone = null; W.step = W.step || 1;
     render();
     var old = null; try { old = JSON.parse(localStorage.getItem("alyx-paper:" + id) || "null"); } catch (e) {}   // from the earlier version
     return Promise.all([
@@ -425,7 +425,7 @@
     el.onclick = function (e) {
       var b = e.target.closest("[data-w]"); if (!b) return;
       var k = b.getAttribute("data-w");
-      if (k === "step") { flush(); closePop(); if (!W.job) W.note = null; W.step = +b.getAttribute("data-v"); render(); }
+      if (k === "step") { W.gone = null; flush(); closePop(); if (!W.job) W.note = null; W.step = +b.getAttribute("data-v"); render(); }
       if (k === "settings") settings();
       if (k === "stop" && W.job) { W.job.stop = true; W.job.label = "Stopping after this part…"; progress(); }
       if (k === "close") { W.note = null; progress(); }
@@ -552,6 +552,18 @@
     if (isHead(b.text)) return '<h3 class="wc-sub" data-b="' + b.id + '">' + richHTML(b.text.replace(/^#+\s*/, "")) + "</h3>";
     return '<p data-b="' + b.id + '"' + ">" + richHTML(b.text) + "</p>";
   }
+  // a deleted chapter leaves a line in its place, with Undo
+  function deleteChapter(id) {
+    var cs = chapters(), i = cs.findIndex(function (x) { return x.id === id; }); if (i < 0) return false;
+    remember(); removeChapter(id); save();
+    W.gone = { id: id, after: i ? cs[i - 1].id : "", no: i + 1, text: cs[i].blocks.length > 0 };
+    if (W.step === 1 && !W.writer) render();
+    return true;
+  }
+  function goneBar(after) {
+    var g = W.gone; if (!g || g.after !== after) return "";
+    return '<div class="wc-gone">No. ' + g.no + " deleted." + (g.text ? " (Its text is also kept in Thesis & style → Kept aside.)" : "") + ' <button type="button" class="mini-btn" data-c="ungone">Undo</button></div>';
+  }
   function insertHere(after, label) {
     return '<div class="wc-ins"><button type="button" data-c="insert" data-after="' + esc(after) + '" title="' + esc(label) + '"><span>+</span> ' + esc(label) + "</button></div>";
   }
@@ -578,7 +590,7 @@
       (cs.length > 1 ? '<nav class="wc-toc" aria-label="Chapters">' + cs.map(function (c, i) {
         return '<a href="#ch-' + esc(c.id) + '" data-c="goto" data-id="' + esc(c.id) + '"><b>' + (i + 1) + "</b> " + esc(chapName(c, labels)) + "</a>";
       }).join("") + "</nav>" : "") +
-      (cs.length ? '<div class="wc-list">' + insertHere("", "Insert a chapter at the beginning") + cs.map(function (c, i) {
+      (cs.length || W.gone ? '<div class="wc-list">' + insertHere("", "Insert a chapter at the beginning") + goneBar("") + cs.map(function (c, i) {
         var t = chapTitle(c.head);
         return '<article class="wc-ch" id="ch-' + esc(c.id) + '" data-id="' + esc(c.id) + '">' +
           '<header class="wc-head"><span class="wc-no">No. ' + (i + 1) + "</span>" +
@@ -590,7 +602,7 @@
               '<button type="button" class="mini-btn danger" data-c="del" data-id="' + esc(c.id) + '" title="Delete this chapter">Delete</button>' +
               '<button type="button" class="pill" data-c="edit" data-id="' + esc(c.id) + '">Write</button></span></header>' +
           '<div class="wc-text" data-c="edit" data-id="' + esc(c.id) + '">' + (c.blocks.length ? c.blocks.map(paraHTML).join("") : '<p class="empty">Empty — click to write.</p>') + "</div></article>" +
-          insertHere(c.id, i < cs.length - 1 ? "Insert a chapter between No. " + (i + 1) + " and No. " + (i + 2) : "Add a chapter at the end");
+          insertHere(c.id, i < cs.length - 1 ? "Insert a chapter between No. " + (i + 1) + " and No. " + (i + 2) : "Add a chapter at the end") + goneBar(c.id);
       }).join("") + "</div>" :
       '<div class="wr-empty"><p>Write the article one chapter at a time — one topic each, in any order; you can move them later.</p><p class="j-hint">You can also drop .docx, .pdf, .md or .txt files here: each becomes a chapter.</p></div>');
     wireDrop(body, function (files) { addFiles(files); });
@@ -599,14 +611,21 @@
     body.onclick = function (e) {
       var b = e.target.closest("[data-c]"); if (!b || b.tagName === "INPUT") return;
       var k = b.getAttribute("data-c"), id = b.getAttribute("data-id");
+      if (k !== "ungone" && k !== "del") W.gone = null;
       if (k === "copyall") { copyAll(); return; }
       if (k === "del") {
-        var dc = chapterById(id); if (!dc) return;
-        // no browser pop-up (some browsers silently block them): it goes at once, and Undo brings it back
-        var no = chapters().findIndex(function (x) { return x.id === id; }) + 1;
-        remember(); removeChapter(id); save();
-        W.note = { html: "No. " + no + " deleted." + (dc.blocks.length ? " Its text is also kept in Thesis & style → Kept aside." : "") }; render();
-        var jb = $(".wr-job"); if (jb) jb.scrollIntoView({ block: "center" });
+        // no browser pop-up (some browsers silently block them): it goes at once, a line stays in its place
+        // with Undo, and the page does not move
+        var art = b.closest(".wc-ch"), y = art ? art.getBoundingClientRect().top : 0;
+        if (!deleteChapter(id)) return;
+        var bar = $(".wc-gone");
+        if (bar) { window.scrollBy(0, bar.getBoundingClientRect().top - y); var bt = bar.getBoundingClientRect().top; if (bt < 60) window.scrollBy(0, bt - 60); }
+        return;
+      }
+      if (k === "ungone") {
+        var gid = W.gone && W.gone.id, y2 = b.closest(".wc-gone").getBoundingClientRect().top;
+        W.gone = null; if (W.history.length) undo();
+        var back = gid && document.getElementById("ch-" + gid); if (back) window.scrollBy(0, back.getBoundingClientRect().top - y2);
         return;
       }
       if (k === "goto") { e.preventDefault(); var el = document.getElementById("ch-" + id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
@@ -731,13 +750,7 @@
       if (k === "close") closeWriter();
       if (k === "prev" || k === "next") { readChapter(w); var cs2 = chapters(), i2 = cs2.findIndex(function (x) { return x.id === w._ch; }) + (k === "prev" ? -1 : 1); if (cs2[i2]) writeChapter(cs2[i2].id); }
       if (k === "gemini") { readChapter(w); var cg = chapterById(w._ch); if (cg) copyPrompt(writePrompt(cg, "", true), "Copied. Paste it into Gemini; bring back what you want to keep."); }
-      if (k === "del") {
-        readChapter(w);
-        var no2 = chapters().findIndex(function (x) { return x.id === w._ch; }) + 1;
-        remember(); removeChapter(w._ch); save();
-        W.note = { html: "No. " + no2 + " deleted. Its text is also kept in Thesis & style → Kept aside." };
-        closeWriter(); var jb2 = $(".wr-job"); if (jb2) jb2.scrollIntoView({ block: "center" });
-      }
+      if (k === "del") { readChapter(w); deleteChapter(w._ch); closeWriter(); }
     });
     w.addEventListener("keydown", function (k) {
       if ((k.metaKey || k.ctrlKey) && k.key === "s") { k.preventDefault(); readChapter(w); saveNow(); }
@@ -798,7 +811,7 @@
     w.remove(); W.writer = null;
     if (!$(".ed-sheet")) document.documentElement.classList.remove("lb-open");
     if (quiet) return;
-    if (W.step === 1) { render(); var el = document.getElementById("ch-" + id); if (el) el.scrollIntoView({ block: "start" }); }
+    if (W.step === 1) { render(); var el = document.getElementById("ch-" + id) || $(".wc-gone"); if (el) el.scrollIntoView({ block: el.id ? "start" : "center" }); }
   }
   // one passage, as typed: italics → *…*, line breaks kept
   function readLines(el) {
