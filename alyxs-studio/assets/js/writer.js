@@ -96,7 +96,8 @@
     p.title = p.title || "Untitled"; p.aside = p.aside || []; p.deleted = p.deleted || []; p.english = p.english || {};
     p.thesis = p.thesis || ""; p.keywords = p.keywords || ""; p.readers = p.readers || ""; p.samples = p.samples || "";
     p.sources = p.sources || {}; p.mla = p.mla || {}; p.worksCited = p.worksCited || ""; p.pt = p.pt || "pt-PT"; p.version = 2;
-    p.checks = p.checks || {}; p.sugg = p.sugg || {};
+    p.checks = p.checks || {}; p.sugg = p.sugg || {}; p.materials = p.materials || [];
+    p.materials.forEach(function (m) { if (m.state === "working") m.state = "new"; });
     // articles from before chapters: each heading starts a chapter; without headings, it is one chapter
     if (!p.blocks.some(function (b) { return b.chap; })) {
       p.blocks.forEach(function (b) { if (!isRef(b) && (b.head || isHead(b.text))) { b.chap = true; b.head = true; b.text = chapTitle(b) ? "## " + chapTitle(b) : ""; } });
@@ -118,6 +119,7 @@
       if (cands[0] && cands[0] !== r[1]) save();   // the newest copy was on this device: send it up
       else setStatus(W.cloudErr ? "Saved on this device" : "✓ Saved");
       render();
+      setTimeout(matQueue, 800);
     });
   }
   function setStatus(t) {
@@ -242,9 +244,12 @@
   }
   // Gemini's label when there is a key (kept until the chapter changes), otherwise the words' label
   function autoLabels() {
-    var p = W.paper, cs = chapters(), loc = localLabels(cs.map(chapText)), out = {};
+    var p = W.paper, cs = chapters(), key = cs.map(function (c) { return c.id + ":" + c.head.text + ":" + chapText(c).length; }).join("|") + JSON.stringify(p.labels || {}).length;
+    if (W._labKey === key && W._labP === p) return W._labVal;
+    var loc = localLabels(cs.map(chapText)), out = {};
     p.labels = p.labels || {};
     cs.forEach(function (c, i) { var g = p.labels[c.id]; out[c.id] = g && g.h === hashText(chapText(c)) ? g.t : loc[i]; });
+    W._labKey = key; W._labP = p; W._labVal = out;
     return out;
   }
   function chapName(c, labels) { return chapTitle(c.head) || (labels || autoLabels())[c.id] || "Untitled"; }
@@ -594,6 +599,7 @@
       '<div class="wr-tools">' +
         '<button type="button" class="pill solid" data-c="new">+ New chapter</button>' +
         (cs.length ? '<button type="button" class="pill" data-c="copyall" title="All chapters as one text: no numbers, titles or dates">Copy all chapters</button>' : "") +
+        (cs.length ? '<button type="button" class="pill" data-c="mats" title="Findings, details and quotations to add — each written for its place">Materials' + (function () { var n = mats().filter(function (m) { return m.state !== "used" && m.state !== "aside"; }).length; return n ? " (" + n + ")" : ""; })() + "</button>" : "") +
         '<label class="pill wr-file">Add a file as a chapter<input type="file" accept="' + FILES + '" multiple hidden data-c="file"></label>' +
         '<span class="wr-key">' + cs.length + (cs.length === 1 ? " chapter" : " chapters") + " · Translate, Sources and Format put them together as one article</span></div>" +
       (cs.length > 1 ? '<nav class="wc-toc" aria-label="Chapters">' + cs.map(function (c, i) {
@@ -605,6 +611,7 @@
           '<header class="wc-head"><span class="wc-no">No. ' + (i + 1) + "</span>" +
             (t ? '<h2 class="wc-title">' + esc(t) + "</h2>" : labels[c.id] ? '<span class="wc-auto" title="What this chapter is about (give it a title to change this)">' + esc(labels[c.id]) + "</span>" : "") +
             '<span class="wc-meta">' + esc(fmtDate(c.head.date)) + " · " + fmtN(chapCount(c)) + " 字" +
+              (matsFor(c.id).length ? ' · <button type="button" class="wc-mchip" data-c="openmats" data-id="' + esc(c.id) + '">✦ ' + matsFor(c.id).length + (matsFor(c.id).length === 1 ? " material" : " materials") + "</button>" : "") +
               "</span>" +
             '<span class="wc-btns">' +
               (auto && c.blocks.length ? '<button type="button" class="mini-btn" data-c="rewrite" data-id="' + esc(c.id) + '"' + (W.job ? " disabled" : "") + ' title="Gemini writes this section as finished prose">Rewrite</button>' : "") +
@@ -632,6 +639,8 @@
       if (k !== "ungone" && k !== "del") W.gone = null;
       if (b.tagName === "TEXTAREA" || k === "autoon") return;
       if (k === "copyall") { copyAll(); return; }
+      if (k === "mats") { matSheet(); return; }
+      if (k === "openmats") { W.openMats = true; writeChapter(id); return; }
       if (k === "autoadd") { var tb = $(".wa-paste", body); if (tb && tb.value.trim()) addAuto(tb.value); return; }
       if (k === "arrange") { arrangeAll(); return; }
       if (k === "rewriteall") { rewriteAll(); return; }
@@ -719,6 +728,7 @@
         '<button type="button" class="mini-btn" data-x="prev"' + (idx ? "" : " disabled") + ">← Previous</button>" +
         '<button type="button" class="mini-btn" data-x="next"' + (idx < cs.length - 1 ? "" : " disabled") + ">Next →</button>" +
         '<span class="ew-status" aria-live="polite">' + esc(W.status) + "</span>" +
+        '<button type="button" class="pill" data-x="mats" title="Your materials: findings and details to add, written for their place">Materials</button>' +
         '<button type="button" class="pill" data-x="gemini" title="Copies this chapter with the request to write it again with what you pasted in worked in, and opens Gemini">Copy for Gemini</button>' +
         '<button type="button" class="pill danger" data-x="del">Delete</button></header>' +
       '<div class="ew-tools" role="toolbar">' +
@@ -730,7 +740,7 @@
         '<div class="ew-meta"><input class="ew-date" type="datetime-local" value="' + esc(c.head.date || "") + '"></div>' +
         '<input class="ew-title" placeholder="Chapter title 章节名 (optional)" value="' + esc(chapTitle(c.head)) + '">' +
         '<div class="ew-body" contenteditable="true" spellcheck="true" data-placeholder="开始写… Start writing, or paste."></div></div>' +
-        "</div>";
+        '<aside class="wc-side" hidden></aside></div>';
     document.body.appendChild(w);
     document.documentElement.classList.add("lb-open");
     W.writer = w;
@@ -779,7 +789,12 @@
       var k = b.getAttribute("data-x");
       if (k === "close") closeWriter();
       if (k === "prev" || k === "next") { readChapter(w); var cs2 = chapters(), i2 = cs2.findIndex(function (x) { return x.id === w._ch; }) + (k === "prev" ? -1 : 1); if (cs2[i2]) writeChapter(cs2[i2].id); }
-      if (k === "gemini") { readChapter(w); var cg = chapterById(w._ch); if (cg) copyPrompt(writePrompt(cg, "", true), "Copied. Paste it into Gemini; bring back what you want to keep."); }
+      if (k === "gemini") {
+        readChapter(w); var cg = chapterById(w._ch); if (!cg) return;
+        var mm = matsFor(w._ch);
+        copyPrompt(writePrompt(cg, "", true) + (mm.length ? "\n\nMaterial she wants worked into this chapter (keep every fact):\n\n" + mm.map(function (m, i) { return "(" + (i + 1) + ") " + m.text; }).join("\n\n") : ""), "Copied. Paste it into Gemini; bring back what you want to keep.");
+      }
+      if (k === "mats") { readChapter(w); var sd = $(".wc-side", w); if (sd.hidden) matPanel(w); else { sd.hidden = true; w.classList.remove("with-side"); } }
       if (k === "del") { readChapter(w); deleteChapter(w._ch); closeWriter(); }
     });
     w.addEventListener("keydown", function (k) {
@@ -788,6 +803,8 @@
     });
     (chapTitle(c.head) || c.blocks.length ? body : $(".ew-title", w)).focus({ preventScroll: true });
     if (c.blocks.length) placeCaret(w, spot);
+    if (window.innerWidth >= 900 || W.openMats) matPanel(w); else updateMatBtn(w);
+    W.openMats = false;
   }
   // where the cursor is in its paragraph: "start", "middle", "end" or "" (outside / empty paragraph)
   function caretPlace(body) {
@@ -927,6 +944,199 @@
       "\nCURRENT — No. " + no + (chapTitle(c.head) ? " 《" + chapTitle(c.head) + "》" : "") + ":\n" +
       c.blocks.map(function (b, i) { return "[" + (i + 1) + "]" + (b.added ? " [NEW]" : "") + " " + b.text; }).join("\n\n");
   }
+  /* ================= materials: what you want to keep but haven't written in yet =================
+     Paste findings, details, quotations, background into the materials drawer — never into the text.
+     Each piece is kept for good. It is placed at once (by its words) next to the chapter it belongs with;
+     then Gemini reads the whole article, picks the chapter and the exact paragraph it continues from, and
+     writes it as finished prose for that place. You see it beside the chapter and decide: put it in, or not. */
+  var MAT_RULES =
+    "She keeps a drawer of MATERIAL for this article: new findings, details, quotations and background she wants to use but has not written into the text yet. Below are the whole article (chapters numbered, paragraphs numbered inside each chapter) and one piece of material.\n" +
+    "1. Decide where it belongs in the WHOLE article: the chapter, and the paragraph after which it fits best (0 = at the start of the chapter). Choose by meaning, not by shared words.\n" +
+    "2. Write it as finished prose for exactly that place: it continues from the paragraph before it and leads into the one after it; the same voice, images and facts as the text around it, consistent with the rest of the article (names, dates, how people and places were described). Vivid and concrete, dense, no padding, no stock phrases.\n" +
+    "3. Keep every fact, name, date and quotation of the material (quotations in their original language, with their line breaks). Explain briefly what a reader needs to understand it. Never invent anything; speculation stays marked as speculation.\n" +
+    "4. kind: \"add\" = a new paragraph after that one; \"weave\" = the detail belongs inside that paragraph — then write that whole paragraph again with the detail woven in (keep all of its own content); \"repeat\" = the article already says this (say where in why); \"note\" = an instruction or note to herself, not article text.\n" +
+    "5. why: one short sentence in Chinese saying where it goes and what it adds.\n" +
+    "Same language as the article (Chinese). Literary analysis, not history.\n" +
+    'Answer JSON only: {"chapter": n, "after": n, "kind": "add|weave|repeat|note", "draft": "…", "why": "…"}';
+  function mats(p) { p = p || W.paper; return (p.materials = p.materials || []); }
+  function matsFor(id) { return mats().filter(function (m) { return m.ch === id && m.state !== "used" && m.state !== "aside"; }); }
+  // where the words alone say it belongs: the chapter, and the paragraph most like it
+  function placeByWords(text) {
+    var cs = chapters(); if (!cs.length) return { ch: null, after: null };
+    var docs = cs.map(chapText).concat([text]), vs = A().weigh(docs.map(function (t) { return A().terms(t); })), mv = vs.pop(), best = 0, bs = -1;
+    vs.forEach(function (v, i) { var s = A().cosine(mv, v); if (s > bs) { bs = s; best = i; } });
+    var c = cs[best], after = null, ps = -1;
+    c.blocks.forEach(function (b) { var s = A().cosine(A().terms(b.text), A().terms(text)); if (s > ps) { ps = s; after = b.id; } });
+    return { ch: c.id, after: after };
+  }
+  function addMats(text, hint) {
+    var t = String(text || "").replace(/\r\n?/g, "\n").trim(); if (!t) return 0;
+    // a long paste is kept as several pieces of about 2,500 characters, at paragraph breaks
+    var pieces = [], cur = "";
+    splitMarkdown(t).forEach(function (para) { if (cur && cur.length + para.length > 2500) { pieces.push(cur); cur = ""; } cur += (cur ? "\n\n" : "") + para; });
+    if (cur) pieces.push(cur);
+    pieces.forEach(function (x) {
+      var pl = placeByWords(x);
+      mats().push({ id: "m" + uid().slice(1), text: x, at: Date.now(), state: aiKey() ? "new" : "local", ch: pl.ch, after: pl.after, hint: hint || null });
+    });
+    save(); matQueue();
+    return pieces.length;
+  }
+  // the article as Gemini reads it: in full while it is not too long, otherwise by the opening of each paragraph
+  function articleFor(maxChars) {
+    var cs = chapters(), full = cs.reduce(function (s, c) { return s + chapText(c).length; }, 0) <= maxChars;
+    return cs.map(function (c, i) {
+      return "No. " + (i + 1) + (chapTitle(c.head) ? " 《" + chapTitle(c.head) + "》" : "") + "\n" +
+        c.blocks.map(function (b, k) { return "[" + (k + 1) + "] " + (full ? b.text : cut1(b.text, 140)); }).join("\n");
+    }).join("\n\n");
+  }
+  // one piece at a time, in the background; what is waiting survives a refresh and goes on when the article opens again
+  function matQueue() {
+    var p = W.paper; if (!p || W.matBusy || !aiKey()) return;
+    // pieces kept before there was a key are written too, once there is one
+    var m = mats(p).filter(function (x) { return x.state === "new" || x.state === "working" || x.state === "local"; })[0]; if (!m) return;
+    W.matBusy = true; m.state = "working"; matRefresh();
+    var cs = chapters(), hintNo = m.hint ? cs.findIndex(function (c) { return c.id === m.hint; }) + 1 : 0;
+    var prompt = context() + "\n" + MAT_RULES + "\n\nThe article:\n\n" + articleFor(90000) +
+      "\n\nThe material" + (hintNo ? " (she added it while working on No. " + hintNo + " — a hint, not a rule)" : "") + ":\n" + m.text;
+    gemini(prompt, { json: true, temp: 0.4, max: 8192 }).then(function (r) {
+      var j = parseJSON(r.text) || {}, cs2 = chapters(), c = cs2[+j.chapter - 1];
+      if (!c) throw new Error("no place came back");
+      var after = +j.after > 0 && c.blocks[+j.after - 1] ? c.blocks[+j.after - 1].id : null;
+      var kind = /^(add|weave|repeat|note)$/.test(j.kind) ? j.kind : "add";
+      Object.assign(m, { ch: c.id, after: after, kind: kind, draft: String(j.draft || "").trim(), why: String(j.why || "").trim(), state: "ready", model: r.model, done: Date.now() });
+      if (kind === "weave" && !after) m.kind = "add";
+    }).catch(function (e) { m.state = "new"; m.err = e.message; W.matErr = e.message; }).then(function () {
+      W.matBusy = false; save(); matRefresh();
+      if (W.paper === p && !W.matErr) matQueue();
+      else if (W.matErr) { W.matErr = null; setTimeout(matQueue, 30000); }   // Gemini busy or down: try again in a while
+    });
+  }
+  // what's on screen follows: the drawer beside the chapter, or the chapter list
+  function matRefresh() {
+    if (W.writer) { if (!$(".wc-side", W.writer).hidden) matPanel(W.writer); updateMatBtn(W.writer); return; }
+    if ($(".wr-sheet .wm-sheet")) matSheetFill($(".wr-sheet .wm-sheet"));
+    else if (W.paper && W.step === 1) { var y = window.scrollY; render(); window.scrollTo(0, y); }
+  }
+  function updateMatBtn(w) { var b = $("[data-x=mats]", w); if (b) { var n = matsFor(w._ch).length; b.textContent = "Materials" + (n ? " (" + n + ")" : ""); } }
+  function matCard(m, here) {
+    var c = chapterById(m.ch), cs = chapters(), no = c ? cs.findIndex(function (x) { return x.id === m.ch; }) + 1 : 0;
+    var ab = c && m.after ? c.blocks.filter(function (b) { return b.id === m.after; })[0] : null, pi = ab ? c.blocks.indexOf(ab) + 1 : 0;
+    var where = !c ? "Not placed yet" : (here ? "" : "No. " + no + " · ") + (m.kind === "weave" && ab ? "inside ¶" + pi : ab ? "after ¶" + pi + " 「" + cut1(ab.text, 14) + "」" : m.after ? "at the end" : "at the start");
+    var ready = m.state === "ready" && m.draft;
+    var opts = cs.map(function (x, i) { return '<option value="' + esc(x.id) + '"' + (x.id === m.ch ? " selected" : "") + ">No. " + (i + 1) + " " + esc(cut1(chapName(x), 14)) + "</option>"; }).join("");
+    return '<div class="wm-card' + (m.state === "working" ? " busy" : "") + (m.kind === "repeat" || m.kind === "note" ? " quiet" : "") + '" data-m="' + esc(m.id) + '">' +
+      '<p class="wm-top"><span class="wc-type">' + esc(m.kind === "weave" ? "Weave in" : m.kind === "repeat" ? "Already in the text" : m.kind === "note" ? "Your note" : ready ? "Written for this place" : m.state === "working" ? "Gemini is writing…" : m.state === "new" ? "Waiting for Gemini" : "Your material") + "</span> " + esc(where) + "</p>" +
+      (m.why ? '<p class="wm-why">' + esc(m.why) + "</p>" : "") +
+      (ready && m.kind !== "repeat" && m.kind !== "note" ? '<div class="wm-draft">' + splitMarkdown(m.draft).map(function (t) { return "<p>" + richHTML(t) + "</p>"; }).join("") + "</div>" +
+        '<details class="wm-orig"><summary>Your material</summary>' + splitMarkdown(m.text).map(function (t) { return "<p>" + richHTML(t) + "</p>"; }).join("") + "</details>"
+        : '<div class="wm-draft orig">' + splitMarkdown(m.text).map(function (t) { return "<p>" + richHTML(t) + "</p>"; }).join("") + "</div>") +
+      '<p class="wm-btns">' +
+        (c && m.kind !== "note" ? '<button type="button" class="pill solid" data-y="use">' + (ready && m.kind === "weave" ? "Use — replaces ¶" + pi : ready && m.kind !== "repeat" ? "Put it in" : "Put it in as it is") + "</button>" : "") +
+        (ready && m.kind !== "repeat" && m.kind !== "note" && c ? '<button type="button" class="mini-btn" data-y="useorig">Put in my words instead</button>' : "") +
+        (m.kind === "note" ? '<button type="button" class="mini-btn" data-y="tobrief">Move to About this article</button>' : "") +
+        (ready ? '<button type="button" class="mini-btn" data-y="copy">Copy</button>' : "") +
+        (aiKey() && m.state !== "working" ? '<button type="button" class="mini-btn" data-y="again">' + (ready ? "Write again" : "Write it") + "</button>" : "") +
+        (!here && c ? '<button type="button" class="mini-btn" data-y="open">Open No. ' + no + "</button>" : "") +
+        '<select class="wm-move" data-y="move" title="Belongs to another chapter">' + opts + "</select>" +
+        '<button type="button" class="mini-btn" data-y="aside">Set aside</button></p></div>';
+  }
+  // put a piece into the text where Gemini placed it (her choice, one click); the writing page shows it at once
+  function useMat(m, original) {
+    var c = chapterById(m.ch); if (!c) return;
+    if (W.writer && W.writer._ch === m.ch) readChapter(W.writer);
+    c = chapterById(m.ch);
+    remember();
+    var text = original || !m.draft || m.kind === "repeat" ? m.text : m.draft;
+    var blocks = c.blocks.slice(), first = null;
+    var ai = m.after ? blocks.findIndex(function (b) { return b.id === m.after; }) : -1;
+    if (!original && m.kind === "weave" && ai > -1) {
+      var tb = blocks[ai]; W.paper.aside.push({ text: tb.text, at: Date.now(), why: "version", of: "before a detail was woven in" });
+      tb.text = text; tb.by = "ai"; first = tb;
+    } else {
+      var at = ai > -1 ? ai + 1 : m.after ? blocks.length : 0;
+      var nb = splitMarkdown(text).map(function (t) { return { id: uid(), text: t, by: original ? "paste" : "ai", src: [] }; });
+      blocks.splice.apply(blocks, [at, 0].concat(nb)); first = nb[0];
+    }
+    putChapter(m.ch, blocks);
+    m.state = "used"; m.usedAt = Date.now();
+    save(); W.needRender = true;
+    if (W.writer && W.writer._ch === m.ch) { var w = W.writer; w._flush = null; w._dead = true; writeChapter(m.ch, { b: first.id, off: 0, y: 160 }); var el = W.writer && $('.ew-body [data-id="' + first.id + '"]', W.writer); if (el) { el.classList.add("flash"); setTimeout(function () { el.classList.remove("flash"); }, 3000); } }
+    else matRefresh();
+    toast("Put in No. " + (chapters().findIndex(function (x) { return x.id === m.ch; }) + 1) + ".");
+  }
+  function matAction(k, m, el) {
+    if (k === "use") useMat(m, false);
+    if (k === "useorig") useMat(m, true);
+    if (k === "copy") navigator.clipboard.writeText(m.draft || m.text).then(function () { toast("Copied."); });
+    if (k === "again") { m.state = "new"; m.draft = ""; m.why = ""; save(); matQueue(); matRefresh(); }
+    if (k === "aside") { m.state = "aside"; save(); matRefresh(); }
+    if (k === "back") { m.state = m.draft ? "ready" : aiKey() ? "new" : "local"; save(); matQueue(); matRefresh(); }
+    if (k === "tobrief") { W.paper.brief = (W.paper.brief ? W.paper.brief + "\n\n" : "") + m.text; m.state = "used"; save(); toast("Added to Thesis & style → About this article."); matRefresh(); }
+    if (k === "open") { closeSheet(); if (W.writer) { readChapter(W.writer); } writeChapter(m.ch); }
+    if (k === "move") { m.ch = el.value; m.after = placeByWords(m.text).ch === m.ch ? placeByWords(m.text).after : null; m.draft = ""; m.why = ""; m.state = aiKey() ? "new" : "local"; save(); matQueue(); matRefresh(); }
+  }
+  // the drawer beside the chapter you are writing
+  function matPanel(w) {
+    var side = $(".wc-side", w), id = w._ch; if (!side) return;
+    var old = $(".wm-paste", side), keepText = old ? old.value : "", hadFocus = old && document.activeElement === old, st = side.scrollTop;
+    var here = matsFor(id), elsewhere = mats().filter(function (m) { return m.ch !== id && m.state !== "used" && m.state !== "aside"; }).length;
+    var waiting = aiKey() ? mats().filter(function (m) { return m.state === "new" || m.state === "working" || m.state === "local"; }).length : 0;
+    side.hidden = false; w.classList.add("with-side");
+    side.innerHTML = '<div class="wc-side-head"><b>Materials</b><button type="button" class="ed-x" data-y="hide" aria-label="Close">×</button></div>' +
+      '<textarea class="ed-input wm-paste" rows="3" placeholder="Paste new material here — 新发现、细节、引文。It is kept here, not in the text."></textarea>' +
+      '<p class="wm-btns"><button type="button" class="pill" data-y="add">Add</button>' + (waiting ? '<span class="j-hint">' + (W.matBusy ? '<span class="wr-spin"></span> ' : "") + "Gemini is placing and writing " + waiting + (waiting === 1 ? " piece" : " pieces") + "…</span>" : "") + "</p>" +
+      (aiKey() ? "" : '<p class="j-hint">Without a Gemini key, material is placed by its words and kept as you wrote it. With a key (Thesis & style), Gemini picks the place in the whole article and writes it for that place.</p>') +
+      (here.length ? '<h4 class="wr-sub">For this chapter (' + here.length + ")</h4>" + here.map(function (m) { return matCard(m, true); }).join("") : '<p class="empty">No material for this chapter yet.</p>') +
+      (elsewhere ? '<p><button type="button" class="mini-btn" data-y="all">' + elsewhere + " more for other chapters →</button></p>" : "");
+    var box = $(".wm-paste", side);
+    box.value = keepText; side.scrollTop = st; if (hadFocus) box.focus();
+    box.addEventListener("paste", function (e) { var t = e.clipboardData && e.clipboardData.getData("text/plain"); if (!t) return; e.preventDefault(); var n = addMats(t, id); toast(n === 1 ? "Kept in Materials." : n + " pieces kept in Materials."); matPanel(w); });
+    side.onclick = function (e) {
+      var b = e.target.closest("[data-y]"); if (!b || b.tagName === "SELECT") return;
+      var k = b.getAttribute("data-y");
+      if (k === "hide") { side.hidden = true; w.classList.remove("with-side"); return; }
+      if (k === "add") { if (box.value.trim()) { addMats(box.value, id); box.value = ""; matPanel(w); } return; }
+      if (k === "all") { matSheet(); return; }
+      var card = b.closest("[data-m]"), m = card && mats().filter(function (x) { return x.id === card.getAttribute("data-m"); })[0];
+      if (m) matAction(k, m, b);
+    };
+    side.onchange = function (e) { if (e.target.getAttribute("data-y") === "move") { var card = e.target.closest("[data-m]"), m = mats().filter(function (x) { return x.id === card.getAttribute("data-m"); })[0]; if (m) matAction("move", m, e.target); } };
+    side.onmouseover = function (e) {
+      var card = e.target.closest("[data-m]"); $$(".ew-body .hl", w).forEach(function (x) { x.classList.remove("hl"); }); if (!card) return;
+      var m = mats().filter(function (x) { return x.id === card.getAttribute("data-m"); })[0], el = m && m.after && $('.ew-body [data-id="' + m.after + '"]', w);
+      if (el) el.classList.add("hl");
+    };
+    updateMatBtn(w);
+  }
+  // every piece of material, chapter by chapter
+  function matSheet() {
+    var w = sheet("Materials", '<div class="wm-sheet"></div>');
+    $(".ed-panel", w).classList.add("wide");
+    matSheetFill($(".wm-sheet", w));
+  }
+  function matSheetFill(box) {
+    var cs = chapters(), all = mats(), open = all.filter(function (m) { return m.state !== "used" && m.state !== "aside"; });
+    var groups = cs.map(function (c, i) { var ms = open.filter(function (m) { return m.ch === c.id; }); return ms.length ? '<h4 class="wr-sub">No. ' + (i + 1) + " " + esc(chapName(c)) + " (" + ms.length + ")</h4>" + ms.map(function (m) { return matCard(m, false); }).join("") : ""; }).join("");
+    var loose = open.filter(function (m) { return !chapterById(m.ch); });
+    var aside = all.filter(function (m) { return m.state === "aside"; }), used = all.filter(function (m) { return m.state === "used"; }).length;
+    var old = $(".wm-paste", box), keepText = old ? old.value : "", hadFocus = old && document.activeElement === old;
+    box.innerHTML = '<textarea class="ed-input wm-paste" rows="3" placeholder="Paste new material here — 新发现、细节、引文"></textarea><p class="wm-btns"><button type="button" class="pill" data-y="add">Add</button><span class="j-hint">' + open.length + " waiting to be used · " + used + " already in the text</span></p>" +
+      (groups || loose.length ? groups + (loose.length ? '<h4 class="wr-sub">Not placed yet</h4>' + loose.map(function (m) { return matCard(m, false); }).join("") : "") : '<p class="empty">No material yet. Paste findings, details and quotations here; each is placed beside the chapter it belongs with.</p>') +
+      (aside.length ? '<details class="wm-aside"><summary>Set aside (' + aside.length + ")</summary>" + aside.map(function (m) { return '<div class="wm-card quiet" data-m="' + esc(m.id) + '"><div class="wm-draft orig"><p>' + richHTML(cut1(m.text, 300)) + '</p></div><p class="wm-btns"><button type="button" class="mini-btn" data-y="back">Bring back</button></p></div>'; }).join("") + "</details>" : "");
+    var ta = $(".wm-paste", box);
+    ta.value = keepText; if (hadFocus) ta.focus();
+    ta.addEventListener("paste", function (e) { var t = e.clipboardData && e.clipboardData.getData("text/plain"); if (!t) return; e.preventDefault(); addMats(t, null); matSheetFill(box); });
+    box.onclick = function (e) {
+      var b = e.target.closest("[data-y]"); if (!b || b.tagName === "SELECT") return;
+      var k = b.getAttribute("data-y");
+      if (k === "add") { if (ta.value.trim()) { addMats(ta.value, null); matSheetFill(box); } return; }
+      var card = b.closest("[data-m]"), m = card && mats().filter(function (x) { return x.id === card.getAttribute("data-m"); })[0];
+      if (m) { matAction(k, m, b); if (k !== "open" && $(".wr-sheet .wm-sheet")) matSheetFill(box); }
+    };
+    box.onchange = function (e) { if (e.target.getAttribute("data-y") === "move") { var card = e.target.closest("[data-m]"), m = mats().filter(function (x) { return x.id === card.getAttribute("data-m"); })[0]; if (m) { matAction("move", m, e.target); matSheetFill(box); } } };
+  }
+
   /* ================= experiment: an article that arranges itself =================
      Paste anything, anywhere, any amount. At once: exact repeats are set aside (the fuller wording stays).
      Then Gemini reads the whole article in one go and arranges it — one subject in one place, in an order
