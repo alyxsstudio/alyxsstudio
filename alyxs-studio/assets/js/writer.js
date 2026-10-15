@@ -440,7 +440,7 @@
       (W.failed ? '<p class="j-hint">Private storage couldn\'t open. Open /admin once in this browser to sign in, then reload.</p>' : "") +
       (W.movedNote ? '<p class="wr-moved">' + esc(W.movedNote) + "</p>" : "") +
       missingMoved().map(function (m) { return '<p class="wr-moved">“' + esc(m.title) + '” from Novel isn\'t here yet' + (W.moveErr ? " (" + esc(W.moveErr) + ")" : "") + '. <button type="button" class="pill solid" data-l="move">Bring “' + esc(m.title) + '” here</button></p>'; }).join("") +
-      '<p class="owner-tools"><button type="button" class="pill solid" data-l="new">+ New article</button></p>' +
+      '<p class="owner-tools"><button type="button" class="pill solid" data-l="new">+ New article</button> <button type="button" class="pill" data-l="newauto" title="Paste anything; it is arranged into one article by itself">+ New experiment: auto-arrange 自动整理</button></p>' +
       (list.length ? '<ul class="wr-list">' + list.map(function (x) {
         return '<li><a href="#p=' + esc(x.id) + '"><span class="wr-l-title">' + esc(x.title || "Untitled") + '</span><span class="wr-l-meta">' + (x.chapters ? x.chapters + (x.chapters === 1 ? " chapter · " : " chapters · ") : "") + fmtN(x.words || 0) + " 字 / words · " +
           (x.updated ? new Date(x.updated).toLocaleDateString() : "") + '</span></a><button type="button" class="mini-btn" data-l="del" data-id="' + esc(x.id) + '">Remove</button></li>';
@@ -448,6 +448,15 @@
     el.onclick = function (e) {
       var b = e.target.closest("[data-l]"); if (!b) return;
       if (b.getAttribute("data-l") === "move") { b.disabled = true; b.textContent = "Bringing it…"; moveFromNovel(true).then(function () { renderList(el); }); return; }
+      if (b.getAttribute("data-l") === "newauto") {
+        var aid = (W.list || []).some(function (x) { return x.id === AUTO_ID; }) ? "auto-" + stamp() : AUTO_ID;
+        W.removed = (W.removed || []).filter(function (x) { return x !== aid; });
+        W.paper = upgrade({ id: aid, title: "实验 · 自动整理", auto: true, blocks: [], created: Date.now() });
+        (W.list = W.list || []).unshift({ id: aid, title: W.paper.title, words: 0, updated: Date.now() });
+        saveList(); save(); W.step = 1;
+        W.ctx.setHash("p=" + aid);
+        return;
+      }
       if (b.getAttribute("data-l") === "new") {
         var id = "paper-" + stamp();
         W.paper = upgrade({ id: id, title: "Untitled", blocks: [], created: Date.now() });
@@ -956,7 +965,7 @@
   function setAside(b, why, of) { W.paper.aside.push({ text: b.text, at: Date.now(), why: why, of: of || "" }); }
   // the experiment's article: made once, never touching the others
   function ensureExperiment() {
-    if (W.failed || (W.list || []).some(function (x) { return x.id === AUTO_ID; }) || (W.removed || []).indexOf(AUTO_ID) > -1) return Promise.resolve();
+    if ((W.list || []).some(function (x) { return x.id === AUTO_ID; }) || (W.removed || []).indexOf(AUTO_ID) > -1) return Promise.resolve();
     return lget("paper:" + AUTO_ID).then(function (have) {
       var p = have && have.blocks ? have : upgrade({ id: AUTO_ID, title: "实验 · 自动整理", auto: true, blocks: [], created: Date.now() });
       p.auto = true; p.updated = p.updated || 1;
