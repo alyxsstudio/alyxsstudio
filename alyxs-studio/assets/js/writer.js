@@ -800,7 +800,7 @@
       var sl = window.getSelection(), inBody = sl.rangeCount && body.contains(sl.anchorNode);
       if (!inBody) return;
       w._sel = sl.isCollapsed ? "" : String(sl);
-      var gb = $("[data-x=gemini]", w); if (gb) gb.textContent = w._sel.trim() ? "Send selection to Gemini" : "Send to Gemini";
+      var gb = $("[data-x=gemini]", w); if (gb) { var on = !!w._sel.trim(); gb.classList.toggle("solid", on); gb.title = on ? "Sends the selected passage, with its context" : "Sends this chapter's materials (or the chapter)"; }
     };
     document.addEventListener("selectionchange", onSel);
     w.addEventListener("keydown", function (k) {
@@ -916,9 +916,9 @@
     if (chapTitle(c.head) !== tv.trim()) { setTitle(c.head, tv); changed = true; }
     if ((c.head.date || "") !== dv && dv) { c.head.date = dv; changed = true; }
     if (changed) {
-      trackDeleted(w, out);
+      var moved = trackDeleted(w, out);
       putChapter(id, out); save();
-      var sd = $(".wc-side", w); if (sd && !sd.hidden && w._del) matPanel(w); else updateMatBtn(w);
+      if (moved) { var sd = $(".wc-side", w); if (sd && !sd.hidden) matPanel(w); else updateMatBtn(w); }
     } else setStatus(W.status === "Typing…" ? "✓ Saved" : W.status);
     var st = $(".ew-status", w); if (st) st.textContent = W.status;
   }
@@ -1013,7 +1013,7 @@
   function bigrams(t) { t = normT(t); var o = {}; for (var i = 0; i < t.length - 1; i++) o[t.substr(i, 2)] = 1; return o; }
   function overlap(a, b) { var n = 0, m = 0; for (var k in a) { m++; if (b[k]) n++; } return m ? n / m : 0; }
   function trackDeleted(w, cur) {
-    var base = w._base; if (!base) return;
+    var base = w._base; if (!base) return false;
     var p = W.paper, all = normT(cur.map(function (b) { return b.text; }).join("")), nowSet = {}, baseSet = {};
     cur.forEach(function (b) { nowSet[normT(b.text)] = 1; });
     w._order.forEach(function (id) { if (base[id]) baseSet[normT(base[id])] = 1; });
@@ -1029,9 +1029,12 @@
     // not a single character; and not text you only moved elsewhere in the chapter
     pieces = pieces.filter(function (x) { return A().count(x.text).total >= 2 && all.indexOf(normT(x.text)) < 0; });
     var item = w._del && mats().filter(function (m) { return m.id === w._del; })[0];
-    if (!pieces.length) { if (item) { p.materials = mats().filter(function (m) { return m !== item; }); w._del = null; } return; }
+    if (!pieces.length) { if (item) { p.materials = mats().filter(function (m) { return m !== item; }); w._del = null; return true; } return false; }
     if (!item) { item = { id: "m" + uid().slice(1), kind: "deleted", at: Date.now(), state: "open", ch: w._ch, pick: true }; mats().push(item); w._del = item.id; }
-    item.pieces = pieces; item.text = pieces.map(function (x) { return x.text; }).join("\n\n"); item.at = Date.now();
+    var nt = pieces.map(function (x) { return x.text; }).join("\n\n");
+    if (item.text === nt) return false;
+    item.pieces = pieces; item.text = nt; item.at = Date.now();
+    return true;
   }
   /* ---------- to Gemini, in one click ---------- */
   function prevChapterEnd(c) {

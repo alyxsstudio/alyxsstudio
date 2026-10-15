@@ -1280,3 +1280,12 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
 .wm-card .wm-top { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .wm-send { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 0 2px; margin: 4px 0 14px; }
 .wm-req { min-height: 48px; font-size: calc(var(--u) * 13); }
+/* the writing page's bar never changes height while you work (it used to wrap and push the text) */
+.wc-write .ew-bar { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.wc-write .ew-bar::-webkit-scrollbar { display: none; }
+.wc-write .ew-bar > * { flex: none; }
+.wc-write .ew-status { flex: 0 1 9.5em; min-width: 0; width: 9.5em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.wc-write [data-x=mats] { min-width: 8.6em; }
+.wc-write .ew-tools { flex-wrap: nowrap; }
+.wc-write .ew-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
+@media (max-width: 900px) { .wc-side { flex: 0 0 40vh; height: 40vh; max-height: none; } }
