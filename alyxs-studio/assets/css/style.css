@@ -1257,14 +1257,6 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
 .wc-toc a { max-width: 17em; }
 .mini-btn.danger { color: #b3261e; }
 .wc-gone { margin: 6px 0; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 10px; font-size: calc(var(--u) * 13); color: var(--mute); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-/* Thesis · the experiment that arranges itself */
-.wa-box { margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 10px; }
-.wa-what { margin: 0; font-size: calc(var(--u) * 13); color: var(--mute); }
-.wa-what b { color: var(--ink); font-weight: 500; }
-.wa-paste { min-height: 70px; }
-.wa-btns { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.wa-on { font-size: calc(var(--u) * 12); color: var(--mute); display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
-.wa-note { margin: 0; padding: 8px 12px; background: var(--tile); border-radius: 10px; font-size: calc(var(--u) * 13); }
 .wc-aside { border-top: 1px solid var(--line); padding: 10px 0; font-size: calc(var(--u) * 14); }
 .wc-aside p { margin: 0 0 6px; }
 /* Thesis · materials drawer */
@@ -1284,3 +1276,7 @@ mark.ck:hover { background: color-mix(in srgb, var(--sun) 40%, transparent); }
 .wm-sheet .wr-sub { margin-top: 18px; }
 .wm-aside summary { cursor: pointer; color: var(--mute); margin: 14px 0 8px; }
 .ew-body .flash { background: color-mix(in srgb, var(--sun) 55%, transparent); border-radius: 4px; transition: background 1s; }
+.wm-card.del { border-style: dashed; }
+.wm-card .wm-top { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.wm-send { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 0 2px; margin: 4px 0 14px; }
+.wm-req { min-height: 48px; font-size: calc(var(--u) * 13); }
