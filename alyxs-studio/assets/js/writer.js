@@ -380,10 +380,30 @@
   }
   function note(m) { if (/pro/.test(m) && !W.notedPro) { W.notedPro = true; toast("Gemini Pro isn't open to your key's free plan, so Flash is writing instead."); } }
   function parseJSON(t) { try { return JSON.parse(t); } catch (e) {} try { return JSON.parse((String(t).match(/[\[{][\s\S]*[\]}]/) || [t])[0]); } catch (e) { return null; } }
+  // copy at once, inside the click (the way every browser allows), with the clipboard API as a second try
+  function copyNow(text) {
+    var ok = false, active = document.activeElement;
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;";
+      document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand("copy"); ta.remove();
+    } catch (e) { ok = false; }
+    if (!ok && navigator.clipboard && navigator.clipboard.writeText) { try { navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; } }
+    try { if (active && active.focus) active.focus({ preventScroll: true }); } catch (e) {}
+    return ok;
+  }
+  // copies the request and opens Gemini in a new tab, both straight from your click; if the browser stops either,
+  // the text is shown ready to copy, with a link that opens Gemini
   function copyPrompt(prompt, after) {
-    var go = function () { window.open("https://gemini.google.com/app", "_blank", "noopener"); toast(after || "Prompt copied. Paste it into Gemini, then paste the answer back here."); };
-    var manual = function () { window.prompt("Copy this prompt, then paste it into Gemini", prompt); window.open("https://gemini.google.com/app", "_blank", "noopener"); };
-    if (navigator.clipboard) navigator.clipboard.writeText(prompt).then(go, manual); else manual();
+    var ok = copyNow(prompt), win = null;
+    try { win = window.open("https://gemini.google.com/app", "_blank"); if (win) win.opener = null; } catch (e) { win = null; }
+    if (ok && win) { toast(after || "Copied. Paste it into Gemini."); return; }
+    var w = sheet("Send to Gemini", '<p class="j-hint">' + (ok ? "Copied. " : "Your browser didn't let the page copy: the text below is selected — press ⌘C (Ctrl+C). ") + "Then open Gemini and paste it (⌘V / Ctrl+V).</p>" +
+      '<textarea class="ed-input" rows="12" readonly data-pt>' + esc(prompt) + "</textarea>" +
+      '<p class="wm-btns"><a class="pill solid" href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini ↗</a><button type="button" class="mini-btn" data-cp>Copy again</button></p>');
+    var ta = $("[data-pt]", w); ta.focus(); ta.select();
+    $("[data-cp]", w).addEventListener("click", function () { ta.focus(); ta.select(); toast(copyNow(prompt) ? "Copied." : "Press ⌘C (Ctrl+C) to copy."); });
   }
 
 
@@ -767,7 +787,7 @@
       if (k === "prev" || k === "next") { readChapter(w); var cs2 = chapters(), i2 = cs2.findIndex(function (x) { return x.id === w._ch; }) + (k === "prev" ? -1 : 1); if (cs2[i2]) writeChapter(cs2[i2].id); }
       if (k === "gemini") {
         readChapter(w); var cg = chapterById(w._ch); if (!cg) return;
-        var sel = (w._sel || "").trim(), picked = matsFor(w._ch).filter(function (m) { return m.pick !== false; });
+        var sel = (w._sel || "").trim(), allM = matsFor(w._ch), tk = allM.filter(function (m) { return m.pick !== false; }), picked = tk.length ? tk : allM;
         if (sel) copyPrompt(selPrompt(cg, sel, W.paper.gemReq), "The marked passage is copied with its context. Paste it into Gemini, then paste its text in place of the passage.");
         else if (picked.length) copyPrompt(sendPrompt(cg, picked, W.paper.gemReq), "Copied with your requirement. Paste it into Gemini, then paste its text into the chapter.");
         else copyPrompt(writePrompt(cg, W.paper.gemReq, true), "The chapter is copied. Paste it into Gemini; bring back what you want to keep.");
@@ -1062,10 +1082,10 @@
       '<p class="wm-btns"><button type="button" class="pill" data-y="add">Add</button><span class="j-hint">What you delete from the chapter (a word or more) comes here by itself.</span></p>' +
       '<div class="wm-send">' +
         '<textarea class="ed-input wm-req" rows="2" placeholder="Your requirement for Gemini (optional) — 例如：衔接上一章的结尾；开头用画面">' + esc(W.paper.gemReq || "") + "</textarea>" +
-        '<p class="wm-btns"><button type="button" class="pill solid" data-y="send"' + (picked.length ? "" : " disabled") + ">Send " + (picked.length ? picked.length + " ticked " : "") + "to Gemini</button>" +
-        '<button type="button" class="mini-btn" data-y="copyall"' + (picked.length ? "" : " disabled") + ">Copy ticked</button>" +
-        '<button type="button" class="mini-btn" data-y="donepicked"' + (picked.length ? "" : " disabled") + ">✓ Ticked are done</button></p>" +
-        '<p class="j-hint">Copies the chapter, the end of the chapter before it, the ticked material (deleted pieces with where they were) and the request to write it in so it connects — then opens Gemini. Paste its text back into the chapter.</p></div>' +
+        '<p class="wm-btns"><button type="button" class="pill solid" data-y="send">Send to Gemini' + (here.length ? " (" + (picked.length || here.length) + ")" : "") + "</button>" +
+        (here.length ? '<button type="button" class="mini-btn" data-y="copyall">Copy ' + (picked.length && picked.length < here.length ? "ticked" : "all") + "</button>" +
+          '<button type="button" class="mini-btn" data-y="donepicked">✓ ' + (picked.length && picked.length < here.length ? "Ticked" : "All") + " done</button>" : "") + "</p>" +
+        '<p class="j-hint">' + (here.length ? "Copies everything here (or only what is ticked) — what you deleted, with where it was, and what you added — with the chapter, the end of the chapter before and your requirement, and opens Gemini." : "Nothing here yet, so it sends the whole chapter.") + " Paste Gemini's text back into the chapter.</p></div>" +
       (here.length ? here.map(function (m) { return matItemHTML(m, c); }).join("") : '<p class="empty">Nothing here yet.</p>') +
       (done.length ? '<details class="wm-aside"><summary>Done (' + done.length + ")</summary>" + done.map(function (m) { return '<div class="wm-card quiet" data-m="' + esc(m.id) + '"><div class="wm-draft orig"><p>' + richHTML(cut1(m.text, 240)) + '</p></div><p class="wm-btns"><button type="button" class="mini-btn" data-y="back">Bring back</button></p></div>'; }).join("") + "</details>" : "") +
       (others ? '<p><button type="button" class="mini-btn" data-y="all">' + others + " more beside other chapters →</button></p>" : "");
@@ -1081,9 +1101,10 @@
       if (k === "all") { matSheet(); return; }
       if (k === "send" || k === "copyall" || k === "donepicked") {
         readChapter(w);
-        var cc = chapterById(id), items = matsFor(id).filter(function (m) { return m.pick !== false; }); if (!items.length) return;
-        if (k === "send") copyPrompt(sendPrompt(cc, items, W.paper.gemReq), "Copied with your requirement. Paste it into Gemini, then paste its text into the chapter.");
-        if (k === "copyall") navigator.clipboard.writeText(items.map(function (m) { return m.text; }).join("\n\n")).then(function () { toast("Copied."); });
+        var cc = chapterById(id), all = matsFor(id), ticked = all.filter(function (m) { return m.pick !== false; }), items = ticked.length ? ticked : all;
+        if (k === "send") { if (items.length) copyPrompt(sendPrompt(cc, items, W.paper.gemReq), "Copied, and Gemini is opening: paste it there (⌘V / Ctrl+V), then paste its text into the chapter."); else copyPrompt(writePrompt(cc, W.paper.gemReq, true), "The chapter is copied, and Gemini is opening: paste it there."); return; }
+        if (!items.length) return;
+        if (k === "copyall") { var tx = items.map(function (m) { return m.text; }).join("\n\n"); if (copyNow(tx)) toast("Copied."); else copyPrompt(tx); }
         if (k === "donepicked") { items.forEach(function (m) { m.state = "done"; if (m.id === w._del) { w._del = null; rebase(w); } }); save(); matPanel(w); }
         return;
       }
